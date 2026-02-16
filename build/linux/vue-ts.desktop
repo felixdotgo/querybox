@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=vue-ts
+Exec=vue-ts
+Icon=vue-ts
+Categories=Development;
+Terminal=false
+Keywords=wails
+Version=1.0
+StartupNotify=false
