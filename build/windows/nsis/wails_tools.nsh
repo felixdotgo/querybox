@@ -5,7 +5,7 @@
 !include "FileFunc.nsh"
 
 !ifndef INFO_PROJECTNAME
-    !define INFO_PROJECTNAME "vue-ts"
+    !define INFO_PROJECTNAME "querybox"
 !endif
 !ifndef INFO_COMPANYNAME
     !define INFO_COMPANYNAME "My Company"

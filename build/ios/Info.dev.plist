@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key>
-    <string>vue-ts</string>
+    <string>querybox</string>
     <key>CFBundleIdentifier</key>
-    <string>com.example.vuets.dev</string>
+    <string>com.example.querybox.dev</string>
     <key>CFBundleName</key>
     <string>My Product (Dev)</string>
     <key>CFBundleDisplayName</key>

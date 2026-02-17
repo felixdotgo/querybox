@@ -3,26 +3,26 @@
 #
 # The lines below are called `modelines`. See `:help modeline`
 
-name: "vue-ts"
+name: "querybox"
 arch: ${GOARCH}
 platform: "linux"
 version: "0.1.0"
 section: "default"
 priority: "extra"
 maintainer: ${GIT_COMMITTER_NAME} <${GIT_COMMITTER_EMAIL}>
-description: "A vue-ts application"
+description: "A querybox application"
 vendor: "My Company"
 homepage: "https://wails.io"
 license: "MIT"
 release: "1"
 
 contents:
-  - src: "./bin/vue-ts"
-    dst: "/usr/local/bin/vue-ts"
+  - src: "./bin/querybox"
+    dst: "/usr/local/bin/querybox"
   - src: "./build/appicon.png"
-    dst: "/usr/share/icons/hicolor/128x128/apps/vue-ts.png"
-  - src: "./build/linux/vue-ts.desktop"
-    dst: "/usr/share/applications/vue-ts.desktop"
+    dst: "/usr/share/icons/hicolor/128x128/apps/querybox.png"
+  - src: "./build/linux/querybox.desktop"
+    dst: "/usr/share/applications/querybox.desktop"
 
 # Default dependencies for Debian 12/Ubuntu 22.04+ with WebKit 4.1
 depends:

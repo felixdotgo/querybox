@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=vue-ts
-Exec=vue-ts
-Icon=vue-ts
+Name=querybox
+Exec=querybox
+Icon=querybox
 Categories=Development;
 Terminal=false
 Keywords=wails

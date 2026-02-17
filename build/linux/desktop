@@ -1,13 +1,13 @@
 [Desktop Entry]
 Version=1.0
 Name=My Product
-Comment=A vue-ts application
+Comment=A querybox application
 # The Exec line includes %u to pass the URL to the application
-Exec=/usr/local/bin/vue-ts %u
+Exec=/usr/local/bin/querybox %u
 Terminal=false
 Type=Application
-Icon=vue-ts
+Icon=querybox
 Categories=Utility;
-StartupWMClass=vue-ts
+StartupWMClass=querybox
 
  

@@ -2,8 +2,8 @@
 set -e
 
 # Build configuration
-APP_NAME="vue-ts"
-BUNDLE_ID="com.example.vuets"
+APP_NAME="querybox"
+BUNDLE_ID="com.example.querybox"
 VERSION="0.1.0"
 BUILD_NUMBER="0.1.0"
 BUILD_DIR="build/ios"

@@ -6,9 +6,9 @@
         <key>CFBundleName</key>
             <string>My Product</string>
         <key>CFBundleExecutable</key>
-            <string>vue-ts</string>
+            <string>querybox</string>
         <key>CFBundleIdentifier</key>
-            <string>com.example.vuets</string>
+            <string>com.example.querybox</string>
         <key>CFBundleVersion</key>
             <string>0.1.0</string>
         <key>CFBundleGetInfoString</key>
