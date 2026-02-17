@@ -64,3 +64,11 @@ tasks:
     cmds:
       - mkdir -p {{.BIN_DIR}}/plugins
       - bash ./scripts/build-plugins.sh
+
+  proto:generate:
+    summary: Generate Go code from proto files (requires protoc + plugins)
+    cmds:
+      - mkdir -p rpc
+      - protoc --go_out=rpc --go_opt=paths=source_relative contracts/plugin/v1/plugin.proto || true
+      - protoc --go-grpc_out=rpc --go-grpc_opt=paths=source_relative contracts/plugin/v1/plugin.proto || true
+      - echo "(If you need exact generated files, install protoc + protoc-gen-go + protoc-gen-go-grpc)"

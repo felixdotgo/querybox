@@ -1,7 +1,7 @@
 # QueryBox Basic Design
 
 **Version**: 0.0.1 (Draft)
-**Updated**: February 8, 2026
+**Updated**: February 17, 2026
 
 ## 1. Architecture
 
@@ -9,6 +9,7 @@
 - QueryBox Core orchestrates query execution and credential management.
 - Driver processes implement database-specific behavior and run out of process.
 - Frontend initiates operations through the Wails bridge to Core and streams results supplied by Core.
+- Plugins: on‑demand executables discovered under `bin/plugins`; the host exposes `ListPlugins`, `Rescan`, and `ExecPlugin` via the plugin manager. `pkg/plugin` provides a CLI shim and the canonical proto is at `contracts/plugin/v1` (generated package `pluginpb`).
 
 ### 1.2 Core Concepts
 - Orchestrator Core: stores connection metadata, encrypts credentials, and routes queries to the right driver.

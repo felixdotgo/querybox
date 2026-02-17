@@ -8,6 +8,7 @@
 ## Public interfaces
 - gRPC: `Execute`, `GetSchema`, `ListConnections`, `ManageConnection`
 - Frontend bridge: Wails bridge (UI ↔ Core)
+- Plugin manager (exposed via Wails): `ListPlugins`, `Rescan`, `ExecPlugin`
 
 ## State & storage
 - Backing store for `connections`, `audit_logs`, schema versions.

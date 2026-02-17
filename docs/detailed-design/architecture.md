@@ -64,6 +64,7 @@ graph LR
 - Core continues to persist only AES-256-GCM-encrypted credential blobs and never stores plaintext secrets on disk.
 - Headless/server installs MUST use environment/secret-manager provisioning for Core master keys — document explicit admin opt-in for any disk-backed fallback.
 - Drivers are stateless and never persist plaintext credentials; runtime protections (timeout, memory caps, non-root) apply to launched driver processes.
+- Plugin manager: the host discovers on‑demand plugin executables under `./bin/plugins`, probes `plugin info` for metadata, and exposes `ListPlugins`, `Rescan`, and `ExecPlugin` via the Wails bridge. The canonical proto is `contracts/plugin/v1/plugin.proto` (generated `pluginpb`) and `pkg/plugin` provides `ServeCLI` helpers.
 - Tests to add: keyring availability and permission-denied behavior (desktop), Core fallback when keyring unavailable (server/headless), and credential-migration flows into the OS keyring via Core (Wails bridge).
 - Audit logs retain session ids only. Continue to require secure master-key provisioning and rotation for Core.
 

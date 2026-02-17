@@ -7,6 +7,9 @@ import (
 	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+
+	"github.com/felixdotgo/querybox/services"
+	"github.com/felixdotgo/querybox/services/pluginmgr"
 )
 
 // Wails uses Go's `embed` package to embed the frontend files into the binary.
@@ -38,7 +41,8 @@ func main() {
 		Name:        "querybox",
 		Description: "A lightweight database management tool for executing and managing queries.",
 		Services: []application.Service{
-			application.NewService(&GreetService{}),
+			application.NewService(&services.GreetService{}),
+			application.NewService(pluginmgr.New()),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -54,7 +58,7 @@ func main() {
 	// 'BackgroundColour' is the background colour of the window.
 	// 'URL' is the URL that will be loaded into the webview.
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title: "Window 1",
+		Title: "QueryBox",
 		Mac: application.MacWindow{
 			InvisibleTitleBarHeight: 50,
 			Backdrop:                application.MacBackdropTranslucent,

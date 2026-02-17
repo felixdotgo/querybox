@@ -1,0 +1,31 @@
+syntax = "proto3";
+package plugin.v1;
+
+option go_package = "plugin/v1;pluginpb";
+
+// Contract for on-demand plugins (CLI-invoked). Plugins SHOULD implement
+// `Info` (static metadata) and `Exec` (execute SQL against a connection).
+service PluginService {
+  rpc Info(InfoRequest) returns (InfoResponse);
+  rpc Exec(ExecRequest) returns (ExecResponse);
+}
+
+message InfoRequest {}
+
+message InfoResponse {
+  string name = 1;
+  string version = 2;
+  string description = 3;
+}
+
+message ExecRequest {
+  // connection is plugin-defined key/value (host, user, password, ...)
+  map<string, string> connection = 1;
+  string sql = 2; // SQL or plugin-specific payload
+}
+
+message ExecResponse {
+  string result = 1; // plugin-serialized result (string/json)
+  string error = 2;  // optional error message
+}
+
