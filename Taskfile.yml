@@ -58,3 +58,9 @@ tasks:
     summary: Builds and runs the Docker image
     cmds:
       - task: common:run:docker
+
+  build:plugins:
+    summary: Builds all executables in `plugins/` and places them in `bin/plugins`
+    cmds:
+      - mkdir -p {{.BIN_DIR}}/plugins
+      - bash ./scripts/build-plugins.sh
