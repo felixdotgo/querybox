@@ -6,26 +6,33 @@ option go_package = "plugin/v1;pluginpb";
 // Contract for on-demand plugins (CLI-invoked). Plugins SHOULD implement
 // `Info` (static metadata) and `Exec` (execute SQL against a connection).
 service PluginService {
-  rpc Info(InfoRequest) returns (InfoResponse);
-  rpc Exec(ExecRequest) returns (ExecResponse);
+  rpc Info(PluginV1.InfoRequest) returns (PluginV1.InfoResponse);
+  rpc Exec(PluginV1.ExecRequest) returns (PluginV1.ExecResponse);
 }
 
-message InfoRequest {}
+message PluginV1 {
+  enum Type {
+    UNKNOWN = 0;
+    DRIVER = 1; // SQL plugin (e.g. MySQL, Postgres, etc.)
+  }
 
-message InfoResponse {
-  string name = 1;
-  string version = 2;
-  string description = 3;
+  message InfoRequest {}
+
+  message InfoResponse {
+    Type type = 1;
+    string name = 2;
+    string version = 3;
+    string description = 4;
+  }
+
+  message ExecRequest {
+    // connection is plugin-defined key/value (host, user, password, ...)
+    map<string, string> connection = 1;
+    string sql = 2; // SQL or plugin-specific payload
+  }
+
+  message ExecResponse {
+    string result = 1; // plugin-serialized result (string/json)
+    string error = 2;  // optional error message
+  }
 }
-
-message ExecRequest {
-  // connection is plugin-defined key/value (host, user, password, ...)
-  map<string, string> connection = 1;
-  string sql = 2; // SQL or plugin-specific payload
-}
-
-message ExecResponse {
-  string result = 1; // plugin-serialized result (string/json)
-  string error = 2;  // optional error message
-}
-

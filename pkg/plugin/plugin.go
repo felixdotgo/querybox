@@ -12,9 +12,14 @@ import (
 // Reuse proto-derived types (aliases) so plugin authors import a single
 // stable package (`github.com/felixdotgo/querybox/rpc/contracts/plugin/v1`) if they prefer. These aliases keep
 // the existing `pkg/plugin` API stable while aligning it with the .proto.
-type InfoResponse = pluginpb.InfoResponse
-type ExecRequest = pluginpb.ExecRequest
-type ExecResponse = pluginpb.ExecResponse
+type InfoResponse = pluginpb.PluginV1_InfoResponse
+type ExecRequest = pluginpb.PluginV1_ExecRequest
+type ExecResponse = pluginpb.PluginV1_ExecResponse
+type DriverType = pluginpb.PluginV1_Type
+
+const (
+	TypeDriver DriverType = pluginpb.PluginV1_DRIVER
+)
 
 // Plugin describes the minimal contract a plugin should implement. Keeping
 // this small and explicit makes it easy to implement either an in-process

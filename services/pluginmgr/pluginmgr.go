@@ -18,6 +18,7 @@ type PluginInfo struct {
 	Name        string `json:"name"`
 	Path        string `json:"path"`
 	Running     bool   `json:"running"` // always false in on-demand model
+	Type        int    `json:"type,omitempty"` // follows PluginV1.Type enum (DRIVER = 1)
 	Version     string `json:"version,omitempty"`
 	Description string `json:"description,omitempty"`
 	LastError   string `json:"lastError,omitempty"`
@@ -55,6 +56,8 @@ func New() *Manager {
 		stopCh:       make(chan struct{}),
 	}
 	_ = os.MkdirAll(m.Dir, 0o755)
+	// Perform an initial synchronous scan so callers (UI) get immediate results on first ListPlugins()
+	m.scanOnce()
 	go m.run()
 	return m
 }
@@ -100,8 +103,12 @@ func (m *Manager) scanOnce() {
 			if err != nil {
 				info.LastError = err.Error()
 			} else {
+				// Preserve filename as the displayed name/key but copy important
+				// metadata (type/version/description) returned by the plugin.
+				info.Type = meta.Type
 				info.Version = meta.Version
 				info.Description = meta.Description
+				info.LastError = ""
 			}
 			m.plugins[name] = info
 		}
@@ -146,6 +153,7 @@ func probeInfo(fullpath string) (PluginInfo, error) {
 		return PluginInfo{}, fmt.Errorf("probe info failed: %w", err)
 	}
 	var resp struct {
+		Type        int    `json:"type,omitempty"`
 		Name        string `json:"name"`
 		Version     string `json:"version"`
 		Description string `json:"description"`
@@ -153,7 +161,7 @@ func probeInfo(fullpath string) (PluginInfo, error) {
 	if err := json.Unmarshal(out, &resp); err != nil {
 		return PluginInfo{}, fmt.Errorf("invalid info json: %w", err)
 	}
-	return PluginInfo{Name: resp.Name, Version: resp.Version, Description: resp.Description}, nil
+	return PluginInfo{Name: resp.Name, Type: resp.Type, Version: resp.Version, Description: resp.Description}, nil
 }
 
 // ListPlugins returns the discovered plugins (does not start them).

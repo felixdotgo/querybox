@@ -1,21 +1,32 @@
-import {Events} from "@wailsio/runtime";
-import {GreetService} from "../bindings/changeme";
+import './styles/tailwind.css';
+import { createApp } from 'vue';
+import { createRouter, createWebHistory } from 'vue-router';
+import App from './App.vue';
+import Home from './views/Home.vue';
+import Connections from './views/Connections.vue';
+import { ShowConnections } from "@/bindings/github.com/felixdotgo/querybox/services/app";
+import naive from 'naive-ui';
 
-const resultElement = document.getElementById('result');
-const timeElement = document.getElementById('time');
+// Expose an imperative opener for legacy onclicks / global usage
+window.openConnectionsWindow = async function openConnectionsWindow() {
+  try {
+    await ShowConnections();
+    return;
+  } catch (err) {
+    // binding not available — fall back to route change
+    window.location.href = '/connections';
+  }
+};
 
-window.doGreet = async () => {
-    let name = document.getElementById('name').value;
-    if (!name) {
-        name = 'anonymous';
-    }
-    try {
-        resultElement.innerText = await GreetService.Greet(name);
-    } catch (err) {
-        console.error(err);
-    }
-}
+const routes = [
+  { path: '/', component: Home },
+  { path: '/connections', component: Connections },
+];
 
-Events.On('time', (time) => {
-    timeElement.innerText = time.data;
+const router = createRouter({
+  history: createWebHistory(import.meta.env.BASE_URL),
+  routes,
 });
+
+createApp(App).use(router).use(naive).mount('#app');
+

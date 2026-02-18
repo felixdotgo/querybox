@@ -55,6 +55,12 @@ Your goal is robust, scalable, testable and maintainable software.
 - No fluff phrases: "I hope this helps", "Let me know if...", "Feel free to...".
 - Action over words.
 
+### Frontend UI Guidelines
+- Use Tailwind's default *light* theme for frontend UI; avoid global hard-coded background or form colors in `public/style.css`.
+- Do not use inline `style="..."` attributes in components; always use Tailwind utility classes for layout and styling.
+- Prefer Tailwind utility classes and component CSS (`btn-tw`, `input-tw`) when styling; do not override base colors site-wide.
+- Record UI/theme decisions in `docs/basic-design/overview.md` and reference them in PR descriptions.
+
 ## 🧠 The "Deep Reasoning" Protocol (Mandatory)
 *Since `thinkingTool` is active, you must structure your internal thought process before generating any response.*
 

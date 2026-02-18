@@ -65,4 +65,12 @@
 - Basic telemetry (success/failure counters, duration histogram) exposed via Prometheus endpoint.
 - Documentation for driver trust assumptions, installation flow, and credential handling practices.
 
+### 3.4 Frontend UI / Theme
+- Use Tailwind's default *light* theme for the entire UI — do not hardcode a global dark background or form colors in `public/style.css`.
+- Do not use inline `style="..."` attributes in components; prefer Tailwind utility classes for layout and visual styling.
+- Component system: `Naive UI` (Vue 3, themeable). Use Naive UI for form controls and interactive components; pair with Tailwind for layout and utility styling.
+- Prefer Tailwind utility classes and component-level classes (e.g. `btn-tw`, `input-tw`) for styling; avoid global color overrides that conflict with Tailwind.
+- Inputs and forms should rely on `input-tw` (light background / dark text) and primary actions may use `btn-tw`.
+- Document any deliberate deviations from the default Tailwind palette in design docs and PR descriptions.
+
 ---

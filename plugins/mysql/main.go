@@ -17,7 +17,12 @@ import (
 type mysqlPlugin struct{}
 
 func (m *mysqlPlugin) Info() (plugin.InfoResponse, error) {
-	return plugin.InfoResponse{Name: "mysql", Version: "0.1.0", Description: "MySQL plugin (exec only)"}, nil
+	return plugin.InfoResponse{
+		Type:        plugin.TypeDriver,
+		Name:        "mysql",
+		Version:     "0.1.0",
+		Description: "MySQL plugin (exec only)",
+	}, nil
 }
 
 func (m *mysqlPlugin) Exec(req plugin.ExecRequest) (plugin.ExecResponse, error) {
