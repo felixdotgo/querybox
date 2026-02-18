@@ -7,6 +7,7 @@
 import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Create } from "@wailsio/runtime";
 
 /**
+ * CloseConnectionsWindow hides the connections window and sends it to the back.
  * @returns {$CancellablePromise<void>}
  */
 export function CloseConnectionsWindow() {
@@ -14,8 +15,41 @@ export function CloseConnectionsWindow() {
 }
 
 /**
+ * CloseMainWindow closes the main application window.
+ * @returns {$CancellablePromise<void>}
+ */
+export function CloseMainWindow() {
+    return $Call.ByID(4246455082);
+}
+
+/**
+ * MaximiseMainWindow maximises the main application window to use the full screen size.
+ * @returns {$CancellablePromise<void>}
+ */
+export function MaximiseMainWindow() {
+    return $Call.ByID(1508820399);
+}
+
+/**
+ * MinimiseMainWindow minimises the main application window.
+ * @returns {$CancellablePromise<void>}
+ */
+export function MinimiseMainWindow() {
+    return $Call.ByID(400698897);
+}
+
+/**
+ * ShowConnectionsWindow shows the connections window and brings it to the front.
  * @returns {$CancellablePromise<void>}
  */
 export function ShowConnectionsWindow() {
     return $Call.ByID(2544478289);
+}
+
+/**
+ * ToggleFullScreenMainWindow toggles the main application window between fullscreen and windowed mode.
+ * @returns {$CancellablePromise<void>}
+ */
+export function ToggleFullScreenMainWindow() {
+    return $Call.ByID(3718089985);
 }

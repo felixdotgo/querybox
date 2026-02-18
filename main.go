@@ -65,6 +65,9 @@ func main() {
 		Title: "QueryBox",
 		URL:   "/",
 		DisableResize: false,
+		MinWidth: 1280,
+		MinHeight: 720,
+		// Frameless: true,
 		Mac: application.MacWindow{
 			InvisibleTitleBarHeight: 50,
 			Backdrop:                application.MacBackdropTranslucent,

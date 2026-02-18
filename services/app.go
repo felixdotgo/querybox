@@ -8,6 +8,35 @@ type App struct {
 	ConnectionsWindow *application.WebviewWindow
 }
 
+// MaximiseMainWindow maximises the main application window to use the full screen size.
+func (a *App) MaximiseMainWindow() {
+	if a.MainWindow != nil {
+		a.MainWindow.Maximise()
+	}
+}
+
+// MinimiseMainWindow minimises the main application window.
+func (a *App) MinimiseMainWindow() {
+	if a.MainWindow != nil {
+		a.MainWindow.Minimise()
+	}
+}
+
+// CloseMainWindow closes the main application window.
+func (a *App) CloseMainWindow() {
+	if a.MainWindow != nil {
+		a.MainWindow.Close()
+	}
+}
+
+// ToggleFullScreenMainWindow toggles the main application window between fullscreen and windowed mode.
+func (a *App) ToggleFullScreenMainWindow() {
+	if a.MainWindow != nil {
+		a.MainWindow.ToggleFullscreen()
+	}
+}
+
+// ShowConnectionsWindow shows the connections window and brings it to the front.
 func (a *App) ShowConnectionsWindow() {
 	if a.ConnectionsWindow != nil {
 		a.ConnectionsWindow.Show()
@@ -16,6 +45,7 @@ func (a *App) ShowConnectionsWindow() {
 	}
 }
 
+// CloseConnectionsWindow hides the connections window and sends it to the back.
 func (a *App) CloseConnectionsWindow() {
 	if a.ConnectionsWindow != nil {
 		a.ConnectionsWindow.SetAlwaysOnTop(false)
