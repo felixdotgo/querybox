@@ -9,13 +9,13 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 /**
  * @returns {$CancellablePromise<void>}
  */
-export function CloseConnections() {
-    return $Call.ByID(2421872468);
+export function CloseConnectionsWindow() {
+    return $Call.ByID(1394660968);
 }
 
 /**
  * @returns {$CancellablePromise<void>}
  */
-export function ShowConnections() {
-    return $Call.ByID(1778628337);
+export function ShowConnectionsWindow() {
+    return $Call.ByID(2544478289);
 }

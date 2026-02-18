@@ -3,7 +3,7 @@
     <n-layout has-sider>
       <n-layout-sider class="border-r border-gray-200">
         <div class="p-4">
-          <h3 class="mb-2">Drivers</h3>
+          <h3 class="mb-2 font-bold">Drivers</h3>
           <ul class="list-none p-0 m-0 flex flex-col gap-1.5">
             <li v-if="drivers.length === 0" class="opacity-70">
               No driver plugins found
@@ -12,7 +12,7 @@
               <n-button
                 block
                 :type="
-                  selectedPlugin && selectedPlugin.name === p.name
+                  selectedDriver && selectedDriver.name === p.name
                     ? 'primary'
                     : 'default'
                 "
@@ -20,12 +20,8 @@
                 class="flex justify-between items-center text-left p-2"
               >
                 <div>
-                  <div class="font-semibold">
-                    {{ p.name }}
-                    <small class="opacity-70 ml-1.5">{{
-                      p.version || ""
-                    }}</small>
-                  </div>
+                  {{ p.name }}
+                  <small class="opacity-70 ml-1.5">{{ p.version || "" }}</small>
                 </div>
               </n-button>
             </li>
@@ -35,13 +31,9 @@
 
       <n-layout-content>
         <div class="p-4">
-          <div class="flex flex-col gap-2 max-w-3xl">
-            <div>
-              <n-input v-model:value="form.driver" readonly hidden />
-            </div>
-
-            <div>
-              <label class="block mb-1.5 text-gray-700">Name</label>
+          <div class="max-w-3xl">
+            <div class="mb-4">
+              <label class="block mb-1.5 text-gray-700 font-bold">Name</label>
               <n-input
                 v-model:value="form.name"
                 placeholder="e.g. local-mysql"
@@ -61,15 +53,29 @@
                 </n-tab-pane>
               </n-tabs>
             </div>
+
+            <div>
+              <n-input v-model:value="form.driver" readonly hidden />
+            </div>
           </div>
         </div>
       </n-layout-content>
     </n-layout>
 
-    <div class="fixed bottom-0 left-0 right-0 border-t p-4 border-gray-200 bg-white flex shadow-lg">
-      <n-button class="w-32 ml-auto" quaternary @click="closeWindow">Cancel</n-button>
+    <div
+      class="fixed bottom-0 left-0 right-0 border-t p-4 border-gray-200 bg-white flex shadow-lg"
+    >
+      <n-button class="w-32 ml-auto" quaternary @click="CloseConnectionsWindow"
+        >Cancel</n-button
+      >
       <n-button class="w-32 ml-2" quaternary @click="clearForm">Clear</n-button>
-      <n-button class="w-32 ml-2" type="primary" @click="connect" :disabled="!canConnect">OK</n-button>
+      <n-button
+        class="w-32 ml-2"
+        type="primary"
+        @click="saveConnection"
+        :disabled="!canConnect"
+        >OK</n-button
+      >
     </div>
   </div>
 </template>
@@ -77,21 +83,15 @@
 <script setup>
 import { ref, computed, onMounted, watch } from "vue"
 import {
-  ListConnections,
-  CreateConnection,
-  DeleteConnection,
-} from "@/bindings/github.com/felixdotgo/querybox/services/connectionservice"
-import {
   ListPlugins,
   GetPluginAuthForms,
 } from "@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager"
-import { CloseConnections } from "@/bindings/github.com/felixdotgo/querybox/services/app"
+import { CloseConnectionsWindow } from "@/bindings/github.com/felixdotgo/querybox/services/app"
 import AuthFormRenderer from "@/components/AuthFormRenderer.vue"
 
-const connections = ref([])
 const plugins = ref([])
 const pluginFilter = ref("")
-const selectedPlugin = ref(null)
+const selectedDriver = ref(null)
 const statusText = ref("")
 
 // AuthForms state
@@ -101,13 +101,6 @@ const authValues = ref({})
 
 const form = ref({ name: "", driver: "", cred: "" })
 const filterText = ref("")
-
-const filtered = computed(() => {
-  const f = (filterText.value || "").toLowerCase()
-  return (connections.value || []).filter((c) =>
-    c.name.toLowerCase().includes(f),
-  )
-})
 
 function resetAuthState() {
   authForms.value = {}
@@ -156,13 +149,12 @@ const canConnect = computed(() => {
 
 async function load() {
   try {
-    const [plist, clist] = await Promise.all([ListPlugins(), ListConnections()])
+    const [plist] = await Promise.all([ListPlugins()])
     plugins.value = plist || []
-    connections.value = clist || []
 
     // Auto-select the first available driver by default when opening the
     // Connections view and nothing is currently selected.
-    if (!selectedPlugin.value) {
+    if (!selectedDriver.value) {
       const firstDriver = (plugins.value || []).find((p) => p && p.type === 1)
       if (firstDriver) {
         // use selectPlugin to initialize auth forms and defaults
@@ -172,12 +164,11 @@ async function load() {
   } catch (err) {
     console.error("load:", err)
     plugins.value = plugins.value || []
-    connections.value = connections.value || []
   }
 }
 
 async function selectPlugin(p) {
-  selectedPlugin.value = p
+  selectedDriver.value = p
   form.value.driver = p.name || ""
 
   // probe plugin for auth forms (graceful fallback to DSN input)
@@ -215,11 +206,11 @@ watch(selectedAuthForm, (newKey) => {
 
 function clearForm() {
   form.value = { name: "", driver: "", cred: "" }
-  selectedPlugin.value = null
+  selectedDriver.value = null
   statusText.value = ""
 }
 
-async function connect() {
+async function saveConnection() {
   if (!canConnect.value) {
     alert("Please select a driver, provide a connection name and DSN")
     return
@@ -250,30 +241,6 @@ async function connect() {
     console.error("connect:", err)
     statusText.value = "Failed to save"
     alert("Failed to create connection")
-  }
-}
-
-async function remove(id) {
-  if (!confirm("Delete this connection?")) return
-  try {
-    await DeleteConnection(id)
-    await load()
-  } catch (err) {
-    console.error("delete:", err)
-    alert("Failed to delete connection")
-  }
-}
-
-function refresh() {
-  load()
-}
-
-function closeWindow() {
-  // Best-effort: close the app window (works in Wails / browser fallback)
-  try {
-    CloseConnections()
-  } catch (e) {
-    /* ignore */
   }
 }
 

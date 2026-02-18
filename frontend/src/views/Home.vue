@@ -9,13 +9,13 @@
 </template>
 
 <script setup>
-import { ShowConnections } from "@/bindings/github.com/felixdotgo/querybox/services/app";
+import { ShowConnectionsWindow } from "@/bindings/github.com/felixdotgo/querybox/services/app";
 import { useRouter } from "vue-router";
 
 const router = useRouter();
 async function openConnections() {
   try {
-    await ShowConnections();
+    await ShowConnectionsWindow();
     return;
   } catch (err) {
     // binding not available (web) — navigate

@@ -8,7 +8,7 @@ type App struct {
 	ConnectionsWindow *application.WebviewWindow
 }
 
-func (a *App) ShowConnections() {
+func (a *App) ShowConnectionsWindow() {
 	if a.ConnectionsWindow != nil {
 		a.ConnectionsWindow.Show()
 		a.ConnectionsWindow.Focus()
@@ -16,7 +16,7 @@ func (a *App) ShowConnections() {
 	}
 }
 
-func (a *App) CloseConnections() {
+func (a *App) CloseConnectionsWindow() {
 	if a.ConnectionsWindow != nil {
 		a.ConnectionsWindow.SetAlwaysOnTop(false)
 		// Hide the window instead of closing it. Closing destroys the underlying webview

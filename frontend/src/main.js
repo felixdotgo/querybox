@@ -4,13 +4,13 @@ import { createRouter, createWebHistory } from 'vue-router';
 import App from './App.vue';
 import Home from './views/Home.vue';
 import Connections from './views/Connections.vue';
-import { ShowConnections } from "@/bindings/github.com/felixdotgo/querybox/services/app";
+import { ShowConnectionsWindow } from "@/bindings/github.com/felixdotgo/querybox/services/app";
 import naive from 'naive-ui';
 
 // Expose an imperative opener for legacy onclicks / global usage
 window.openConnectionsWindow = async function openConnectionsWindow() {
   try {
-    await ShowConnections();
+    await ShowConnectionsWindow();
     return;
   } catch (err) {
     // binding not available — fall back to route change

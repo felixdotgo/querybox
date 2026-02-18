@@ -71,10 +71,13 @@ func main() {
 			TitleBar:                application.MacTitleBarHiddenInset,
 		},
 	})
+	// Maximise the main window to use the full screen size by default when the application starts.
 	app.MainWindow.Maximise()
 
-	// Create a connections window that is hidden by default. This window will be shown when the user clicks the "Connections" button in the UI.
+	// Create a connections window that is hidden by default.
+	// This window will be shown when the user clicks the "Connections" button in the UI.
 	// or when there is no configured connection and the app needs to prompt the user to create one.
+	// See `services/app.go` for the `ShowConnectionsWindow` method that shows this window.
 	app.ConnectionsWindow = app.App.Window.NewWithOptions(application.WebviewWindowOptions{
 		Name:   "connections",
 		Title:  "Connections",
