@@ -21,6 +21,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// Type defines the category of the plugin, which can be used by the core to determine how to handle it (e.g. render SQL editor for DRIVER plugins).
 type PluginV1_Type int32
 
 const (
@@ -67,6 +68,66 @@ func (PluginV1_Type) EnumDescriptor() ([]byte, []int) {
 	return file_contracts_plugin_v1_plugin_proto_rawDescGZIP(), []int{0, 0}
 }
 
+// FieldType defines the type of input field to render for authentication details.
+type PluginV1_AuthField_FieldType int32
+
+const (
+	PluginV1_AuthField_FIELD_UNKNOWN PluginV1_AuthField_FieldType = 0
+	PluginV1_AuthField_TEXT          PluginV1_AuthField_FieldType = 1
+	PluginV1_AuthField_NUMBER        PluginV1_AuthField_FieldType = 2
+	PluginV1_AuthField_PASSWORD      PluginV1_AuthField_FieldType = 3
+	PluginV1_AuthField_CHECKBOX      PluginV1_AuthField_FieldType = 4
+	PluginV1_AuthField_SELECT        PluginV1_AuthField_FieldType = 5
+)
+
+// Enum value maps for PluginV1_AuthField_FieldType.
+var (
+	PluginV1_AuthField_FieldType_name = map[int32]string{
+		0: "FIELD_UNKNOWN",
+		1: "TEXT",
+		2: "NUMBER",
+		3: "PASSWORD",
+		4: "CHECKBOX",
+		5: "SELECT",
+	}
+	PluginV1_AuthField_FieldType_value = map[string]int32{
+		"FIELD_UNKNOWN": 0,
+		"TEXT":          1,
+		"NUMBER":        2,
+		"PASSWORD":      3,
+		"CHECKBOX":      4,
+		"SELECT":        5,
+	}
+)
+
+func (x PluginV1_AuthField_FieldType) Enum() *PluginV1_AuthField_FieldType {
+	p := new(PluginV1_AuthField_FieldType)
+	*p = x
+	return p
+}
+
+func (x PluginV1_AuthField_FieldType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (PluginV1_AuthField_FieldType) Descriptor() protoreflect.EnumDescriptor {
+	return file_contracts_plugin_v1_plugin_proto_enumTypes[1].Descriptor()
+}
+
+func (PluginV1_AuthField_FieldType) Type() protoreflect.EnumType {
+	return &file_contracts_plugin_v1_plugin_proto_enumTypes[1]
+}
+
+func (x PluginV1_AuthField_FieldType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use PluginV1_AuthField_FieldType.Descriptor instead.
+func (PluginV1_AuthField_FieldType) EnumDescriptor() ([]byte, []int) {
+	return file_contracts_plugin_v1_plugin_proto_rawDescGZIP(), []int{0, 4, 0}
+}
+
+// PluginV1 defines the data structures for plugin information, execution, and authentication forms.
 type PluginV1 struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -312,11 +373,249 @@ func (x *PluginV1_ExecResponse) GetError() string {
 	return ""
 }
 
+// AuthField represents a single input field for authentication (e.g. host, user, password).
+// The plugin defines the fields it needs for authentication and the core renders them accordingly.
+type PluginV1_AuthField struct {
+	state         protoimpl.MessageState       `protogen:"open.v1"`
+	Type          PluginV1_AuthField_FieldType `protobuf:"varint,1,opt,name=type,proto3,enum=plugin.v1.PluginV1_AuthField_FieldType" json:"type,omitempty"` // input type
+	Name          string                       `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`                                              // machine name (lower-case, no spaces)
+	Label         string                       `protobuf:"bytes,3,opt,name=label,proto3" json:"label,omitempty"`                                            // human-friendly label
+	Value         string                       `protobuf:"bytes,4,opt,name=value,proto3" json:"value,omitempty"`                                            // default/value used when invoking plugin
+	Required      bool                         `protobuf:"varint,5,opt,name=required,proto3" json:"required,omitempty"`                                     // whether field is required
+	Options       []string                     `protobuf:"bytes,6,rep,name=options,proto3" json:"options,omitempty"`                                        // for select inputs
+	Placeholder   string                       `protobuf:"bytes,7,opt,name=placeholder,proto3" json:"placeholder,omitempty"`                                // optional placeholder
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PluginV1_AuthField) Reset() {
+	*x = PluginV1_AuthField{}
+	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PluginV1_AuthField) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PluginV1_AuthField) ProtoMessage() {}
+
+func (x *PluginV1_AuthField) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PluginV1_AuthField.ProtoReflect.Descriptor instead.
+func (*PluginV1_AuthField) Descriptor() ([]byte, []int) {
+	return file_contracts_plugin_v1_plugin_proto_rawDescGZIP(), []int{0, 4}
+}
+
+func (x *PluginV1_AuthField) GetType() PluginV1_AuthField_FieldType {
+	if x != nil {
+		return x.Type
+	}
+	return PluginV1_AuthField_FIELD_UNKNOWN
+}
+
+func (x *PluginV1_AuthField) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *PluginV1_AuthField) GetLabel() string {
+	if x != nil {
+		return x.Label
+	}
+	return ""
+}
+
+func (x *PluginV1_AuthField) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
+func (x *PluginV1_AuthField) GetRequired() bool {
+	if x != nil {
+		return x.Required
+	}
+	return false
+}
+
+func (x *PluginV1_AuthField) GetOptions() []string {
+	if x != nil {
+		return x.Options
+	}
+	return nil
+}
+
+func (x *PluginV1_AuthField) GetPlaceholder() string {
+	if x != nil {
+		return x.Placeholder
+	}
+	return ""
+}
+
+// AuthForm represents a set of fields for a specific authentication method (e.g. "basic", "oauth").
+// The core will render a tab per form and present the `fields` to the user. When the user submits
+// the form, the core will send the field values back to the plugin for connection/authentication.
+type PluginV1_AuthForm struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`   // e.g. "basic"
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"` // e.g. "Basic"
+	Fields        []*PluginV1_AuthField  `protobuf:"bytes,3,rep,name=fields,proto3" json:"fields,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PluginV1_AuthForm) Reset() {
+	*x = PluginV1_AuthForm{}
+	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PluginV1_AuthForm) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PluginV1_AuthForm) ProtoMessage() {}
+
+func (x *PluginV1_AuthForm) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PluginV1_AuthForm.ProtoReflect.Descriptor instead.
+func (*PluginV1_AuthForm) Descriptor() ([]byte, []int) {
+	return file_contracts_plugin_v1_plugin_proto_rawDescGZIP(), []int{0, 5}
+}
+
+func (x *PluginV1_AuthForm) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *PluginV1_AuthForm) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *PluginV1_AuthForm) GetFields() []*PluginV1_AuthField {
+	if x != nil {
+		return x.Fields
+	}
+	return nil
+}
+
+type PluginV1_AuthFormsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PluginV1_AuthFormsRequest) Reset() {
+	*x = PluginV1_AuthFormsRequest{}
+	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PluginV1_AuthFormsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PluginV1_AuthFormsRequest) ProtoMessage() {}
+
+func (x *PluginV1_AuthFormsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PluginV1_AuthFormsRequest.ProtoReflect.Descriptor instead.
+func (*PluginV1_AuthFormsRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_plugin_v1_plugin_proto_rawDescGZIP(), []int{0, 6}
+}
+
+type PluginV1_AuthFormsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// map key is the form `key` (e.g. "basic").
+	Forms         map[string]*PluginV1_AuthForm `protobuf:"bytes,1,rep,name=forms,proto3" json:"forms,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PluginV1_AuthFormsResponse) Reset() {
+	*x = PluginV1_AuthFormsResponse{}
+	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PluginV1_AuthFormsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PluginV1_AuthFormsResponse) ProtoMessage() {}
+
+func (x *PluginV1_AuthFormsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PluginV1_AuthFormsResponse.ProtoReflect.Descriptor instead.
+func (*PluginV1_AuthFormsResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_plugin_v1_plugin_proto_rawDescGZIP(), []int{0, 7}
+}
+
+func (x *PluginV1_AuthFormsResponse) GetForms() map[string]*PluginV1_AuthForm {
+	if x != nil {
+		return x.Forms
+	}
+	return nil
+}
+
 var File_contracts_plugin_v1_plugin_proto protoreflect.FileDescriptor
 
 const file_contracts_plugin_v1_plugin_proto_rawDesc = "" +
 	"\n" +
-	" contracts/plugin/v1/plugin.proto\x12\tplugin.v1\"\xb9\x03\n" +
+	" contracts/plugin/v1/plugin.proto\x12\tplugin.v1\"\xad\b\n" +
 	"\bPluginV1\x1a\r\n" +
 	"\vInfoRequest\x1a\x8c\x01\n" +
 	"\fInfoResponse\x12,\n" +
@@ -334,14 +633,43 @@ const file_contracts_plugin_v1_plugin_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a<\n" +
 	"\fExecResponse\x12\x16\n" +
 	"\x06result\x18\x01 \x01(\tR\x06result\x12\x14\n" +
-	"\x05error\x18\x02 \x01(\tR\x05error\"\x1f\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\x1a\xbe\x02\n" +
+	"\tAuthField\x12;\n" +
+	"\x04type\x18\x01 \x01(\x0e2'.plugin.v1.PluginV1.AuthField.FieldTypeR\x04type\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
+	"\x05label\x18\x03 \x01(\tR\x05label\x12\x14\n" +
+	"\x05value\x18\x04 \x01(\tR\x05value\x12\x1a\n" +
+	"\brequired\x18\x05 \x01(\bR\brequired\x12\x18\n" +
+	"\aoptions\x18\x06 \x03(\tR\aoptions\x12 \n" +
+	"\vplaceholder\x18\a \x01(\tR\vplaceholder\"\\\n" +
+	"\tFieldType\x12\x11\n" +
+	"\rFIELD_UNKNOWN\x10\x00\x12\b\n" +
+	"\x04TEXT\x10\x01\x12\n" +
+	"\n" +
+	"\x06NUMBER\x10\x02\x12\f\n" +
+	"\bPASSWORD\x10\x03\x12\f\n" +
+	"\bCHECKBOX\x10\x04\x12\n" +
+	"\n" +
+	"\x06SELECT\x10\x05\x1ag\n" +
+	"\bAuthForm\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x125\n" +
+	"\x06fields\x18\x03 \x03(\v2\x1d.plugin.v1.PluginV1.AuthFieldR\x06fields\x1a\x12\n" +
+	"\x10AuthFormsRequest\x1a\xb3\x01\n" +
+	"\x11AuthFormsResponse\x12F\n" +
+	"\x05forms\x18\x01 \x03(\v20.plugin.v1.PluginV1.AuthFormsResponse.FormsEntryR\x05forms\x1aV\n" +
+	"\n" +
+	"FormsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x122\n" +
+	"\x05value\x18\x02 \x01(\v2\x1c.plugin.v1.PluginV1.AuthFormR\x05value:\x028\x01\"\x1f\n" +
 	"\x04Type\x12\v\n" +
 	"\aUNKNOWN\x10\x00\x12\n" +
 	"\n" +
-	"\x06DRIVER\x10\x012\xa5\x01\n" +
+	"\x06DRIVER\x10\x012\xff\x01\n" +
 	"\rPluginService\x12I\n" +
 	"\x04Info\x12\x1f.plugin.v1.PluginV1.InfoRequest\x1a .plugin.v1.PluginV1.InfoResponse\x12I\n" +
-	"\x04Exec\x12\x1f.plugin.v1.PluginV1.ExecRequest\x1a .plugin.v1.PluginV1.ExecResponseB\x14Z\x12plugin/v1;pluginpbb\x06proto3"
+	"\x04Exec\x12\x1f.plugin.v1.PluginV1.ExecRequest\x1a .plugin.v1.PluginV1.ExecResponse\x12X\n" +
+	"\tAuthForms\x12$.plugin.v1.PluginV1.AuthFormsRequest\x1a%.plugin.v1.PluginV1.AuthFormsResponseB\x14Z\x12plugin/v1;pluginpbb\x06proto3"
 
 var (
 	file_contracts_plugin_v1_plugin_proto_rawDescOnce sync.Once
@@ -355,29 +683,41 @@ func file_contracts_plugin_v1_plugin_proto_rawDescGZIP() []byte {
 	return file_contracts_plugin_v1_plugin_proto_rawDescData
 }
 
-var file_contracts_plugin_v1_plugin_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_contracts_plugin_v1_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_contracts_plugin_v1_plugin_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_contracts_plugin_v1_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_contracts_plugin_v1_plugin_proto_goTypes = []any{
-	(PluginV1_Type)(0),            // 0: plugin.v1.PluginV1.Type
-	(*PluginV1)(nil),              // 1: plugin.v1.PluginV1
-	(*PluginV1_InfoRequest)(nil),  // 2: plugin.v1.PluginV1.InfoRequest
-	(*PluginV1_InfoResponse)(nil), // 3: plugin.v1.PluginV1.InfoResponse
-	(*PluginV1_ExecRequest)(nil),  // 4: plugin.v1.PluginV1.ExecRequest
-	(*PluginV1_ExecResponse)(nil), // 5: plugin.v1.PluginV1.ExecResponse
-	nil,                           // 6: plugin.v1.PluginV1.ExecRequest.ConnectionEntry
+	(PluginV1_Type)(0),                 // 0: plugin.v1.PluginV1.Type
+	(PluginV1_AuthField_FieldType)(0),  // 1: plugin.v1.PluginV1.AuthField.FieldType
+	(*PluginV1)(nil),                   // 2: plugin.v1.PluginV1
+	(*PluginV1_InfoRequest)(nil),       // 3: plugin.v1.PluginV1.InfoRequest
+	(*PluginV1_InfoResponse)(nil),      // 4: plugin.v1.PluginV1.InfoResponse
+	(*PluginV1_ExecRequest)(nil),       // 5: plugin.v1.PluginV1.ExecRequest
+	(*PluginV1_ExecResponse)(nil),      // 6: plugin.v1.PluginV1.ExecResponse
+	(*PluginV1_AuthField)(nil),         // 7: plugin.v1.PluginV1.AuthField
+	(*PluginV1_AuthForm)(nil),          // 8: plugin.v1.PluginV1.AuthForm
+	(*PluginV1_AuthFormsRequest)(nil),  // 9: plugin.v1.PluginV1.AuthFormsRequest
+	(*PluginV1_AuthFormsResponse)(nil), // 10: plugin.v1.PluginV1.AuthFormsResponse
+	nil,                                // 11: plugin.v1.PluginV1.ExecRequest.ConnectionEntry
+	nil,                                // 12: plugin.v1.PluginV1.AuthFormsResponse.FormsEntry
 }
 var file_contracts_plugin_v1_plugin_proto_depIdxs = []int32{
-	0, // 0: plugin.v1.PluginV1.InfoResponse.type:type_name -> plugin.v1.PluginV1.Type
-	6, // 1: plugin.v1.PluginV1.ExecRequest.connection:type_name -> plugin.v1.PluginV1.ExecRequest.ConnectionEntry
-	2, // 2: plugin.v1.PluginService.Info:input_type -> plugin.v1.PluginV1.InfoRequest
-	4, // 3: plugin.v1.PluginService.Exec:input_type -> plugin.v1.PluginV1.ExecRequest
-	3, // 4: plugin.v1.PluginService.Info:output_type -> plugin.v1.PluginV1.InfoResponse
-	5, // 5: plugin.v1.PluginService.Exec:output_type -> plugin.v1.PluginV1.ExecResponse
-	4, // [4:6] is the sub-list for method output_type
-	2, // [2:4] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	0,  // 0: plugin.v1.PluginV1.InfoResponse.type:type_name -> plugin.v1.PluginV1.Type
+	11, // 1: plugin.v1.PluginV1.ExecRequest.connection:type_name -> plugin.v1.PluginV1.ExecRequest.ConnectionEntry
+	1,  // 2: plugin.v1.PluginV1.AuthField.type:type_name -> plugin.v1.PluginV1.AuthField.FieldType
+	7,  // 3: plugin.v1.PluginV1.AuthForm.fields:type_name -> plugin.v1.PluginV1.AuthField
+	12, // 4: plugin.v1.PluginV1.AuthFormsResponse.forms:type_name -> plugin.v1.PluginV1.AuthFormsResponse.FormsEntry
+	8,  // 5: plugin.v1.PluginV1.AuthFormsResponse.FormsEntry.value:type_name -> plugin.v1.PluginV1.AuthForm
+	3,  // 6: plugin.v1.PluginService.Info:input_type -> plugin.v1.PluginV1.InfoRequest
+	5,  // 7: plugin.v1.PluginService.Exec:input_type -> plugin.v1.PluginV1.ExecRequest
+	9,  // 8: plugin.v1.PluginService.AuthForms:input_type -> plugin.v1.PluginV1.AuthFormsRequest
+	4,  // 9: plugin.v1.PluginService.Info:output_type -> plugin.v1.PluginV1.InfoResponse
+	6,  // 10: plugin.v1.PluginService.Exec:output_type -> plugin.v1.PluginV1.ExecResponse
+	10, // 11: plugin.v1.PluginService.AuthForms:output_type -> plugin.v1.PluginV1.AuthFormsResponse
+	9,  // [9:12] is the sub-list for method output_type
+	6,  // [6:9] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_contracts_plugin_v1_plugin_proto_init() }
@@ -390,8 +730,8 @@ func file_contracts_plugin_v1_plugin_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_contracts_plugin_v1_plugin_proto_rawDesc), len(file_contracts_plugin_v1_plugin_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   6,
+			NumEnums:      2,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

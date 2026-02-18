@@ -9,7 +9,6 @@ import (
 	"os"
 
 	"github.com/felixdotgo/querybox/pkg/plugin"
-	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -20,9 +19,9 @@ type mysqlPlugin struct{}
 func (m *mysqlPlugin) Info() (plugin.InfoResponse, error) {
 	return plugin.InfoResponse{
 		Type:        plugin.TypeDriver,
-		Name:        "MySQL",
+		Name:        "PostgreSQL",
 		Version:     "0.1.0",
-		Description: "MySQL database driver",
+		Description: "PostgreSQL database driver",
 	}, nil
 }
 
@@ -33,21 +32,14 @@ func (m *mysqlPlugin) AuthForms(plugin.AuthFormsRequest) (plugin.AuthFormsRespon
 		Name: "Basic",
 		Fields: []*plugin.AuthField{
 			{Type: plugin.AuthField_TEXT, Name: "host", Label: "Host", Required: true, Placeholder: "127.0.0.1"},
-			{Type: pluginpb.PluginV1_AuthField_NUMBER, Name: "port", Label: "Port", Placeholder: "3306"},
+			{Type: plugin.AuthField_NUMBER, Name: "port", Label: "Port", Placeholder: "5432"},
 			{Type: plugin.AuthField_TEXT, Name: "user", Label: "User"},
 			{Type: plugin.AuthField_PASSWORD, Name: "password", Label: "Password"},
 			{Type: plugin.AuthField_TEXT, Name: "database", Label: "Database name"},
 		},
 	}
 
-	dsn := plugin.AuthForm{
-		Key: "dsn",
-		Name: "DSN",
-		Fields: []*plugin.AuthField{
-			{Type: plugin.AuthField_TEXT, Name: "dsn", Label: "DSN", Placeholder: "user:pass@tcp(host:port)/dbname"},
-		},
-	}
-	return plugin.AuthFormsResponse{Forms: map[string]*plugin.AuthForm{"basic": &basic, "dsn": &dsn}}, nil
+	return plugin.AuthFormsResponse{Forms: map[string]*plugin.AuthForm{"basic": &basic}}, nil
 }
 
 func (m *mysqlPlugin) Exec(req plugin.ExecRequest) (plugin.ExecResponse, error) {

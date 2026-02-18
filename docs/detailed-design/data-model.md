@@ -7,7 +7,7 @@ Describe persistent data structures, constraints, indexes, and migration conside
 - Add an ER diagram (source in `diagrams/`)
 
 ## Tables (example)
-- `connections` — id, name, driver_type, encrypted_credential_blob, owner_id, created_at, updated_at
+- `connections` — id, name, driver_type, credential_key, owner_id, created_at, updated_at
 - `audit_logs` — id, session_id, event_type, payload, created_at
 
 ## Indexes & constraints

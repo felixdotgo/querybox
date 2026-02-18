@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/felixdotgo/querybox/pkg/plugin"
 )
 
 // PluginInfo holds metadata that the UI can display for each plugin.
@@ -245,6 +247,48 @@ func (m *Manager) ExecPlugin(name string, connection map[string]string, sql stri
 func (m *Manager) Rescan() error {
 	m.scanOnce()
 	return nil
+}
+
+// GetPluginAuthForms probes the plugin executable for supported authentication
+// forms by invoking `plugin authforms` and decoding the JSON response. If the
+// plugin doesn't implement the command or returns no forms an empty map is
+// returned.
+func (m *Manager) GetPluginAuthForms(name string) (map[string]plugin.AuthForm, error) {
+	m.mu.Lock()
+	info, ok := m.plugins[name]
+	m.mu.Unlock()
+	if !ok {
+		return nil, errors.New("plugin not found")
+	}
+	full := info.Path
+	if !isExecutable(full) {
+		return nil, errors.New("plugin is not executable")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, full, "authforms")
+	out, err := cmd.Output()
+	if err != nil {
+		// treat as not implemented gracefully
+		return nil, nil
+	}
+	if len(out) == 0 {
+		return nil, nil
+	}
+	var resp plugin.AuthFormsResponse
+	if err := json.Unmarshal(out, &resp); err != nil {
+		return nil, fmt.Errorf("invalid authforms json: %w", err)
+	}
+	// convert to non-pointer map for convenience
+	ret := make(map[string]plugin.AuthForm)
+	for k, v := range resp.Forms {
+		if v == nil {
+			continue
+		}
+		ret[k] = *v
+	}
+	return ret, nil
 }
 
 // EnablePlugin is not applicable for on-demand execution model.

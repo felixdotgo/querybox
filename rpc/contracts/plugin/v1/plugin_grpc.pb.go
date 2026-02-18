@@ -19,8 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	PluginService_Info_FullMethodName = "/plugin.v1.PluginService/Info"
-	PluginService_Exec_FullMethodName = "/plugin.v1.PluginService/Exec"
+	PluginService_Info_FullMethodName      = "/plugin.v1.PluginService/Info"
+	PluginService_Exec_FullMethodName      = "/plugin.v1.PluginService/Exec"
+	PluginService_AuthForms_FullMethodName = "/plugin.v1.PluginService/AuthForms"
 )
 
 // PluginServiceClient is the client API for PluginService service.
@@ -28,10 +29,17 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
 // Contract for on-demand plugins (CLI-invoked). Plugins SHOULD implement
-// `Info` (static metadata) and `Exec` (execute SQL against a connection).
 type PluginServiceClient interface {
+	// Info returns basic information about the plugin (type, name, version, description).
 	Info(ctx context.Context, in *PluginV1_InfoRequest, opts ...grpc.CallOption) (*PluginV1_InfoResponse, error)
+	// Exec executes a plugin-specific command (e.g. SQL query) and returns the result.
+	// The core will pass user-provided connection details (e.g. host, user, password) and
+	// the plugin will handle the execution and return a serialized result (string/json) or an error message.
 	Exec(ctx context.Context, in *PluginV1_ExecRequest, opts ...grpc.CallOption) (*PluginV1_ExecResponse, error)
+	// AuthForms returns available authentication forms the plugin supports. The core
+	// will render these forms (tabs) and send the selected form values back
+	// to the plugin when creating a connection.
+	AuthForms(ctx context.Context, in *PluginV1_AuthFormsRequest, opts ...grpc.CallOption) (*PluginV1_AuthFormsResponse, error)
 }
 
 type pluginServiceClient struct {
@@ -62,15 +70,32 @@ func (c *pluginServiceClient) Exec(ctx context.Context, in *PluginV1_ExecRequest
 	return out, nil
 }
 
+func (c *pluginServiceClient) AuthForms(ctx context.Context, in *PluginV1_AuthFormsRequest, opts ...grpc.CallOption) (*PluginV1_AuthFormsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PluginV1_AuthFormsResponse)
+	err := c.cc.Invoke(ctx, PluginService_AuthForms_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // PluginServiceServer is the server API for PluginService service.
 // All implementations must embed UnimplementedPluginServiceServer
 // for forward compatibility.
 //
 // Contract for on-demand plugins (CLI-invoked). Plugins SHOULD implement
-// `Info` (static metadata) and `Exec` (execute SQL against a connection).
 type PluginServiceServer interface {
+	// Info returns basic information about the plugin (type, name, version, description).
 	Info(context.Context, *PluginV1_InfoRequest) (*PluginV1_InfoResponse, error)
+	// Exec executes a plugin-specific command (e.g. SQL query) and returns the result.
+	// The core will pass user-provided connection details (e.g. host, user, password) and
+	// the plugin will handle the execution and return a serialized result (string/json) or an error message.
 	Exec(context.Context, *PluginV1_ExecRequest) (*PluginV1_ExecResponse, error)
+	// AuthForms returns available authentication forms the plugin supports. The core
+	// will render these forms (tabs) and send the selected form values back
+	// to the plugin when creating a connection.
+	AuthForms(context.Context, *PluginV1_AuthFormsRequest) (*PluginV1_AuthFormsResponse, error)
 	mustEmbedUnimplementedPluginServiceServer()
 }
 
@@ -86,6 +111,9 @@ func (UnimplementedPluginServiceServer) Info(context.Context, *PluginV1_InfoRequ
 }
 func (UnimplementedPluginServiceServer) Exec(context.Context, *PluginV1_ExecRequest) (*PluginV1_ExecResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Exec not implemented")
+}
+func (UnimplementedPluginServiceServer) AuthForms(context.Context, *PluginV1_AuthFormsRequest) (*PluginV1_AuthFormsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AuthForms not implemented")
 }
 func (UnimplementedPluginServiceServer) mustEmbedUnimplementedPluginServiceServer() {}
 func (UnimplementedPluginServiceServer) testEmbeddedByValue()                       {}
@@ -144,6 +172,24 @@ func _PluginService_Exec_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _PluginService_AuthForms_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PluginV1_AuthFormsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PluginServiceServer).AuthForms(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PluginService_AuthForms_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PluginServiceServer).AuthForms(ctx, req.(*PluginV1_AuthFormsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // PluginService_ServiceDesc is the grpc.ServiceDesc for PluginService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -158,6 +204,10 @@ var PluginService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Exec",
 			Handler:    _PluginService_Exec_Handler,
+		},
+		{
+			MethodName: "AuthForms",
+			Handler:    _PluginService_AuthForms_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

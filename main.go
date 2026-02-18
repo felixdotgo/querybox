@@ -71,6 +71,7 @@ func main() {
 			TitleBar:                application.MacTitleBarHiddenInset,
 		},
 	})
+	app.MainWindow.Maximise()
 
 	// Create a connections window that is hidden by default. This window will be shown when the user clicks the "Connections" button in the UI.
 	// or when there is no configured connection and the app needs to prompt the user to create one.
@@ -81,7 +82,6 @@ func main() {
 		Hidden: true,
 		DisableResize: true,
 		MinWidth: 1024,
-		MinHeight: 768,
 		Frameless: true,
 		Mac: application.MacWindow{
 			InvisibleTitleBarHeight: 50,

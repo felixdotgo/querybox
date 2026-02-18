@@ -14,6 +14,13 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as plugin$0 from "../../pkg/plugin/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as pluginpb$0 from "../../rpc/contracts/plugin/v1/models.js";
+
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as $models from "./models.js";
 
 /**
@@ -48,12 +55,26 @@ export function ExecPlugin(name, connection, sql) {
 }
 
 /**
+ * GetPluginAuthForms probes the plugin executable for supported authentication
+ * forms by invoking `plugin authforms` and decoding the JSON response. If the
+ * plugin doesn't implement the command or returns no forms an empty map is
+ * returned.
+ * @param {string} name
+ * @returns {$CancellablePromise<{ [_ in string]?: plugin$0.AuthForm }>}
+ */
+export function GetPluginAuthForms(name) {
+    return $Call.ByID(545463133, name).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType1($result);
+    }));
+}
+
+/**
  * ListPlugins returns the discovered plugins (does not start them).
  * @returns {$CancellablePromise<$models.PluginInfo[]>}
  */
 export function ListPlugins() {
     return $Call.ByID(668942975).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType1($result);
+        return $$createType3($result);
     }));
 }
 
@@ -74,5 +95,7 @@ export function Shutdown() {
 }
 
 // Private type creation functions
-const $$createType0 = $models.PluginInfo.createFrom;
-const $$createType1 = $Create.Array($$createType0);
+const $$createType0 = pluginpb$0.PluginV1_AuthForm.createFrom;
+const $$createType1 = $Create.Map($Create.Any, $$createType0);
+const $$createType2 = $models.PluginInfo.createFrom;
+const $$createType3 = $Create.Array($$createType2);

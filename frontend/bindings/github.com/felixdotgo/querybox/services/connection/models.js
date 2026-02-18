@@ -7,7 +7,9 @@
 import { Create as $Create } from "@wailsio/runtime";
 
 /**
- * Connection represents a persisted connection record.
+ * Connection represents a persisted connection record. NOTE: `CredentialKey`
+ * stores a key (not the secret) that the CredManager uses to fetch the secret
+ * from the OS keyring.
  */
 export class Connection {
     /**
@@ -36,12 +38,12 @@ export class Connection {
              */
             this["driver_type"] = "";
         }
-        if (!("credential_blob" in $$source)) {
+        if (!("credential_key" in $$source)) {
             /**
              * @member
              * @type {string}
              */
-            this["credential_blob"] = "";
+            this["credential_key"] = "";
         }
         if (!("created_at" in $$source)) {
             /**

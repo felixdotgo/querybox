@@ -5,4 +5,25 @@ Plugin contracts (proto)
 
 Notes
 - Runtime uses JSON CLI for on‑demand plugins, but the `.proto` is the canonical spec for messages and the service interface.
-- To produce canonical generated Go code with `protoc`, run `task proto:generate` (requires `protoc`, `protoc-gen-go`, `protoc-gen-go-grpc`).
+- `AuthForms` (new) lets plugins describe structured authentication forms the UI can render.
+  - Response shape: `AuthFormsResponse { forms: map<string, AuthForm> }` where an `AuthForm` contains `fields` (type, name, label, required, placeholder, options).
+  - Example response:
+
+```json
+{
+  "forms": {
+    "basic": {
+      "key": "basic",
+      "name": "Basic",
+      "fields": [
+        { "type": "TEXT", "name": "host", "label": "Host", "required": true, "placeholder": "127.0.0.1" },
+        { "type": "PASSWORD", "name": "password", "label": "Password" }
+      ]
+    }
+  }
+}
+```
+
+- To regenerate Go code after changing the proto, run `task proto:generate` (requires `protoc`, `protoc-gen-go`, `protoc-gen-go-grpc`).
+- To implement CLI helpers in Go, use `pkg/plugin.ServeCLI` which now supports the `authforms` command.
+- When adding fields/options, prefer conservative defaults so older UI versions still behave predictably.

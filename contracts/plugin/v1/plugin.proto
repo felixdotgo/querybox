@@ -4,13 +4,25 @@ package plugin.v1;
 option go_package = "plugin/v1;pluginpb";
 
 // Contract for on-demand plugins (CLI-invoked). Plugins SHOULD implement
-// `Info` (static metadata) and `Exec` (execute SQL against a connection).
 service PluginService {
+  // Info returns basic information about the plugin (type, name, version, description).
   rpc Info(PluginV1.InfoRequest) returns (PluginV1.InfoResponse);
+
+  // Exec executes a plugin-specific command (e.g. SQL query) and returns the result.
+  // The core will pass user-provided connection details (e.g. host, user, password) and
+  // the plugin will handle the execution and return a serialized result (string/json) or an error message.
   rpc Exec(PluginV1.ExecRequest) returns (PluginV1.ExecResponse);
+
+  // AuthForms returns available authentication forms the plugin supports. The core
+  // will render these forms (tabs) and send the selected form values back
+  // to the plugin when creating a connection.
+  rpc AuthForms(PluginV1.AuthFormsRequest) returns (PluginV1.AuthFormsResponse);
 }
 
+// PluginV1 defines the data structures for plugin information, execution, and authentication forms.
 message PluginV1 {
+
+  // Type defines the category of the plugin, which can be used by the core to determine how to handle it (e.g. render SQL editor for DRIVER plugins).
   enum Type {
     UNKNOWN = 0;
     DRIVER = 1; // SQL plugin (e.g. MySQL, Postgres, etc.)
@@ -34,5 +46,44 @@ message PluginV1 {
   message ExecResponse {
     string result = 1; // plugin-serialized result (string/json)
     string error = 2;  // optional error message
+  }
+
+  // AuthField represents a single input field for authentication (e.g. host, user, password).
+  // The plugin defines the fields it needs for authentication and the core renders them accordingly.
+  message AuthField {
+
+    // FieldType defines the type of input field to render for authentication details.
+    enum FieldType {
+      FIELD_UNKNOWN = 0;
+      TEXT = 1;
+      NUMBER = 2;
+      PASSWORD = 3;
+      CHECKBOX = 4;
+      SELECT = 5;
+    }
+
+    FieldType type = 1; // input type
+    string name = 2; // machine name (lower-case, no spaces)
+    string label = 3; // human-friendly label
+    string value = 4; // default/value used when invoking plugin
+    bool required = 5; // whether field is required
+    repeated string options = 6; // for select inputs
+    string placeholder = 7; // optional placeholder
+  }
+
+  // AuthForm represents a set of fields for a specific authentication method (e.g. "basic", "oauth").
+  // The core will render a tab per form and present the `fields` to the user. When the user submits
+  // the form, the core will send the field values back to the plugin for connection/authentication.
+  message AuthForm {
+    string key = 1; // e.g. "basic"
+    string name = 2; // e.g. "Basic"
+    repeated AuthField fields = 3;
+  }
+
+  message AuthFormsRequest {}
+
+  message AuthFormsResponse {
+    // map key is the form `key` (e.g. "basic").
+    map<string, AuthForm> forms = 1;
   }
 }

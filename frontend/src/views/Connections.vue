@@ -35,24 +35,13 @@
 
       <n-layout-content>
         <div class="p-4">
-          <h3 class="mb-2">Connect to database</h3>
           <div class="flex flex-col gap-2 max-w-3xl">
             <div>
-              <label class="block mb-1.5 text-gray-700">Driver</label>
-              <n-input
-                v-model:value="form.driver"
-                readonly
-                :placeholder="
-                  selectedPlugin
-                    ? selectedPlugin.name
-                    : 'Select a driver from the left'
-                "
-                class="w-full"
-              />
+              <n-input v-model:value="form.driver" readonly hidden />
             </div>
 
             <div>
-              <label class="block mb-1.5 text-gray-700">Connection name</label>
+              <label class="block mb-1.5 text-gray-700">Name</label>
               <n-input
                 v-model:value="form.name"
                 placeholder="e.g. local-mysql"
@@ -61,47 +50,54 @@
             </div>
 
             <div>
-              <label class="block mb-1.5 text-gray-700">DSN / Credential</label>
-              <n-input
-                v-model:value="form.cred"
-                placeholder="DSN (user:pass@tcp(host:port)/dbname) or plugin-specific"
-                class="w-full"
-              />
-            </div>
-
-            <div class="flex items-center gap-2 mt-2">
-              <n-button type="primary" @click="connect" :disabled="!canConnect"
-                >Connect</n-button
-              >
-              <n-button @click="clearForm">Clear</n-button>
-              <div class="ml-auto text-gray-600">{{ statusText }}</div>
+              <n-tabs type="card" v-model:value="selectedAuthForm" class="mb-3">
+                <n-tab-pane
+                  v-for="(f, k) in authForms"
+                  :key="k"
+                  :name="k"
+                  :title="f.name"
+                >
+                  <AuthFormRenderer :form="f" v-model="authValues" />
+                </n-tab-pane>
+              </n-tabs>
             </div>
           </div>
         </div>
       </n-layout-content>
     </n-layout>
 
-    <div class="border-t p-4 border-gray-200 w-full flex">
-      <n-button class="w-32 ml-auto" @click="closeWindow">Close</n-button>
+    <div class="fixed bottom-0 left-0 right-0 border-t p-4 border-gray-200 bg-white flex shadow-lg">
+      <n-button class="w-32 ml-auto" quaternary @click="closeWindow">Cancel</n-button>
+      <n-button class="w-32 ml-2" quaternary @click="clearForm">Clear</n-button>
+      <n-button class="w-32 ml-2" type="primary" @click="connect" :disabled="!canConnect">OK</n-button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue"
+import { ref, computed, onMounted, watch } from "vue"
 import {
   ListConnections,
   CreateConnection,
   DeleteConnection,
 } from "@/bindings/github.com/felixdotgo/querybox/services/connectionservice"
-import { ListPlugins } from "@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager"
+import {
+  ListPlugins,
+  GetPluginAuthForms,
+} from "@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager"
 import { CloseConnections } from "@/bindings/github.com/felixdotgo/querybox/services/app"
+import AuthFormRenderer from "@/components/AuthFormRenderer.vue"
 
 const connections = ref([])
 const plugins = ref([])
 const pluginFilter = ref("")
 const selectedPlugin = ref(null)
 const statusText = ref("")
+
+// AuthForms state
+const authForms = ref({})
+const selectedAuthForm = ref("")
+const authValues = ref({})
 
 const form = ref({ name: "", driver: "", cred: "" })
 const filterText = ref("")
@@ -112,6 +108,12 @@ const filtered = computed(() => {
     c.name.toLowerCase().includes(f),
   )
 })
+
+function resetAuthState() {
+  authForms.value = {}
+  selectedAuthForm.value = ""
+  authValues.value = {}
+}
 
 const drivers = computed(() => {
   // PluginInfo.type follows PluginV1.Type enum where DRIVER = 1
@@ -128,6 +130,20 @@ const filteredDrivers = computed(() => {
 })
 
 const canConnect = computed(() => {
+  // if auth forms are present for selected plugin, validate required fields
+  const hasForms = Object.keys(authForms.value || {}).length > 0
+  if (hasForms) {
+    if (!selectedAuthForm.value) return false
+    const formDef = authForms.value[selectedAuthForm.value]
+    if (!formDef) return false
+    for (const f of formDef.fields || []) {
+      if (f.required && !(authValues.value[f.name] || "").toString().trim()) {
+        return false
+      }
+    }
+    return form.value.driver && form.value.name && form.value.name.trim()
+  }
+
   return (
     form.value.driver &&
     form.value.driver.trim() &&
@@ -143,6 +159,16 @@ async function load() {
     const [plist, clist] = await Promise.all([ListPlugins(), ListConnections()])
     plugins.value = plist || []
     connections.value = clist || []
+
+    // Auto-select the first available driver by default when opening the
+    // Connections view and nothing is currently selected.
+    if (!selectedPlugin.value) {
+      const firstDriver = (plugins.value || []).find((p) => p && p.type === 1)
+      if (firstDriver) {
+        // use selectPlugin to initialize auth forms and defaults
+        await selectPlugin(firstDriver)
+      }
+    }
   } catch (err) {
     console.error("load:", err)
     plugins.value = plugins.value || []
@@ -150,13 +176,42 @@ async function load() {
   }
 }
 
-function selectPlugin(p) {
+async function selectPlugin(p) {
   selectedPlugin.value = p
   form.value.driver = p.name || ""
-  if (!form.value.name) {
-    form.value.name = `${p.name}-connection`
+
+  // probe plugin for auth forms (graceful fallback to DSN input)
+  resetAuthState()
+  try {
+    const resp = await GetPluginAuthForms(p.name)
+    if (resp && Object.keys(resp).length > 0) {
+      authForms.value = resp || {}
+      const keys = Object.keys(authForms.value)
+      selectedAuthForm.value = keys[0]
+      // initialize values object for selected form
+      authValues.value = {}
+      for (const f of authForms.value[selectedAuthForm.value].fields || []) {
+        authValues.value[f.name] = f.value || ""
+      }
+      // pre-fill credential field with serialized blob for convenience (not required)
+      // leave `form.cred` empty — CreateConnection will serialize current form values
+      return
+    }
+  } catch (err) {
+    console.error("GetPluginAuthForms:", err)
   }
 }
+
+// keep values in sync when user changes selected tab
+watch(selectedAuthForm, (newKey) => {
+  if (!newKey) return
+  const def = authForms.value[newKey]
+  authValues.value = {}
+  if (!def) return
+  for (const f of def.fields || []) {
+    authValues.value[f.name] = f.value || ""
+  }
+})
 
 function clearForm() {
   form.value = { name: "", driver: "", cred: "" }
@@ -171,6 +226,13 @@ async function connect() {
   }
   try {
     statusText.value = "Connecting..."
+
+    // if authForms in use, serialize the selected form values into credential_blob
+    if (Object.keys(authForms.value || {}).length > 0) {
+      const blob = { form: selectedAuthForm.value, values: authValues.value }
+      form.value.cred = JSON.stringify(blob)
+    }
+
     await CreateConnection(
       form.value.name.trim(),
       form.value.driver.trim(),
@@ -179,6 +241,7 @@ async function connect() {
     statusText.value = "Saved"
     // reset form but keep driver selected
     form.value = { name: "", driver: "", cred: "" }
+    resetAuthState()
     await load()
     setTimeout(() => {
       statusText.value = ""
