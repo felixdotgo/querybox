@@ -7,56 +7,74 @@
 
 ### 1.1 Overview
 - QueryBox Core orchestrates query execution and credential management.
-- Driver processes implement database-specific behavior and run out of process.
-- Frontend initiates operations through the Wails bridge to Core and streams results supplied by Core.
-- Plugins: on‑demand executables discovered under `bin/plugins`; the host exposes `ListPlugins`, `Rescan`, and `ExecPlugin` via the plugin manager. `pkg/plugin` provides a CLI shim and the canonical proto is at `contracts/plugin/v1` (generated package `pluginpb`).
+- Plugins are on-demand executables discovered under `bin/plugins` that implement database-specific behavior.
+- Frontend initiates operations through Wails service bindings to Core and receives execution results.
+- Plugin Manager exposes `ListPlugins`, `Rescan`, `ExecPlugin`, and `GetPluginAuthForms` via Wails bindings. `pkg/plugin` provides a CLI helper (`ServeCLI`) and the canonical proto is at `contracts/plugin/v1/plugin.proto` (generated package `pluginpb`).
 
 ### 1.2 Core Concepts
-- Orchestrator Core: stores connection metadata (including a `credential_key` reference) and routes queries to the right driver. Credential secrets are stored in the OS keyring (via `go-keyring`) or an encrypted blob for server/headless deployments.
-- Stateless Drivers: launched per request (or short-lived pool), contain protocol logic, and stream results over gRPC.
-- Session Envelope: every execution uses an ephemeral session identifier to bind Core and driver communication.
-- Separation of Knowledge: Core never implements database protocols; drivers never persist credentials or metadata.
+- **Connection Service**: stores connection metadata in SQLite (including a `credential_key` reference) and delegates credential storage to CredManager.
+- **Credential Manager**: stores secrets in OS keyring (via `go-keyring`) with automatic fallback to in-memory storage when keyring unavailable (server/headless/test environments).
+- **Stateless Plugins**: spawned per request, receive connection parameters and SQL via JSON stdin/stdout, execute queries, and return results as JSON.
+- **On-Demand Execution**: plugins are CLI executables invoked when needed; no long-running processes or gRPC communication.
+- **Separation of Knowledge**: Core never implements database protocols; plugins never persist credentials or connection metadata.
 
 ## 2. Connection & Credential Management
 
 ### 2.1 Storage
-- Connections persist in the Core backing store with metadata plus a `credential_key` (TEXT). The actual credential secret is stored in the OS keyring (desktop) or in an encrypted credential blob (server/headless).
-- MVP behaviour: the frontend serializes plugin AuthForms into JSON and sends that string to Core when creating/updating a connection; Core stores the secret in the OS keyring and persists only a `credential_key` reference in SQLite.
-- Audit fields capture creation and last access timestamps to support monitoring and rotation.
+- Connections persist in SQLite (`data/connections.db`) with metadata plus a `credential_key` (TEXT) reference.
+- Actual credential secrets are stored by CredManager:
+  - **Primary**: OS keyring via `go-keyring` (macOS Keychain, Windows Credential Manager, Linux Secret Service)
+  - **Fallback**: In-memory map when keyring unavailable (server/headless/test environments)
+- When creating/updating connections, the frontend serializes plugin AuthForms to JSON and sends to ConnectionService; Core stores the secret via CredManager and persists only the `credential_key` reference in SQLite.
+- Schema includes `created_at` and `updated_at` timestamps for audit tracking.
 
 ### 2.2 Execution Flow
-1. Frontend asks Core to execute a query on a named connection.
-2. Core loads connection metadata (including `credential_blob`) and selects the driver binary by `driver_type`.
-3. For plugin-backed connections the `credential_blob` commonly contains JSON: `{"form":"<key>","values":{...}}`; drivers are responsible for interpreting that blob (plugins accept DSN or `credential_blob` JSON today).
-4. Core spawns the driver process with predefined timeout and resource limits and provides the connection metadata (including `credential_blob`) to the driver.
-5. Driver opens the database connection using the provided credentials, streams rows/errors back to Core, and never persists plaintext secrets.
-6. Core forwards streamed results to the frontend and invalidates the session id.
+1. Frontend calls `PluginManager.ExecPlugin` with plugin name, connection parameters, and SQL query.
+2. PluginManager looks up the plugin executable in its registry (scanned from `bin/plugins`).
+3. Manager spawns the plugin as a subprocess: `plugin exec` with 30-second timeout.
+4. Plugin request is sent as JSON via stdin: `{"connection": {...}, "sql": "..."}`.
+5. Plugin executes the query against the database and writes JSON response to stdout: `{"result": "...", "error": "..."}` or returns plaintext results.
+6. PluginManager reads stdout/stderr, parses the response, and returns results to frontend.
+7. Plugin process exits after completing the request; no persistent connections maintained.
 
-### 2.3 Security posture (current vs planned)
-- Current MVP: `credential_blob` is persisted as-is in the local backing store (SQLite). There is no OS keyring or master-key encryption in the current implementation.
-- Planned improvements (post-MVP): encrypted credential blobs (AES-256-GCM), OS keyring integration for desktop installs, and master-key provisioning for headless/server deployments (with migration tooling and UX).
-- Runtime protections remain in place: per-request timeout, memory caps, non-root execution, and parent-death enforcement.
+### 2.3 Security Posture
+- **Current Implementation**:
+  - Credentials stored in OS keyring via `go-keyring` (preferred).
+  - Automatic fallback to in-memory storage when keyring unavailable.
+  - Only `credential_key` references persisted in SQLite; no plaintext secrets on disk.
+  - Plugin execution timeout: 30 seconds per request.
+  - Plugins receive connection parameters via stdin (ephemeral, not logged).
+- **Runtime Protections**:
+  - Plugins spawned per-request with context timeout enforcement.
+  - No long-running plugin processes to manage.
+  - Credential retrieval isolated in CredManager with concurrent-safe access.
+- **Migration Support**: Automatic migration from old `credential_blob` column to `credential_key` + keyring storage on startup.
 
 ## 3. MVP Implementation (0.0.1)
 
 ### 3.1 Technology Stack
-- Core service: Go 1.22, gRPC, core backing store for metadata and credential blob storage.
-- Drivers: Go-based reference PostgreSQL driver built with pgx/v5 for protocol handling.
-- Encryption (planned): use Go standard crypto/aes, crypto/cipher, and crypto/rand packages for AES-256-GCM when implementing encrypted credential blobs.
-- Frontend: existing Wails client communicating with Core via the Wails bridge; no driver-facing changes required in MVP.
+- **Backend**: Go 1.26, Wails v3 framework for desktop UI integration.
+- **Storage**: SQLite via `modernc.org/sqlite` for connection metadata.
+- **Credentials**: `go-keyring` (github.com/zalando/go-keyring) for OS keyring access with in-memory fallback.
+- **Plugins**: Standalone Go executables using CLI JSON interchange (stdin/stdout).
+- **Reference Plugins**: MySQL (`go-sql-driver/mysql`), PostgreSQL (planned).
+- **Frontend**: Vue 3 + Naive UI components, Tailwind CSS for styling, TypeScript bindings auto-generated from Go services.
 
-### 3.2 Must-Have Deliverables
-- Core connection manager with encrypted credential store, schema migrations, and key rotation hooks.
-- Shared gRPC contract (Execute, GetSchema) and generated clients for Core and drivers.
-- Driver launcher enforcing resource and timeout limits plus session lifecycle.
-- PostgreSQL driver implementing Execute and GetSchema using pgx connection pools.
-- Frontend wiring to trigger Execute, stream results, and display driver errors.
+### 3.2 Current Implementation Status
+- ✅ ConnectionService with SQLite persistence and credential_key references.
+- ✅ CredManager with OS keyring (go-keyring) + in-memory fallback.
+- ✅ PluginManager with on-demand discovery, scanning, and CLI-based execution.
+- ✅ MySQL plugin implementing info, exec, and authforms commands.
+- ✅ Plugin SDK (`pkg/plugin`) with ServeCLI helper and protobuf contracts.
+- ✅ Frontend Wails bindings for ConnectionService and PluginManager.
+- ✅ Automatic migration from old credential_blob schema to credential_key model.
 
-### 3.3 Operational Tasks
-- Secure master key loading (environment file plus documented rotation procedure).
-- Structured logging with session identifiers and configurable query redaction.
-- Basic telemetry (success/failure counters, duration histogram) exposed via Prometheus endpoint.
-- Documentation for driver trust assumptions, installation flow, and credential handling practices.
+### 3.3 Operational Considerations
+- **Plugin Discovery**: PluginManager scans `bin/plugins/` every 2 seconds for new/removed executables.
+- **Credential Migration**: Existing installations automatically migrate from `credential_blob` to keyring on startup.
+- **Error Handling**: Plugin failures captured with stderr output; graceful fallback when plugins not implemented.
+- **Platform Support**: Cross-platform builds via Taskfile (Windows, macOS, Linux, iOS, Android).
+- **Development Workflow**: `wails3 dev` for hot reload, `scripts/build-plugins.sh` for plugin compilation.
 
 ### 3.4 Frontend UI / Theme
 - Use Tailwind's default *light* theme for the entire UI — do not hardcode a global dark background or form colors in `public/style.css`.

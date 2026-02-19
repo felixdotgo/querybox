@@ -4,68 +4,105 @@
 
 ```mermaid
 graph LR
-    subgraph DriverPool ["Drivers (stateless)"]
-        LAUNCH["Driver launcher<br/>(timeout, mem caps)"]
-        DRV["Driver process<br/>(stateless, gRPC)"]
+    subgraph PluginSystem ["Plugin System (on-demand)"]
+        SCAN["Plugin Scanner<br/>(scans bin/plugins every 2s)"]
+        EXEC["Plugin Executor<br/>(30s timeout per exec)"]
+        PLUGIN["Plugin Process<br/>(CLI: info/exec/authforms)"]
         DB[(Remote DB)]
     end
 
-    subgraph Core ["Core (Go)"]
-        CORE["Core Service<br/>(Wails bridge for UI)"]
-        STORE[(Core backing store)]
-        MK["Master key<br/>(env secret manager)"]
-        KR["OS Keyring<br/>(go-keyring)"]
-        AUD[Logs & telemetry]
+    subgraph Core ["Core Services (Go)"]
+        APP["App Service<br/>(window management)"]
+        CONN["ConnectionService<br/>(CRUD operations)"]
+        MGR["ConnectionManager<br/>(SQLite persistence)"]
+        CRED["CredManager<br/>(OS keyring + fallback)"]
+        PLUGMGR["PluginManager<br/>(discovery & execution)"]
+        SQLITE[(SQLite<br/>data/connections.db)]
+        KEYRING["OS Keyring<br/>(go-keyring)"]
+        MEMORY["In-Memory Fallback<br/>(when keyring unavailable)"]
     end
 
-    subgraph Frontend ["Frontend (Wails)"]
-        FE[Wails]
+    subgraph Frontend ["Frontend (Wails + Vue)"]
+        FE["Vue UI<br/>(Naive UI + Tailwind)"]
+        BIND["TypeScript Bindings<br/>(auto-generated)"]
     end
 
-    FE -->|store/retrieve password via Core (Wails bridge)| CORE
-    FE -->|Execute request: session id| CORE
+    FE -->|Wails bindings| BIND
+    BIND -->|CreateConnection, ListConnections| CONN
+    BIND -->|ExecPlugin, ListPlugins| PLUGMGR
+    BIND -->|Window controls| APP
 
-    CORE -->|load metadata| STORE
-    CORE -->|decrypt creds - AES-256-GCM, in-memory only| MK
-    CORE -->|access OS keyring via go-keyring| KR
-    CORE -->|spawn driver - resource limits| LAUNCH
-    LAUNCH -->|start: session id| DRV
+    CONN -->|persist metadata + credential_key| MGR
+    MGR -->|store/retrieve in SQLite| SQLITE
+    MGR -->|Store/Get/Delete secrets| CRED
 
-    CORE -->|Execute gRPC: session id, creds, query| DRV
-    DRV -->|open DB connection - uses creds| DB
-    DRV -->|stream rows/errors - gRPC| CORE
+    CRED -->|primary: keyring.Set/Get| KEYRING
+    CRED -->|fallback: map storage| MEMORY
 
-    CORE -->|stream results to frontend| FE
-    CORE -->|scrub creds & invalidate session| CORE
-    DRV -->|exit after request| LAUNCH
+    PLUGMGR -->|periodic scan| SCAN
+    SCAN -->|discover executables| EXEC
+    PLUGMGR -->|ExecPlugin request| EXEC
+    EXEC -->|spawn: plugin exec| PLUGIN
+    EXEC -->|stdin: JSON request| PLUGIN
+    PLUGIN -->|stdout: JSON response| EXEC
+    PLUGIN -->|open connection| DB
+    DB -->|query results| PLUGIN
+    EXEC -->|return results| PLUGMGR
+    PLUGMGR -->|results| FE
 
-    CORE -->|audit: session id only| AUD
-
+    PLUGIN -->|exit after request| EXEC
 ```
 
 ---
 
-## Query & credential flow (numbered)
+## Query & Credential Flow
 
-1. Core stores per-user connection passwords in the OS keyring via `go-keyring` (macOS Keychain, Windows Credential Manager, Linux Secret Service). The Frontend MUST call Core (via the Wails bridge) to add or retrieve per-user credentials — the frontend never talks to the OS keyring directly.
-2. User triggers an Execute in the Frontend; Frontend requests Core to execute a named connection and includes a generated session id.
-3. Core resolves credentials (deployment-dependent):
-   - Desktop / co-located Core: Core reads the per-user password from the OS keyring (via `go-keyring`) when Core and Frontend run on the same host.
-   - Remote / server Core: Core reads the AES-256-GCM-encrypted credential blob from the Core backing store and decrypts it in-memory using the master key supplied by the environment/secret-manager. The Frontend MUST NOT write plaintext secrets to disk; if Core cannot access an OS keyring the Frontend should securely transmit credentials to Core over the protected channel or require admin provisioning.
-   After resolving credentials, Core launches a stateless driver process with enforced time and memory limits.
-4. Core calls the driver over gRPC with session id and decrypted credentials; driver opens the DB connection and streams rows/errors back over gRPC.
-5. Core forwards streamed rows to the Frontend, scrubs credentials from memory, invalidates the session id, and records only the session id in logs for traceability.
+1. **Connection Creation**:
+   - Frontend calls `ConnectionService.CreateConnection(name, driverType, credential)` via Wails bindings.
+   - ConnectionManager generates a UUID and creates `credential_key` (format: `"connection:<uuid>"`).
+   - Credential JSON is stored via `CredManager.Store(credential_key, credential)`.
+   - CredManager attempts OS keyring first (`keyring.Set`), falls back to in-memory map if unavailable.
+   - Only connection metadata + `credential_key` reference persisted in SQLite.
+
+2. **Plugin Discovery**:
+   - PluginManager scans `bin/plugins/` every 2 seconds for executables.
+   - For new plugins, probes metadata: `plugin info` (2s timeout).
+   - Stores discovered plugins in memory registry: `{name, path, type, version, description}`.
+
+3. **Query Execution**:
+   - Frontend calls `PluginManager.ExecPlugin(pluginName, connectionParams, sql)`.
+   - PluginManager looks up plugin path from registry.
+   - Spawns subprocess: `plugin exec` with 30-second context timeout.
+   - Sends JSON via stdin: `{"connection": {...}, "sql": "SELECT ..."}`.
+   - Plugin opens database connection, executes query, writes result to stdout.
+   - PluginManager reads stdout/stderr, parses response, returns to frontend.
+   - Plugin process exits automatically after response.
+
+4. **Credential Retrieval** (when connection params reference stored credentials):
+   - Service calls `CredManager.Get(credential_key)`.
+   - CredManager tries `keyring.Get` first, returns if found.
+   - Falls back to in-memory map if keyring unavailable.
+   - Returns error if credential not found in either location.
+
+5. **Connection Deletion**:
+   - Frontend calls `ConnectionService.DeleteConnection(id)`.
+   - ConnectionManager calls `CredManager.Delete(credential_key)`.
+   - CredManager removes from both keyring (best-effort) and in-memory fallback.
+   - Connection metadata removed from SQLite.
 
 ---
 
-## Notes & security callouts 🔐
+## Notes & Security Callouts 🔐
 
-- Core MUST use `go-keyring` for OS keyring access; the Frontend MUST call Core (via the Wails bridge) to add/retrieve per-user passwords. On desktop installs where Core and Frontend are co-located, Core may read/write the OS keyring on behalf of the user; otherwise Core uses the encrypted credential blob in its backing store.
-- Core continues to persist only AES-256-GCM-encrypted credential blobs and never stores plaintext secrets on disk.
-- Headless/server installs MUST use environment/secret-manager provisioning for Core master keys — document explicit admin opt-in for any disk-backed fallback.
-- Drivers are stateless and never persist plaintext credentials; runtime protections (timeout, memory caps, non-root) apply to launched driver processes.
-- Plugin manager: the host discovers on‑demand plugin executables under `./bin/plugins`, probes `plugin info` for metadata, and exposes `ListPlugins`, `Rescan`, and `ExecPlugin` via the Wails bridge. The canonical proto is `contracts/plugin/v1/plugin.proto` (generated `pluginpb`) and `pkg/plugin` provides `ServeCLI` helpers.
-- Tests to add: keyring availability and permission-denied behavior (desktop), Core fallback when keyring unavailable (server/headless), and credential-migration flows into the OS keyring via Core (Wails bridge).
-- Audit logs retain session ids only. Continue to require secure master-key provisioning and rotation for Core.
+- **Credential Storage**: `CredManager` uses `go-keyring` for OS keyring integration (primary path). When keyring unavailable (server/headless/test), automatically falls back to in-memory storage.
+- **No Plaintext on Disk**: SQLite stores only `credential_key` references (TEXT), never plaintext secrets or encrypted blobs.
+- **Plugin Communication**: CLI-based JSON interchange via stdin/stdout. Plugins are short-lived (30s timeout max).
+- **Plugin Contract**: Three commands - `info` (metadata), `exec` (query execution), `authforms` (authentication form definitions).
+- **Schema Migration**: Automatic migration from old `credential_blob` column to `credential_key` + keyring model on startup.
+- **Concurrent Safety**: CredManager uses `sync.RWMutex` for thread-safe fallback map access.
+- **Service Bindings**: Frontend calls Go services via Wails bindings (type-safe TypeScript generated from Go).
+- **Window Management**: App service provides window controls (maximize, minimize, fullscreen, close) for main and connections windows.
+- **Plugin Discovery**: Background scanner with 2-second interval; `Rescan()` available for manual refresh.
+- **Error Handling**: Plugin failures captured with stderr output; graceful degradation when commands not implemented.
 
-> Tip: diagram and flow reflect the MVP trust model — plan container isolation and further OS hardening for post-MVP.
+> **Current Implementation**: Focused on simplicity and cross-platform compatibility. OS keyring preferred; in-memory fallback ensures usability in all environments.

@@ -1,43 +1,107 @@
 # QueryBox
 
-**QueryBox** is a lightweight database management tool for executing and managing queries.
+**QueryBox** is a lightweight database management tool for executing and managing queries across multiple database systems through a plugin-based architecture.
+
+## Features
+
+- **Multi-database support** via plugin system (MySQL, PostgreSQL)
+- **Secure credential storage** using system keychain
+- **Connection management** with SQLite-backed persistence
+- **Cross-platform** support (Windows, macOS, Linux)
+- **Plugin-based architecture** for extensibility
 
 ## Getting Started
 
-1. Navigate to your project directory in the terminal.
+### Prerequisites
 
-2. To run your application in development mode, use the following command:
+- Go 1.26 or higher
+- [Wails v3](https://v3alpha.wails.io/) framework
+- [Taskfile](https://taskfile.dev/) for build automation
+- protoc and protoc-gen-go for gRPC code generation
 
-   ```
-   wails3 dev
-   ```
+### Development
 
-   This will start your application and enable hot-reloading for both frontend and backend changes.
+Navigate to the project directory and run:
 
-3. To build your application for production, use:
+```bash
+wails3 dev
+```
 
-   ```
-   wails3 build
-   ```
+This starts the application in development mode with hot-reloading for both frontend and backend changes.
 
-   This will create a production-ready executable in the `build` directory.
+### Building
+
+Build the application for production:
+
+```bash
+wails3 build
+```
+
+This creates a production-ready executable.
+
+Build plugins separately:
+
+```bash
+task build:plugins
+```
+
+Plugin executables are placed in `bin/plugins/` and automatically discovered at runtime.
 
 ## Project Structure
 
-Take a moment to familiarize yourself with your project structure:
+```
+├── main.go                # Application entry point
+├── services/              # Application services/features
+├── pkg/plugin/            # Plugin SDK and contracts
+├── plugins/               # Database driver plugins
+│   ├── mysql/             # MySQL driver plugin
+│   ├── postgresql/        # PostgreSQL driver plugin
+│   └── template/          # Plugin template
+├── contracts/plugin/      # Protobuf definitions
+├── rpc/contracts/plugin/  # Generated gRPC code
+├── frontend/              # Vue.js frontend
+│   ├── src/
+│   │   ├── views/         # UI views (Home, Connections)
+│   │   └── components/    # Reusable components
+│   └── bindings/          # Auto-generated TypeScript bindings
+├── docs/                  # Architecture and design docs
+└── build/                 # Build configuration and assets
+```
 
-- `docs/`: Documentation for QueryBox, organized into `basic-design/` and `detailed-design/` folders with their own README.md files.
-- `frontend/`: Contains your frontend code (HTML, CSS, JavaScript/TypeScript)
-- `main.go`: The entry point of your Go backend
-- `app.go`: Define your application structure and methods here
-- `wails.json`: Configuration file for your Wails project
+## Architecture
 
-## Next Steps
+### Services
 
-1. Modify the frontend in the `frontend/` directory to create your desired UI.
-2. Add backend functionality in `main.go`.
-3. Use `wails3 dev` to see your changes in real-time.
-4. When ready, build your application with `wails3 build`.
+QueryBox follows a service-oriented architecture:
+
+- **App Service**: Window lifecycle management (maximize, minimize, fullscreen)
+- **ConnectionService**: CRUD operations for database connections
+- **ConnectionManager**: SQLite-backed connection persistence
+- **PluginManager**: On-demand plugin discovery and execution
+- **CredentialManager**: Secure credential storage via `go-keyring`
+
+### Plugin System
+
+Plugins are standalone executables implementing a simple CLI interface:
+
+- `plugin info` - Returns metadata (name, version, description)
+- `plugin exec` - Executes SQL query against database
+- `plugin authforms` - Provides authentication form definitions
+
+Plugins communicate via JSON stdin/stdout. See [pkg/plugin/plugin.go](pkg/plugin/plugin.go) for the contract.
+
+## Development Workflow
+
+1. **Modify frontend**: Edit files in [frontend/src/](frontend/src/)
+2. **Add backend logic**: Update services in [services/](services/)
+3. **Create plugins**: Use [plugins/template/](plugins/template/) as a starting point
+4. **Run tests**: `go test ./...`
+5. **See changes**: `wails3 dev` for hot-reload
+6. **Build**: `wails3 build` for production executable
 
 ## References
-- https://v3alpha.wails.io/quick-start/installation/
+
+- [Wails v3 Documentation](https://v3alpha.wails.io/)
+- [Plugin Development Guide](docs/plugins.md)
+- [Architecture Overview](docs/detailed-design/architecture.md)
+- [go-keyring](https://github.com/zalando/go-keyring) for credential management
