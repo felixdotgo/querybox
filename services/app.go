@@ -8,6 +8,11 @@ type App struct {
 	ConnectionsWindow *application.WebviewWindow
 }
 
+// NewAppService creates a new instance of the App service, which provides methods for controlling the main application window and the connections window.
+func NewAppService() *App {
+	return &App{}
+}
+
 // MaximiseMainWindow maximises the main application window to use the full screen size.
 func (a *App) MaximiseMainWindow() {
 	if a.MainWindow != nil {
