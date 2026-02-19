@@ -21,12 +21,12 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Type defines the category of the plugin, which can be used by the core to determine how to handle it (e.g. render SQL editor for DRIVER plugins).
+// Type defines the category of the plugin, which can be used by the core to determine how to handle it (e.g. render query editor for DRIVER plugins).
 type PluginV1_Type int32
 
 const (
 	PluginV1_UNKNOWN PluginV1_Type = 0
-	PluginV1_DRIVER  PluginV1_Type = 1 // SQL plugin (e.g. MySQL, Postgres, etc.)
+	PluginV1_DRIVER  PluginV1_Type = 1 // Driver plugin (e.g. SQL databases like MySQL, Postgres)
 )
 
 // Enum value maps for PluginV1_Type.
@@ -272,7 +272,7 @@ type PluginV1_ExecRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// connection is plugin-defined key/value (host, user, password, ...)
 	Connection    map[string]string `protobuf:"bytes,1,rep,name=connection,proto3" json:"connection,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	Sql           string            `protobuf:"bytes,2,opt,name=sql,proto3" json:"sql,omitempty"` // SQL or plugin-specific payload
+	Query         string            `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"` // Query or plugin-specific payload (SQL/NoSQL/etc.)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -314,9 +314,9 @@ func (x *PluginV1_ExecRequest) GetConnection() map[string]string {
 	return nil
 }
 
-func (x *PluginV1_ExecRequest) GetSql() string {
+func (x *PluginV1_ExecRequest) GetQuery() string {
 	if x != nil {
-		return x.Sql
+		return x.Query
 	}
 	return ""
 }
@@ -615,19 +615,19 @@ var File_contracts_plugin_v1_plugin_proto protoreflect.FileDescriptor
 
 const file_contracts_plugin_v1_plugin_proto_rawDesc = "" +
 	"\n" +
-	" contracts/plugin/v1/plugin.proto\x12\tplugin.v1\"\xad\b\n" +
+	" contracts/plugin/v1/plugin.proto\x12\tplugin.v1\"\xb1\b\n" +
 	"\bPluginV1\x1a\r\n" +
 	"\vInfoRequest\x1a\x8c\x01\n" +
 	"\fInfoResponse\x12,\n" +
 	"\x04type\x18\x01 \x01(\x0e2\x18.plugin.v1.PluginV1.TypeR\x04type\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
 	"\aversion\x18\x03 \x01(\tR\aversion\x12 \n" +
-	"\vdescription\x18\x04 \x01(\tR\vdescription\x1a\xaf\x01\n" +
+	"\vdescription\x18\x04 \x01(\tR\vdescription\x1a\xb3\x01\n" +
 	"\vExecRequest\x12O\n" +
 	"\n" +
 	"connection\x18\x01 \x03(\v2/.plugin.v1.PluginV1.ExecRequest.ConnectionEntryR\n" +
-	"connection\x12\x10\n" +
-	"\x03sql\x18\x02 \x01(\tR\x03sql\x1a=\n" +
+	"connection\x12\x14\n" +
+	"\x05query\x18\x02 \x01(\tR\x05query\x1a=\n" +
 	"\x0fConnectionEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a<\n" +

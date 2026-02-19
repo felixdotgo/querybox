@@ -42,16 +42,16 @@ export function EnablePlugin(name) {
 }
 
 /**
- * ExecPlugin runs the named plugin with the provided connection info and SQL.
+ * ExecPlugin runs the named plugin with the provided connection info and query.
  * The plugin is invoked as an executable: `plugin exec` and receives a JSON
  * payload on stdin. The method returns the plugin's result or an error.
  * @param {string} name
  * @param {{ [_ in string]?: string }} connection
- * @param {string} sql
+ * @param {string} query
  * @returns {$CancellablePromise<string>}
  */
-export function ExecPlugin(name, connection, sql) {
-    return $Call.ByID(2332402495, name, connection, sql);
+export function ExecPlugin(name, connection, query) {
+    return $Call.ByID(2332402495, name, connection, query);
 }
 
 /**

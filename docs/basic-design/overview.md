@@ -14,7 +14,7 @@
 ### 1.2 Core Concepts
 - **Connection Service**: stores connection metadata in SQLite (including a `credential_key` reference) and delegates credential storage to CredManager.
 - **Credential Manager**: stores secrets in OS keyring (via `go-keyring`) with automatic fallback to in-memory storage when keyring unavailable (server/headless/test environments).
-- **Stateless Plugins**: spawned per request, receive connection parameters and SQL via JSON stdin/stdout, execute queries, and return results as JSON.
+- **Stateless Plugins**: spawned per request, receive connection parameters and query via JSON stdin/stdout, execute queries, and return results as JSON.
 - **On-Demand Execution**: plugins are CLI executables invoked when needed; no long-running processes or gRPC communication.
 - **Separation of Knowledge**: Core never implements database protocols; plugins never persist credentials or connection metadata.
 
@@ -29,10 +29,10 @@
 - Schema includes `created_at` and `updated_at` timestamps for audit tracking.
 
 ### 2.2 Execution Flow
-1. Frontend calls `PluginManager.ExecPlugin` with plugin name, connection parameters, and SQL query.
+1. Frontend calls `PluginManager.ExecPlugin` with plugin name, connection parameters, and query.
 2. PluginManager looks up the plugin executable in its registry (scanned from `bin/plugins`).
 3. Manager spawns the plugin as a subprocess: `plugin exec` with 30-second timeout.
-4. Plugin request is sent as JSON via stdin: `{"connection": {...}, "sql": "..."}`.
+4. Plugin request is sent as JSON via stdin: `{"connection": {...}, "query": "..."}`.
 5. Plugin executes the query against the database and writes JSON response to stdout: `{"result": "...", "error": "..."}` or returns plaintext results.
 6. PluginManager reads stdout/stderr, parses the response, and returns results to frontend.
 7. Plugin process exits after completing the request; no persistent connections maintained.

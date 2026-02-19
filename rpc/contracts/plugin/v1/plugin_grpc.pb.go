@@ -32,7 +32,7 @@ const (
 type PluginServiceClient interface {
 	// Info returns basic information about the plugin (type, name, version, description).
 	Info(ctx context.Context, in *PluginV1_InfoRequest, opts ...grpc.CallOption) (*PluginV1_InfoResponse, error)
-	// Exec executes a plugin-specific command (e.g. SQL query) and returns the result.
+	// Exec executes a plugin-specific command (e.g. SQL/NoSQL query) and returns the result.
 	// The core will pass user-provided connection details (e.g. host, user, password) and
 	// the plugin will handle the execution and return a serialized result (string/json) or an error message.
 	Exec(ctx context.Context, in *PluginV1_ExecRequest, opts ...grpc.CallOption) (*PluginV1_ExecResponse, error)
@@ -88,7 +88,7 @@ func (c *pluginServiceClient) AuthForms(ctx context.Context, in *PluginV1_AuthFo
 type PluginServiceServer interface {
 	// Info returns basic information about the plugin (type, name, version, description).
 	Info(context.Context, *PluginV1_InfoRequest) (*PluginV1_InfoResponse, error)
-	// Exec executes a plugin-specific command (e.g. SQL query) and returns the result.
+	// Exec executes a plugin-specific command (e.g. SQL/NoSQL query) and returns the result.
 	// The core will pass user-provided connection details (e.g. host, user, password) and
 	// the plugin will handle the execution and return a serialized result (string/json) or an error message.
 	Exec(context.Context, *PluginV1_ExecRequest) (*PluginV1_ExecResponse, error)

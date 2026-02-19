@@ -172,7 +172,7 @@ Discover plugin executables, manage plugin registry, execute plugins on-demand w
 | Method | Signature | Description |
 |--------|-----------|-------------|
 | `ListPlugins` | `() → []PluginInfo` | Return discovered plugins (does not spawn processes) |
-| `ExecPlugin` | `(name, connParams, sql) → (result, error)` | Execute plugin with 30s timeout |
+| `ExecPlugin` | `(name, connParams, query) → (result, error)` | Execute plugin with 30s timeout |
 | `GetPluginAuthForms` | `(name) → (map[string]AuthForm, error)` | Probe plugin for auth form definitions |
 | `Rescan` | `() → error` | Manual trigger for directory scan |
 
@@ -201,7 +201,7 @@ type PluginInfo struct {
 2. Validate executable permissions
 3. Create context with 30s timeout
 4. Spawn subprocess: `plugin exec`
-5. Marshal request to JSON and write to stdin: `{"connection": {...}, "sql": "..."}`
+5. Marshal request to JSON and write to stdin: `{"connection": {...}, "query": "..."}`
 6. Read stdout (response) and stderr (errors)
 7. Wait for process exit
 8. Parse JSON response or return raw text

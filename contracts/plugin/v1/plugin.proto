@@ -8,7 +8,7 @@ service PluginService {
   // Info returns basic information about the plugin (type, name, version, description).
   rpc Info(PluginV1.InfoRequest) returns (PluginV1.InfoResponse);
 
-  // Exec executes a plugin-specific command (e.g. SQL query) and returns the result.
+  // Exec executes a plugin-specific command (e.g. SQL/NoSQL query) and returns the result.
   // The core will pass user-provided connection details (e.g. host, user, password) and
   // the plugin will handle the execution and return a serialized result (string/json) or an error message.
   rpc Exec(PluginV1.ExecRequest) returns (PluginV1.ExecResponse);
@@ -22,10 +22,10 @@ service PluginService {
 // PluginV1 defines the data structures for plugin information, execution, and authentication forms.
 message PluginV1 {
 
-  // Type defines the category of the plugin, which can be used by the core to determine how to handle it (e.g. render SQL editor for DRIVER plugins).
+  // Type defines the category of the plugin, which can be used by the core to determine how to handle it (e.g. render query editor for DRIVER plugins).
   enum Type {
     UNKNOWN = 0;
-    DRIVER = 1; // SQL plugin (e.g. MySQL, Postgres, etc.)
+    DRIVER = 1; // Driver plugin (e.g. SQL databases like MySQL, Postgres)
   }
 
   message InfoRequest {}
@@ -40,7 +40,7 @@ message PluginV1 {
   message ExecRequest {
     // connection is plugin-defined key/value (host, user, password, ...)
     map<string, string> connection = 1;
-    string sql = 2; // SQL or plugin-specific payload
+    string query = 2; // Query or plugin-specific payload (SQL/NoSQL/etc.)
   }
 
   message ExecResponse {

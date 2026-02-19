@@ -70,10 +70,10 @@ graph LR
    - Stores discovered plugins in memory registry: `{name, path, type, version, description}`.
 
 3. **Query Execution**:
-   - Frontend calls `PluginManager.ExecPlugin(pluginName, connectionParams, sql)`.
+   - Frontend calls `PluginManager.ExecPlugin(pluginName, connectionParams, query)`.
    - PluginManager looks up plugin path from registry.
    - Spawns subprocess: `plugin exec` with 30-second context timeout.
-   - Sends JSON via stdin: `{"connection": {...}, "sql": "SELECT ..."}`.
+   - Sends JSON via stdin: `{"connection": {...}, "query": "SELECT ..."}`.
    - Plugin opens database connection, executes query, writes result to stdout.
    - PluginManager reads stdout/stderr, parses response, returns to frontend.
    - Plugin process exits automatically after response.

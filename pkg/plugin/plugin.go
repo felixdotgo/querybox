@@ -41,7 +41,7 @@ type Plugin interface {
 	Info() (InfoResponse, error)
 
 	// Exec executes a request from the host and returns a response.
-	// The host will pass a SQL query and a map of connection/authentication parameters (e.g. host, user, password)
+	// The host will pass a query and a map of connection/authentication parameters (e.g. host, user, password)
 	// that the plugin can use to connect to a database or service and execute the query. The plugin is responsible
 	// for defining the expected connection parameters and handling the execution logic.
 	Exec(ExecRequest) (ExecResponse, error)

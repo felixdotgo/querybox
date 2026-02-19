@@ -41,7 +41,7 @@ type Manager struct {
 // exec request/response used for CLI JSON interchange with plugins.
 type execRequest struct {
 	Connection map[string]string `json:"connection"`
-	SQL        string            `json:"sql"`
+	Query      string            `json:"query"`
 }
 
 type execResponse struct {
@@ -177,10 +177,10 @@ func (m *Manager) ListPlugins() []PluginInfo {
 	return ret
 }
 
-// ExecPlugin runs the named plugin with the provided connection info and SQL.
+// ExecPlugin runs the named plugin with the provided connection info and query.
 // The plugin is invoked as an executable: `plugin exec` and receives a JSON
 // payload on stdin. The method returns the plugin's result or an error.
-func (m *Manager) ExecPlugin(name string, connection map[string]string, sql string) (string, error) {
+func (m *Manager) ExecPlugin(name string, connection map[string]string, query string) (string, error) {
 	m.mu.Lock()
 	info, ok := m.plugins[name]
 	m.mu.Unlock()
@@ -192,7 +192,7 @@ func (m *Manager) ExecPlugin(name string, connection map[string]string, sql stri
 		return "", errors.New("plugin is not executable")
 	}
 
-	req := execRequest{Connection: connection, SQL: sql}
+	req := execRequest{Connection: connection, Query: query}
 	b, _ := json.Marshal(&req)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

@@ -85,7 +85,7 @@ QueryBox follows a service-oriented architecture:
 Plugins are standalone executables implementing a simple CLI interface:
 
 - `plugin info` - Returns metadata (name, version, description)
-- `plugin exec` - Executes SQL query against database
+- `plugin exec` - Executes query against database
 - `plugin authforms` - Provides authentication form definitions
 
 Plugins communicate via JSON stdin/stdout. See [pkg/plugin/plugin.go](pkg/plugin/plugin.go) for the contract.

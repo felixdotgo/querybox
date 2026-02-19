@@ -85,7 +85,7 @@ func (m *mysqlPlugin) Exec(req plugin.ExecRequest) (plugin.ExecResponse, error) 
 	}
 	defer db.Close()
 
-	rows, err := db.Query(req.Sql)
+	rows, err := db.Query(req.Query)
 	if err != nil {
 		return plugin.ExecResponse{Error: fmt.Sprintf("query error: %v", err)}, nil
 	}

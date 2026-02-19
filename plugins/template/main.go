@@ -14,8 +14,8 @@ func (t *templatePlugin) Info() (plugin.InfoResponse, error) {
 }
 
 func (t *templatePlugin) Exec(req plugin.ExecRequest) (plugin.ExecResponse, error) {
-	// echo the SQL and connection keys for demonstration
-	return plugin.ExecResponse{Result: fmt.Sprintf("executed sql: %s | connKeys=%v", req.Sql, req.Connection)}, nil
+	// echo the query and connection keys for demonstration
+	return plugin.ExecResponse{Result: fmt.Sprintf("executed query: %s | connKeys=%v", req.Query, req.Connection)}, nil
 }
 
 func (t *templatePlugin) AuthForms(plugin.AuthFormsRequest) (plugin.AuthFormsResponse, error) {
