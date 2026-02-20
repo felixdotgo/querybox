@@ -3,7 +3,7 @@
     <!-- Header (application menu placeholder) -->
     <header
       ref="headerRef"
-      class="w-full border-b px-2 py-2 flex items-center gap-4 flex-shrink-0"
+      :class="['w-full border-b border-gray-200 pr-2 flex items-center flex-shrink-0', isMac ? 'pl-30 py-4 gap-2' : 'pl-2 gap-4 py-2']"
     >
         <n-button size="tiny" quaternary>File</n-button>
         <n-button size="tiny" quaternary>Edit</n-button>
@@ -15,11 +15,11 @@
     <main class="flex-1 min-h-0">
       <div
         ref="containerRef"
-        class="flex w-full h-full border rounded overflow-hidden"
+        class="flex w-full h-full overflow-hidden"
       >
         <!-- Left column: toolbar + tree -->
         <div
-          class="flex-shrink-0 border-r"
+          class="flex-shrink-0"
           :style="{ width: leftWidth + 'px', minWidth: '400px' }"
         >
           <div class="p-3 h-full flex flex-col gap-3">
@@ -79,7 +79,7 @@
         <div class="flex-1 p-6 min-h-0 overflow-auto">
           <h3 class="text-lg font-semibold mb-2">Workspace</h3>
           <div
-            class="p-6 border border-dashed rounded h-full flex items-center justify-center text-gray-500"
+            class="p-6 border border-dashed border-gray-200 rounded h-full flex items-center justify-center text-gray-500"
           >
             <div class="text-center">
               <div class="mb-2">
@@ -109,7 +109,7 @@
     </div>
 
     <!-- Footer: collapsible log / debug area -->
-    <footer class="w-full border-t bg-white transition-all duration-200">
+    <footer class="w-full bg-white transition-all duration-200">
       <div class="flex items-center justify-between px-4 py-2">
         <div class="flex items-center gap-3">
           <button class="text-sm text-gray-600" @click="toggleFooter">
@@ -123,7 +123,7 @@
 
       <div
         v-show="!footerCollapsed"
-        class="border-t bg-gray-50 p-3 overflow-auto"
+        class="bg-gray-50 p-3 overflow-auto"
         :style="{ height: footerHeight + 'px' }"
       >
         <div class="text-sm text-gray-600">Log viewer (placeholder)</div>
@@ -142,6 +142,8 @@ import { useRouter } from "vue-router"
 import { ListConnections } from "@/bindings/github.com/felixdotgo/querybox/services/connectionservice"
 import { ShowConnectionsWindow, MinimiseMainWindow, ToggleFullScreenMainWindow, CloseMainWindow } from "@/bindings/github.com/felixdotgo/querybox/services/app"
 import { createHorizontalResizer, createVerticalResizer } from "@/composables/useResize"
+
+const isMac = navigator.userAgent.includes('Mac')
 
 const router = useRouter()
 async function openConnections() {

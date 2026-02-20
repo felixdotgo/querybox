@@ -1,7 +1,7 @@
 <template>
   <div class="container-fluid p-0">
     <n-layout has-sider>
-      <n-layout-sider class="border-r border-gray-200">
+      <n-layout-sider>
         <div class="p-4">
           <h3 class="mb-2 font-bold">Drivers</h3>
           <ul class="list-none p-0 m-0 flex flex-col gap-1.5">
@@ -63,19 +63,24 @@
     </n-layout>
 
     <div
-      class="fixed bottom-0 left-0 right-0 border-t p-4 border-gray-200 bg-white flex shadow-lg"
+      class="fixed bottom-0 left-0 right-0 p-4 bg-white shadow-lg"
     >
-      <n-button class="w-32 ml-auto" quaternary @click="CloseConnectionsWindow"
-        >Cancel</n-button
-      >
-      <n-button class="w-32 ml-2" quaternary @click="clearForm">Clear</n-button>
-      <n-button
-        class="w-32 ml-2"
-        type="primary"
-        @click="saveConnection"
-        :disabled="!canConnect"
-        >OK</n-button
-      >
+      <n-flex justify="space-between">
+        <n-button class="w-32 ml-auto" quaternary @click="CloseConnectionsWindow">
+          Cancel
+        </n-button>
+        <n-flex>
+          <n-button class="w-32 ml-2" quaternary @click="clearForm">Clear</n-button>
+          <n-button
+            class="w-32 ml-2"
+            type="primary"
+            @click="saveConnection"
+            :disabled="!canConnect"
+          >
+            OK
+          </n-button>
+        </n-flex>
+      </n-flex>
     </div>
   </div>
 </template>
