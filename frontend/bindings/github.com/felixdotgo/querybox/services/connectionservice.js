@@ -4,8 +4,9 @@
 
 /**
  * ConnectionService is the application-facing service that exposes connection
- * management APIs to the frontend. Methods are intentionally thin wrappers over
- * the lower-level ConnectionManager to keep bindings small and focused.
+ * management APIs to the frontend. The service now embeds the persistence and
+ * credential-storage logic (previously in connection.ConnectionManager). It is
+ * safe for concurrent use.
  * @module
  */
 
@@ -15,14 +16,16 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as connection$0 from "./connection/models.js";
+import * as $models from "./models.js";
 
 /**
- * CreateConnection creates and persists a new connection record.
+ * CreateConnection inserts a new connection record and returns it. The
+ * provided `credential` (typically the frontend-serialized auth form) is
+ * stored in the OS keyring and the DB only keeps the key reference.
  * @param {string} name
  * @param {string} driverType
  * @param {string} credential
- * @returns {$CancellablePromise<connection$0.Connection>}
+ * @returns {$CancellablePromise<$models.Connection>}
  */
 export function CreateConnection(name, driverType, credential) {
     return $Call.ByID(3879129233, name, driverType, credential).then(/** @type {($result: any) => any} */(($result) => {
@@ -31,7 +34,8 @@ export function CreateConnection(name, driverType, credential) {
 }
 
 /**
- * DeleteConnection removes a connection by id.
+ * DeleteConnection removes a connection by id and attempts to remove the
+ * associated secret from the keyring as a best-effort cleanup.
  * @param {string} id
  * @returns {$CancellablePromise<void>}
  */
@@ -42,7 +46,7 @@ export function DeleteConnection(id) {
 /**
  * GetConnection retrieves a single connection by id.
  * @param {string} id
- * @returns {$CancellablePromise<connection$0.Connection>}
+ * @returns {$CancellablePromise<$models.Connection>}
  */
 export function GetConnection(id) {
     return $Call.ByID(599383695, id).then(/** @type {($result: any) => any} */(($result) => {
@@ -51,8 +55,9 @@ export function GetConnection(id) {
 }
 
 /**
- * ListConnections returns all configured connections.
- * @returns {$CancellablePromise<connection$0.Connection[]>}
+ * ListConnections returns all stored connections ordered by creation time
+ * (newest first).
+ * @returns {$CancellablePromise<$models.Connection[]>}
  */
 export function ListConnections() {
     return $Call.ByID(3704832906).then(/** @type {($result: any) => any} */(($result) => {
@@ -61,5 +66,5 @@ export function ListConnections() {
 }
 
 // Private type creation functions
-const $$createType0 = connection$0.Connection.createFrom;
+const $$createType0 = $models.Connection.createFrom;
 const $$createType1 = $Create.Array($$createType0);

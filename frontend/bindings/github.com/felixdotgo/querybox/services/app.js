@@ -6,6 +6,10 @@
 // @ts-ignore: Unused imports
 import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Create } from "@wailsio/runtime";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as application$0 from "../../../wailsapp/wails/v3/pkg/application/models.js";
+
 /**
  * CloseConnectionsWindow hides the connections window and sends it to the back.
  * @returns {$CancellablePromise<void>}
@@ -39,6 +43,15 @@ export function MinimiseMainWindow() {
 }
 
 /**
+ * @returns {$CancellablePromise<application$0.WebviewWindow | null>}
+ */
+export function NewConnectionsWindow() {
+    return $Call.ByID(3366044994).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType1($result);
+    }));
+}
+
+/**
  * ShowConnectionsWindow shows the connections window and brings it to the front.
  * @returns {$CancellablePromise<void>}
  */
@@ -53,3 +66,7 @@ export function ShowConnectionsWindow() {
 export function ToggleFullScreenMainWindow() {
     return $Call.ByID(3718089985);
 }
+
+// Private type creation functions
+const $$createType0 = application$0.WebviewWindow.createFrom;
+const $$createType1 = $Create.Nullable($$createType0);

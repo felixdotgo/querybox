@@ -8,3 +8,7 @@ export {
     App,
     ConnectionService
 };
+
+export {
+    Connection
+} from "./models.js";

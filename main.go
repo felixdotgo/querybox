@@ -81,20 +81,7 @@ func main() {
 	// This window will be shown when the user clicks the "Connections" button in the UI.
 	// or when there is no configured connection and the app needs to prompt the user to create one.
 	// See `services/app.go` for the `ShowConnectionsWindow` method that shows this window.
-	app.ConnectionsWindow = app.App.Window.NewWithOptions(application.WebviewWindowOptions{
-		Name:   "connections",
-		Title:  "Connections",
-		URL:    "/connections",
-		Hidden: true,
-		DisableResize: true,
-		MinWidth: 1024,
-		Frameless: true,
-		Mac: application.MacWindow{
-			InvisibleTitleBarHeight: 50,
-			Backdrop:                application.MacBackdropTranslucent,
-			TitleBar:                application.MacTitleBarHiddenInset,
-		},
-	})
+	app.ConnectionsWindow = app.NewConnectionsWindow()
 
 	// Run the application. This blocks until the application has been exited.
 	err := app.App.Run()

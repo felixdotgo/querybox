@@ -1,6 +1,8 @@
 package services
 
-import "github.com/wailsapp/wails/v3/pkg/application"
+import (
+	"github.com/wailsapp/wails/v3/pkg/application"
+)
 
 type App struct {
 	App               *application.App
@@ -11,6 +13,25 @@ type App struct {
 // NewAppService creates a new instance of the App service, which provides methods for controlling the main application window and the connections window.
 func NewAppService() *App {
 	return &App{}
+}
+
+func (a *App) NewConnectionsWindow() *application.WebviewWindow {
+	w := a.App.Window.NewWithOptions(application.WebviewWindowOptions{
+		Name:   "connections",
+		Title:  "Connections",
+		URL:    "/connections",
+		Hidden: true,
+		DisableResize: true,
+		MinWidth: 1024,
+		Frameless: true,
+		Mac: application.MacWindow{
+			InvisibleTitleBarHeight: 50,
+			Backdrop:                application.MacBackdropTranslucent,
+			TitleBar:                application.MacTitleBarHiddenInset,
+		},
+	})
+
+	return w
 }
 
 // MaximiseMainWindow maximises the main application window to use the full screen size.
@@ -43,11 +64,12 @@ func (a *App) ToggleFullScreenMainWindow() {
 
 // ShowConnectionsWindow shows the connections window and brings it to the front.
 func (a *App) ShowConnectionsWindow() {
-	if a.ConnectionsWindow != nil {
-		a.ConnectionsWindow.Show()
-		a.ConnectionsWindow.Focus()
-		a.ConnectionsWindow.SetAlwaysOnTop(true)
+	if a.ConnectionsWindow == nil {
+		a.ConnectionsWindow = a.NewConnectionsWindow()
 	}
+	a.ConnectionsWindow.Show()
+	a.ConnectionsWindow.Focus()
+	a.ConnectionsWindow.SetAlwaysOnTop(true)
 }
 
 // CloseConnectionsWindow hides the connections window and sends it to the back.
