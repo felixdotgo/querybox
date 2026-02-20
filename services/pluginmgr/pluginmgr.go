@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/felixdotgo/querybox/pkg/plugin"
+	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
 )
 
 // PluginInfo holds metadata that the UI can display for each plugin.
@@ -39,15 +40,22 @@ type Manager struct {
 }
 
 // exec request/response used for CLI JSON interchange with plugins.
+// The CLI format mirrors the protobuf types so that authors can simply
+// marshal the generated messages. We no longer use a plain string result;
+// instead the envelope contains a typed ExecResult (see contracts/plugin/v1).
+// For historical compatibility we still accept raw string output and wrap it
+// in a key/value result.
 type execRequest struct {
 	Connection map[string]string `json:"connection"`
 	Query      string            `json:"query"`
 }
+// We reuse the generated protobuf alias for the response so we stay in sync
+// with any future changes.
+//
+// Note that plugin.ExecResponse is alias for pluginpb.PluginV1_ExecResponse.
+// Using it here allows json.Unmarshal to correctly populate the nested
+// ExecResult field.
 
-type execResponse struct {
-	Result string `json:"result"`
-	Error  string `json:"error"`
-}
 
 // New creates a Manager and starts a background scanner for the plugins folder.
 func New() *Manager {
@@ -179,17 +187,19 @@ func (m *Manager) ListPlugins() []PluginInfo {
 
 // ExecPlugin runs the named plugin with the provided connection info and query.
 // The plugin is invoked as an executable: `plugin exec` and receives a JSON
-// payload on stdin. The method returns the plugin's result or an error.
-func (m *Manager) ExecPlugin(name string, connection map[string]string, query string) (string, error) {
+// payload on stdin. The method returns the structured `plugin.ExecResponse` or
+// an error.  Historically this returned a raw string; callers may need to
+// examine the `Result` field to access rows, documents, or key/value data.
+func (m *Manager) ExecPlugin(name string, connection map[string]string, query string) (plugin.ExecResponse, error) {
 	m.mu.Lock()
 	info, ok := m.plugins[name]
 	m.mu.Unlock()
 	if !ok {
-		return "", errors.New("plugin not found")
+		return plugin.ExecResponse{}, errors.New("plugin not found")
 	}
 	full := info.Path
 	if !isExecutable(full) {
-		return "", errors.New("plugin is not executable")
+		return plugin.ExecResponse{}, errors.New("plugin is not executable")
 	}
 
 	req := execRequest{Connection: connection, Query: query}
@@ -201,19 +211,19 @@ func (m *Manager) ExecPlugin(name string, connection map[string]string, query st
 	cmd.Env = append(os.Environ(), "QUERYBOX_PLUGIN_NAME="+name)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		return "", err
+		return plugin.ExecResponse{}, err
 	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return "", err
+		return plugin.ExecResponse{}, err
 	}
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		return "", err
+		return plugin.ExecResponse{}, err
 	}
 
 	if err := cmd.Start(); err != nil {
-		return "", err
+		return plugin.ExecResponse{}, err
 	}
 
 	// send request
@@ -225,22 +235,24 @@ func (m *Manager) ExecPlugin(name string, connection map[string]string, query st
 	errB, _ := io.ReadAll(stderr)
 
 	if err := cmd.Wait(); err != nil {
-		return "", fmt.Errorf("plugin exited: %w - stderr: %s", err, string(errB))
+		return plugin.ExecResponse{}, fmt.Errorf("plugin exited: %w - stderr: %s", err, string(errB))
 	}
 
-	var resp execResponse
+	// if the plugin didn't emit JSON we still want to return something useful
+	// so wrap the raw output in a simple key/value result.  Older clients may
+	// still just render the string.
+	var resp plugin.ExecResponse
 	if len(outB) == 0 {
-		// allow plain text responses
-		return string(outB), nil
+		return plugin.ExecResponse{}, nil
 	}
 	if err := json.Unmarshal(outB, &resp); err != nil {
-		// if not JSON, return raw output
-		return string(outB), nil
+		// fallback to embedding the raw output in a KV map under "_".
+		return plugin.ExecResponse{Result: &pluginpb.PluginV1_ExecResult{Payload: &pluginpb.PluginV1_ExecResult_Kv{Kv: &pluginpb.PluginV1_KeyValueResult{Data: map[string]string{"_": string(outB)}}}}}, nil
 	}
 	if resp.Error != "" {
-		return resp.Result, errors.New(resp.Error)
+		return resp, errors.New(resp.Error)
 	}
-	return resp.Result, nil
+	return resp, nil
 }
 
 // Rescan triggers an immediate directory scan.

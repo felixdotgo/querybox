@@ -5,6 +5,7 @@ go 1.26
 require (
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/google/uuid v1.6.0
+	github.com/lib/pq v1.11.2
 	github.com/wailsapp/wails/v3 v3.0.0-alpha.72
 	github.com/zalando/go-keyring v0.2.6
 	google.golang.org/grpc v1.79.1

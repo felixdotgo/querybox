@@ -9,6 +9,7 @@ package pluginpb
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	structpb "google.golang.org/protobuf/types/known/structpb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -124,7 +125,7 @@ func (x PluginV1_AuthField_FieldType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use PluginV1_AuthField_FieldType.Descriptor instead.
 func (PluginV1_AuthField_FieldType) EnumDescriptor() ([]byte, []int) {
-	return file_contracts_plugin_v1_plugin_proto_rawDescGZIP(), []int{0, 4, 0}
+	return file_contracts_plugin_v1_plugin_proto_rawDescGZIP(), []int{0, 10, 0}
 }
 
 // PluginV1 defines the data structures for plugin information, execution, and authentication forms.
@@ -321,10 +322,15 @@ func (x *PluginV1_ExecRequest) GetQuery() string {
 	return ""
 }
 
+// ExecResponse contains the output of an Exec call,
+// provide a typed, extensible envelope that can represent at least three
+// common data models (SQL, document/JSON, and simple key-value maps).  The
+// UI will examine the oneof field and render accordingly instead of relying
+// on plugin-specific semantics.
 type PluginV1_ExecResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Result        string                 `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"` // plugin-serialized result (string/json)
-	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`   // optional error message
+	Result        *PluginV1_ExecResult   `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"` // optional error message
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -359,11 +365,11 @@ func (*PluginV1_ExecResponse) Descriptor() ([]byte, []int) {
 	return file_contracts_plugin_v1_plugin_proto_rawDescGZIP(), []int{0, 3}
 }
 
-func (x *PluginV1_ExecResponse) GetResult() string {
+func (x *PluginV1_ExecResponse) GetResult() *PluginV1_ExecResult {
 	if x != nil {
 		return x.Result
 	}
-	return ""
+	return nil
 }
 
 func (x *PluginV1_ExecResponse) GetError() string {
@@ -371,6 +377,355 @@ func (x *PluginV1_ExecResponse) GetError() string {
 		return x.Error
 	}
 	return ""
+}
+
+// ExecResult is a wrapper around the various result types supported by a
+// plugin.  Only one field will be populated.
+type PluginV1_ExecResult struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Payload:
+	//
+	//	*PluginV1_ExecResult_Sql
+	//	*PluginV1_ExecResult_Document
+	//	*PluginV1_ExecResult_Kv
+	Payload       isPluginV1_ExecResult_Payload `protobuf_oneof:"payload"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PluginV1_ExecResult) Reset() {
+	*x = PluginV1_ExecResult{}
+	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PluginV1_ExecResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PluginV1_ExecResult) ProtoMessage() {}
+
+func (x *PluginV1_ExecResult) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PluginV1_ExecResult.ProtoReflect.Descriptor instead.
+func (*PluginV1_ExecResult) Descriptor() ([]byte, []int) {
+	return file_contracts_plugin_v1_plugin_proto_rawDescGZIP(), []int{0, 4}
+}
+
+func (x *PluginV1_ExecResult) GetPayload() isPluginV1_ExecResult_Payload {
+	if x != nil {
+		return x.Payload
+	}
+	return nil
+}
+
+func (x *PluginV1_ExecResult) GetSql() *PluginV1_SqlResult {
+	if x != nil {
+		if x, ok := x.Payload.(*PluginV1_ExecResult_Sql); ok {
+			return x.Sql
+		}
+	}
+	return nil
+}
+
+func (x *PluginV1_ExecResult) GetDocument() *PluginV1_DocumentResult {
+	if x != nil {
+		if x, ok := x.Payload.(*PluginV1_ExecResult_Document); ok {
+			return x.Document
+		}
+	}
+	return nil
+}
+
+func (x *PluginV1_ExecResult) GetKv() *PluginV1_KeyValueResult {
+	if x != nil {
+		if x, ok := x.Payload.(*PluginV1_ExecResult_Kv); ok {
+			return x.Kv
+		}
+	}
+	return nil
+}
+
+type isPluginV1_ExecResult_Payload interface {
+	isPluginV1_ExecResult_Payload()
+}
+
+type PluginV1_ExecResult_Sql struct {
+	Sql *PluginV1_SqlResult `protobuf:"bytes,1,opt,name=sql,proto3,oneof"`
+}
+
+type PluginV1_ExecResult_Document struct {
+	Document *PluginV1_DocumentResult `protobuf:"bytes,2,opt,name=document,proto3,oneof"`
+}
+
+type PluginV1_ExecResult_Kv struct {
+	Kv *PluginV1_KeyValueResult `protobuf:"bytes,3,opt,name=kv,proto3,oneof"`
+}
+
+func (*PluginV1_ExecResult_Sql) isPluginV1_ExecResult_Payload() {}
+
+func (*PluginV1_ExecResult_Document) isPluginV1_ExecResult_Payload() {}
+
+func (*PluginV1_ExecResult_Kv) isPluginV1_ExecResult_Payload() {}
+
+// SqlResult describes a tabular result set with explicit columns and rows.
+// All values are serialized as strings; plugins are free to format them as
+// they wish (e.g. quoting) but the UI will treat them generically.
+// Columns carry metadata about each field in a tabular SQL result.  Name is
+// required; type is optional and may reflect the database's type name (e.g.
+// "varchar", "int").  The UI can use this information to choose appropriate
+// input/edit controls when presenting results or constructing inserts.
+type PluginV1_Column struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Type          string                 `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PluginV1_Column) Reset() {
+	*x = PluginV1_Column{}
+	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PluginV1_Column) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PluginV1_Column) ProtoMessage() {}
+
+func (x *PluginV1_Column) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PluginV1_Column.ProtoReflect.Descriptor instead.
+func (*PluginV1_Column) Descriptor() ([]byte, []int) {
+	return file_contracts_plugin_v1_plugin_proto_rawDescGZIP(), []int{0, 5}
+}
+
+func (x *PluginV1_Column) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *PluginV1_Column) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+type PluginV1_SqlResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Columns       []*PluginV1_Column     `protobuf:"bytes,1,rep,name=columns,proto3" json:"columns,omitempty"`
+	Rows          []*PluginV1_Row        `protobuf:"bytes,2,rep,name=rows,proto3" json:"rows,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PluginV1_SqlResult) Reset() {
+	*x = PluginV1_SqlResult{}
+	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PluginV1_SqlResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PluginV1_SqlResult) ProtoMessage() {}
+
+func (x *PluginV1_SqlResult) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PluginV1_SqlResult.ProtoReflect.Descriptor instead.
+func (*PluginV1_SqlResult) Descriptor() ([]byte, []int) {
+	return file_contracts_plugin_v1_plugin_proto_rawDescGZIP(), []int{0, 6}
+}
+
+func (x *PluginV1_SqlResult) GetColumns() []*PluginV1_Column {
+	if x != nil {
+		return x.Columns
+	}
+	return nil
+}
+
+func (x *PluginV1_SqlResult) GetRows() []*PluginV1_Row {
+	if x != nil {
+		return x.Rows
+	}
+	return nil
+}
+
+type PluginV1_Row struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Values        []string               `protobuf:"bytes,1,rep,name=values,proto3" json:"values,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PluginV1_Row) Reset() {
+	*x = PluginV1_Row{}
+	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PluginV1_Row) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PluginV1_Row) ProtoMessage() {}
+
+func (x *PluginV1_Row) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PluginV1_Row.ProtoReflect.Descriptor instead.
+func (*PluginV1_Row) Descriptor() ([]byte, []int) {
+	return file_contracts_plugin_v1_plugin_proto_rawDescGZIP(), []int{0, 7}
+}
+
+func (x *PluginV1_Row) GetValues() []string {
+	if x != nil {
+		return x.Values
+	}
+	return nil
+}
+
+// DocumentResult is intended for document‑oriented databases (Mongo, Couch,
+// etc.) where each entry is an object.  The google.protobuf.Struct type is
+// used here to avoid prescribing a schema – it maps cleanly to JS objects
+// and the frontend can iterate the fields dynamically.
+type PluginV1_DocumentResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Documents     []*structpb.Struct     `protobuf:"bytes,1,rep,name=documents,proto3" json:"documents,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PluginV1_DocumentResult) Reset() {
+	*x = PluginV1_DocumentResult{}
+	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PluginV1_DocumentResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PluginV1_DocumentResult) ProtoMessage() {}
+
+func (x *PluginV1_DocumentResult) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PluginV1_DocumentResult.ProtoReflect.Descriptor instead.
+func (*PluginV1_DocumentResult) Descriptor() ([]byte, []int) {
+	return file_contracts_plugin_v1_plugin_proto_rawDescGZIP(), []int{0, 8}
+}
+
+func (x *PluginV1_DocumentResult) GetDocuments() []*structpb.Struct {
+	if x != nil {
+		return x.Documents
+	}
+	return nil
+}
+
+// KeyValueResult is a simple map of string→string appropriate for things like
+// Redis or other key/value stores where the “row” concept isn’t meaningful.
+type PluginV1_KeyValueResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          map[string]string      `protobuf:"bytes,1,rep,name=data,proto3" json:"data,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PluginV1_KeyValueResult) Reset() {
+	*x = PluginV1_KeyValueResult{}
+	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PluginV1_KeyValueResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PluginV1_KeyValueResult) ProtoMessage() {}
+
+func (x *PluginV1_KeyValueResult) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PluginV1_KeyValueResult.ProtoReflect.Descriptor instead.
+func (*PluginV1_KeyValueResult) Descriptor() ([]byte, []int) {
+	return file_contracts_plugin_v1_plugin_proto_rawDescGZIP(), []int{0, 9}
+}
+
+func (x *PluginV1_KeyValueResult) GetData() map[string]string {
+	if x != nil {
+		return x.Data
+	}
+	return nil
 }
 
 // AuthField represents a single input field for authentication (e.g. host, user, password).
@@ -390,7 +745,7 @@ type PluginV1_AuthField struct {
 
 func (x *PluginV1_AuthField) Reset() {
 	*x = PluginV1_AuthField{}
-	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[5]
+	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -402,7 +757,7 @@ func (x *PluginV1_AuthField) String() string {
 func (*PluginV1_AuthField) ProtoMessage() {}
 
 func (x *PluginV1_AuthField) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[5]
+	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -415,7 +770,7 @@ func (x *PluginV1_AuthField) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PluginV1_AuthField.ProtoReflect.Descriptor instead.
 func (*PluginV1_AuthField) Descriptor() ([]byte, []int) {
-	return file_contracts_plugin_v1_plugin_proto_rawDescGZIP(), []int{0, 4}
+	return file_contracts_plugin_v1_plugin_proto_rawDescGZIP(), []int{0, 10}
 }
 
 func (x *PluginV1_AuthField) GetType() PluginV1_AuthField_FieldType {
@@ -481,7 +836,7 @@ type PluginV1_AuthForm struct {
 
 func (x *PluginV1_AuthForm) Reset() {
 	*x = PluginV1_AuthForm{}
-	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[6]
+	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -493,7 +848,7 @@ func (x *PluginV1_AuthForm) String() string {
 func (*PluginV1_AuthForm) ProtoMessage() {}
 
 func (x *PluginV1_AuthForm) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[6]
+	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -506,7 +861,7 @@ func (x *PluginV1_AuthForm) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PluginV1_AuthForm.ProtoReflect.Descriptor instead.
 func (*PluginV1_AuthForm) Descriptor() ([]byte, []int) {
-	return file_contracts_plugin_v1_plugin_proto_rawDescGZIP(), []int{0, 5}
+	return file_contracts_plugin_v1_plugin_proto_rawDescGZIP(), []int{0, 11}
 }
 
 func (x *PluginV1_AuthForm) GetKey() string {
@@ -538,7 +893,7 @@ type PluginV1_AuthFormsRequest struct {
 
 func (x *PluginV1_AuthFormsRequest) Reset() {
 	*x = PluginV1_AuthFormsRequest{}
-	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[7]
+	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -550,7 +905,7 @@ func (x *PluginV1_AuthFormsRequest) String() string {
 func (*PluginV1_AuthFormsRequest) ProtoMessage() {}
 
 func (x *PluginV1_AuthFormsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[7]
+	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -563,7 +918,7 @@ func (x *PluginV1_AuthFormsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PluginV1_AuthFormsRequest.ProtoReflect.Descriptor instead.
 func (*PluginV1_AuthFormsRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_plugin_v1_plugin_proto_rawDescGZIP(), []int{0, 6}
+	return file_contracts_plugin_v1_plugin_proto_rawDescGZIP(), []int{0, 12}
 }
 
 type PluginV1_AuthFormsResponse struct {
@@ -576,7 +931,7 @@ type PluginV1_AuthFormsResponse struct {
 
 func (x *PluginV1_AuthFormsResponse) Reset() {
 	*x = PluginV1_AuthFormsResponse{}
-	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[8]
+	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -588,7 +943,7 @@ func (x *PluginV1_AuthFormsResponse) String() string {
 func (*PluginV1_AuthFormsResponse) ProtoMessage() {}
 
 func (x *PluginV1_AuthFormsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[8]
+	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -601,7 +956,7 @@ func (x *PluginV1_AuthFormsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PluginV1_AuthFormsResponse.ProtoReflect.Descriptor instead.
 func (*PluginV1_AuthFormsResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_plugin_v1_plugin_proto_rawDescGZIP(), []int{0, 7}
+	return file_contracts_plugin_v1_plugin_proto_rawDescGZIP(), []int{0, 13}
 }
 
 func (x *PluginV1_AuthFormsResponse) GetForms() map[string]*PluginV1_AuthForm {
@@ -615,7 +970,7 @@ var File_contracts_plugin_v1_plugin_proto protoreflect.FileDescriptor
 
 const file_contracts_plugin_v1_plugin_proto_rawDesc = "" +
 	"\n" +
-	" contracts/plugin/v1/plugin.proto\x12\tplugin.v1\"\xb1\b\n" +
+	" contracts/plugin/v1/plugin.proto\x12\tplugin.v1\x1a\x1cgoogle/protobuf/struct.proto\"\xae\r\n" +
 	"\bPluginV1\x1a\r\n" +
 	"\vInfoRequest\x1a\x8c\x01\n" +
 	"\fInfoResponse\x12,\n" +
@@ -630,10 +985,31 @@ const file_contracts_plugin_v1_plugin_proto_rawDesc = "" +
 	"\x05query\x18\x02 \x01(\tR\x05query\x1a=\n" +
 	"\x0fConnectionEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a<\n" +
-	"\fExecResponse\x12\x16\n" +
-	"\x06result\x18\x01 \x01(\tR\x06result\x12\x14\n" +
-	"\x05error\x18\x02 \x01(\tR\x05error\x1a\xbe\x02\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a\\\n" +
+	"\fExecResponse\x126\n" +
+	"\x06result\x18\x01 \x01(\v2\x1e.plugin.v1.PluginV1.ExecResultR\x06result\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\x1a\xc2\x01\n" +
+	"\n" +
+	"ExecResult\x121\n" +
+	"\x03sql\x18\x01 \x01(\v2\x1d.plugin.v1.PluginV1.SqlResultH\x00R\x03sql\x12@\n" +
+	"\bdocument\x18\x02 \x01(\v2\".plugin.v1.PluginV1.DocumentResultH\x00R\bdocument\x124\n" +
+	"\x02kv\x18\x03 \x01(\v2\".plugin.v1.PluginV1.KeyValueResultH\x00R\x02kvB\t\n" +
+	"\apayload\x1a0\n" +
+	"\x06Column\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
+	"\x04type\x18\x02 \x01(\tR\x04type\x1an\n" +
+	"\tSqlResult\x124\n" +
+	"\acolumns\x18\x01 \x03(\v2\x1a.plugin.v1.PluginV1.ColumnR\acolumns\x12+\n" +
+	"\x04rows\x18\x02 \x03(\v2\x17.plugin.v1.PluginV1.RowR\x04rows\x1a\x1d\n" +
+	"\x03Row\x12\x16\n" +
+	"\x06values\x18\x01 \x03(\tR\x06values\x1aG\n" +
+	"\x0eDocumentResult\x125\n" +
+	"\tdocuments\x18\x01 \x03(\v2\x17.google.protobuf.StructR\tdocuments\x1a\x8b\x01\n" +
+	"\x0eKeyValueResult\x12@\n" +
+	"\x04data\x18\x01 \x03(\v2,.plugin.v1.PluginV1.KeyValueResult.DataEntryR\x04data\x1a7\n" +
+	"\tDataEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a\xbe\x02\n" +
 	"\tAuthField\x12;\n" +
 	"\x04type\x18\x01 \x01(\x0e2'.plugin.v1.PluginV1.AuthField.FieldTypeR\x04type\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
@@ -684,7 +1060,7 @@ func file_contracts_plugin_v1_plugin_proto_rawDescGZIP() []byte {
 }
 
 var file_contracts_plugin_v1_plugin_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_contracts_plugin_v1_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_contracts_plugin_v1_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_contracts_plugin_v1_plugin_proto_goTypes = []any{
 	(PluginV1_Type)(0),                 // 0: plugin.v1.PluginV1.Type
 	(PluginV1_AuthField_FieldType)(0),  // 1: plugin.v1.PluginV1.AuthField.FieldType
@@ -693,31 +1069,47 @@ var file_contracts_plugin_v1_plugin_proto_goTypes = []any{
 	(*PluginV1_InfoResponse)(nil),      // 4: plugin.v1.PluginV1.InfoResponse
 	(*PluginV1_ExecRequest)(nil),       // 5: plugin.v1.PluginV1.ExecRequest
 	(*PluginV1_ExecResponse)(nil),      // 6: plugin.v1.PluginV1.ExecResponse
-	(*PluginV1_AuthField)(nil),         // 7: plugin.v1.PluginV1.AuthField
-	(*PluginV1_AuthForm)(nil),          // 8: plugin.v1.PluginV1.AuthForm
-	(*PluginV1_AuthFormsRequest)(nil),  // 9: plugin.v1.PluginV1.AuthFormsRequest
-	(*PluginV1_AuthFormsResponse)(nil), // 10: plugin.v1.PluginV1.AuthFormsResponse
-	nil,                                // 11: plugin.v1.PluginV1.ExecRequest.ConnectionEntry
-	nil,                                // 12: plugin.v1.PluginV1.AuthFormsResponse.FormsEntry
+	(*PluginV1_ExecResult)(nil),        // 7: plugin.v1.PluginV1.ExecResult
+	(*PluginV1_Column)(nil),            // 8: plugin.v1.PluginV1.Column
+	(*PluginV1_SqlResult)(nil),         // 9: plugin.v1.PluginV1.SqlResult
+	(*PluginV1_Row)(nil),               // 10: plugin.v1.PluginV1.Row
+	(*PluginV1_DocumentResult)(nil),    // 11: plugin.v1.PluginV1.DocumentResult
+	(*PluginV1_KeyValueResult)(nil),    // 12: plugin.v1.PluginV1.KeyValueResult
+	(*PluginV1_AuthField)(nil),         // 13: plugin.v1.PluginV1.AuthField
+	(*PluginV1_AuthForm)(nil),          // 14: plugin.v1.PluginV1.AuthForm
+	(*PluginV1_AuthFormsRequest)(nil),  // 15: plugin.v1.PluginV1.AuthFormsRequest
+	(*PluginV1_AuthFormsResponse)(nil), // 16: plugin.v1.PluginV1.AuthFormsResponse
+	nil,                                // 17: plugin.v1.PluginV1.ExecRequest.ConnectionEntry
+	nil,                                // 18: plugin.v1.PluginV1.KeyValueResult.DataEntry
+	nil,                                // 19: plugin.v1.PluginV1.AuthFormsResponse.FormsEntry
+	(*structpb.Struct)(nil),            // 20: google.protobuf.Struct
 }
 var file_contracts_plugin_v1_plugin_proto_depIdxs = []int32{
 	0,  // 0: plugin.v1.PluginV1.InfoResponse.type:type_name -> plugin.v1.PluginV1.Type
-	11, // 1: plugin.v1.PluginV1.ExecRequest.connection:type_name -> plugin.v1.PluginV1.ExecRequest.ConnectionEntry
-	1,  // 2: plugin.v1.PluginV1.AuthField.type:type_name -> plugin.v1.PluginV1.AuthField.FieldType
-	7,  // 3: plugin.v1.PluginV1.AuthForm.fields:type_name -> plugin.v1.PluginV1.AuthField
-	12, // 4: plugin.v1.PluginV1.AuthFormsResponse.forms:type_name -> plugin.v1.PluginV1.AuthFormsResponse.FormsEntry
-	8,  // 5: plugin.v1.PluginV1.AuthFormsResponse.FormsEntry.value:type_name -> plugin.v1.PluginV1.AuthForm
-	3,  // 6: plugin.v1.PluginService.Info:input_type -> plugin.v1.PluginV1.InfoRequest
-	5,  // 7: plugin.v1.PluginService.Exec:input_type -> plugin.v1.PluginV1.ExecRequest
-	9,  // 8: plugin.v1.PluginService.AuthForms:input_type -> plugin.v1.PluginV1.AuthFormsRequest
-	4,  // 9: plugin.v1.PluginService.Info:output_type -> plugin.v1.PluginV1.InfoResponse
-	6,  // 10: plugin.v1.PluginService.Exec:output_type -> plugin.v1.PluginV1.ExecResponse
-	10, // 11: plugin.v1.PluginService.AuthForms:output_type -> plugin.v1.PluginV1.AuthFormsResponse
-	9,  // [9:12] is the sub-list for method output_type
-	6,  // [6:9] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	17, // 1: plugin.v1.PluginV1.ExecRequest.connection:type_name -> plugin.v1.PluginV1.ExecRequest.ConnectionEntry
+	7,  // 2: plugin.v1.PluginV1.ExecResponse.result:type_name -> plugin.v1.PluginV1.ExecResult
+	9,  // 3: plugin.v1.PluginV1.ExecResult.sql:type_name -> plugin.v1.PluginV1.SqlResult
+	11, // 4: plugin.v1.PluginV1.ExecResult.document:type_name -> plugin.v1.PluginV1.DocumentResult
+	12, // 5: plugin.v1.PluginV1.ExecResult.kv:type_name -> plugin.v1.PluginV1.KeyValueResult
+	8,  // 6: plugin.v1.PluginV1.SqlResult.columns:type_name -> plugin.v1.PluginV1.Column
+	10, // 7: plugin.v1.PluginV1.SqlResult.rows:type_name -> plugin.v1.PluginV1.Row
+	20, // 8: plugin.v1.PluginV1.DocumentResult.documents:type_name -> google.protobuf.Struct
+	18, // 9: plugin.v1.PluginV1.KeyValueResult.data:type_name -> plugin.v1.PluginV1.KeyValueResult.DataEntry
+	1,  // 10: plugin.v1.PluginV1.AuthField.type:type_name -> plugin.v1.PluginV1.AuthField.FieldType
+	13, // 11: plugin.v1.PluginV1.AuthForm.fields:type_name -> plugin.v1.PluginV1.AuthField
+	19, // 12: plugin.v1.PluginV1.AuthFormsResponse.forms:type_name -> plugin.v1.PluginV1.AuthFormsResponse.FormsEntry
+	14, // 13: plugin.v1.PluginV1.AuthFormsResponse.FormsEntry.value:type_name -> plugin.v1.PluginV1.AuthForm
+	3,  // 14: plugin.v1.PluginService.Info:input_type -> plugin.v1.PluginV1.InfoRequest
+	5,  // 15: plugin.v1.PluginService.Exec:input_type -> plugin.v1.PluginV1.ExecRequest
+	15, // 16: plugin.v1.PluginService.AuthForms:input_type -> plugin.v1.PluginV1.AuthFormsRequest
+	4,  // 17: plugin.v1.PluginService.Info:output_type -> plugin.v1.PluginV1.InfoResponse
+	6,  // 18: plugin.v1.PluginService.Exec:output_type -> plugin.v1.PluginV1.ExecResponse
+	16, // 19: plugin.v1.PluginService.AuthForms:output_type -> plugin.v1.PluginV1.AuthFormsResponse
+	17, // [17:20] is the sub-list for method output_type
+	14, // [14:17] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_contracts_plugin_v1_plugin_proto_init() }
@@ -725,13 +1117,18 @@ func file_contracts_plugin_v1_plugin_proto_init() {
 	if File_contracts_plugin_v1_plugin_proto != nil {
 		return
 	}
+	file_contracts_plugin_v1_plugin_proto_msgTypes[5].OneofWrappers = []any{
+		(*PluginV1_ExecResult_Sql)(nil),
+		(*PluginV1_ExecResult_Document)(nil),
+		(*PluginV1_ExecResult_Kv)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_contracts_plugin_v1_plugin_proto_rawDesc), len(file_contracts_plugin_v1_plugin_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   11,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

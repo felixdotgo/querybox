@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
 )
 
 // TestScanOnceSetsType verifies that scanOnce records the plugin `Type` field
@@ -97,4 +99,88 @@ cat > /dev/null
 	if f.Name != "Basic" {
 		t.Fatalf("unexpected name: %s", f.Name)
 	}
+}
+// Tests for ExecPlugin verifying structured result parsing and raw fallback.
+func TestExecPluginStructured(t *testing.T) {
+    d := t.TempDir()
+    bin := filepath.Join(d, "sh-mock-exec")
+    content := `#!/bin/sh
+if [ "$1" = "info" ]; then
+  echo '{"type":1,"name":"sh-mock-exec","version":"0.1.0","description":"mock exec"}'
+  exit 0
+fi
+if [ "$1" = "exec" ]; then
+  cat <<'EOF'
+{"result":{"sql":{"columns":[{"name":"id","type":"int"}],"rows":[{"values":["1"]}]}}}
+EOF
+  exit 0
+fi
+cat > /dev/null
+`
+    if err := os.WriteFile(bin, []byte(content), 0o755); err != nil {
+        t.Fatalf("write mock plugin: %v", err)
+    }
+
+    m := &Manager{
+        Dir:          d,
+        scanInterval: 10 * time.Millisecond,
+        plugins:      make(map[string]PluginInfo),
+        stopCh:       make(chan struct{}),
+    }
+    m.scanOnce()
+    res, err := m.ExecPlugin("sh-mock-exec", nil, "")
+    if err != nil {
+        t.Fatalf("ExecPlugin error: %v", err)
+    }
+    if res.Result == nil {
+        t.Fatal("expected non-nil result")
+    }
+    sql, ok := res.Result.Payload.(*pluginpb.PluginV1_ExecResult_Sql)
+    if !ok {
+        t.Fatalf("expected sql payload, got %T", res.Result.Payload)
+    }
+    if len(sql.Sql.Columns) != 1 || sql.Sql.Columns[0].Name != "id" {
+        t.Fatalf("unexpected columns: %+v", sql.Sql.Columns)
+    }
+}
+
+func TestExecPluginRawFallback(t *testing.T) {
+    d := t.TempDir()
+    bin := filepath.Join(d, "sh-mock-raw")
+    content := `#!/bin/sh
+if [ "$1" = "info" ]; then
+  echo '{"type":1,"name":"sh-mock-raw","version":"0.1.0","description":"mock raw"}'
+  exit 0
+fi
+if [ "$1" = "exec" ]; then
+  echo 'hello world'
+  exit 0
+fi
+cat > /dev/null
+`
+    if err := os.WriteFile(bin, []byte(content), 0o755); err != nil {
+        t.Fatalf("write mock plugin: %v", err)
+    }
+
+    m := &Manager{
+        Dir:          d,
+        scanInterval: 10 * time.Millisecond,
+        plugins:      make(map[string]PluginInfo),
+        stopCh:       make(chan struct{}),
+    }
+    m.scanOnce()
+    res, err := m.ExecPlugin("sh-mock-raw", nil, "")
+    if err != nil {
+        t.Fatalf("ExecPlugin error: %v", err)
+    }
+    if res.Result == nil {
+        t.Fatal("expected non-nil result")
+    }
+    kv, ok := res.Result.Payload.(*pluginpb.PluginV1_ExecResult_Kv)
+    if !ok {
+        t.Fatalf("expected kv payload, got %T", res.Result.Payload)
+    }
+    if kv.Kv.Data["_"] != "hello world\n" {
+        t.Fatalf("unexpected raw payload: %v", kv.Kv.Data)
+    }
 }

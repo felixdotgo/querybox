@@ -44,14 +44,18 @@ export function EnablePlugin(name) {
 /**
  * ExecPlugin runs the named plugin with the provided connection info and query.
  * The plugin is invoked as an executable: `plugin exec` and receives a JSON
- * payload on stdin. The method returns the plugin's result or an error.
+ * payload on stdin. The method returns the structured `plugin.ExecResponse` or
+ * an error.  Historically this returned a raw string; callers may need to
+ * examine the `Result` field to access rows, documents, or key/value data.
  * @param {string} name
  * @param {{ [_ in string]?: string }} connection
  * @param {string} query
- * @returns {$CancellablePromise<string>}
+ * @returns {$CancellablePromise<plugin$0.ExecResponse>}
  */
 export function ExecPlugin(name, connection, query) {
-    return $Call.ByID(2332402495, name, connection, query);
+    return $Call.ByID(2332402495, name, connection, query).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType0($result);
+    }));
 }
 
 /**
@@ -64,7 +68,7 @@ export function ExecPlugin(name, connection, query) {
  */
 export function GetPluginAuthForms(name) {
     return $Call.ByID(545463133, name).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType1($result);
+        return $$createType2($result);
     }));
 }
 
@@ -74,7 +78,7 @@ export function GetPluginAuthForms(name) {
  */
 export function ListPlugins() {
     return $Call.ByID(668942975).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType3($result);
+        return $$createType4($result);
     }));
 }
 
@@ -95,7 +99,8 @@ export function Shutdown() {
 }
 
 // Private type creation functions
-const $$createType0 = pluginpb$0.PluginV1_AuthForm.createFrom;
-const $$createType1 = $Create.Map($Create.Any, $$createType0);
-const $$createType2 = $models.PluginInfo.createFrom;
-const $$createType3 = $Create.Array($$createType2);
+const $$createType0 = pluginpb$0.PluginV1_ExecResponse.createFrom;
+const $$createType1 = pluginpb$0.PluginV1_AuthForm.createFrom;
+const $$createType2 = $Create.Map($Create.Any, $$createType1);
+const $$createType3 = $models.PluginInfo.createFrom;
+const $$createType4 = $Create.Array($$createType3);

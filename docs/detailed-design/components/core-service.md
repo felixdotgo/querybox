@@ -172,7 +172,7 @@ Discover plugin executables, manage plugin registry, execute plugins on-demand w
 | Method | Signature | Description |
 |--------|-----------|-------------|
 | `ListPlugins` | `() → []PluginInfo` | Return discovered plugins (does not spawn processes) |
-| `ExecPlugin` | `(name, connParams, query) → (result, error)` | Execute plugin with 30s timeout |
+| `ExecPlugin` | `(name, connParams, query) → (ExecResponse, error)` | Execute plugin with 30s timeout; `ExecResponse` carries a typed result (sql/document/kv) that the UI can render generically |
 | `GetPluginAuthForms` | `(name) → (map[string]AuthForm, error)` | Probe plugin for auth form definitions |
 | `Rescan` | `() → error` | Manual trigger for directory scan |
 
@@ -239,7 +239,8 @@ import { ExecPlugin, ListPlugins } from '@/bindings/...'
 const conn = await CreateConnection("My DB", "mysql", credentialJSON)
 
 // Execute query via plugin
-const result = await ExecPlugin("mysql", connParams, "SELECT 1")
+const res = await ExecPlugin("mysql", connParams, "SELECT 1")
+// `res.result` will contain one of `{ sql: {...} } | { document: {...} } | { kv: {...} }` depending on plugin
 ```
 
 ## Operational Concerns

@@ -9,14 +9,15 @@ import (
 	"os"
 
 	"github.com/felixdotgo/querybox/pkg/plugin"
+	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
 
-	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/lib/pq" // postgres driver
 )
 
-// mysqlPlugin implements the plugin.Plugin interface for a simple MySQL executor.
-type mysqlPlugin struct{}
+// postgresqlPlugin implements the plugin.Plugin interface for a simple PostgreSQL executor.
+type postgresqlPlugin struct{}
 
-func (m *mysqlPlugin) Info() (plugin.InfoResponse, error) {
+func (m *postgresqlPlugin) Info() (plugin.InfoResponse, error) {
 	return plugin.InfoResponse{
 		Type:        plugin.TypeDriver,
 		Name:        "PostgreSQL",
@@ -25,7 +26,7 @@ func (m *mysqlPlugin) Info() (plugin.InfoResponse, error) {
 	}, nil
 }
 
-func (m *mysqlPlugin) AuthForms(plugin.AuthFormsRequest) (plugin.AuthFormsResponse, error) {
+func (m *postgresqlPlugin) AuthForms(plugin.AuthFormsRequest) (plugin.AuthFormsResponse, error) {
 	// Provide two options: a `basic` property-based form and a `dsn` fallback.
 	basic := plugin.AuthForm{
 		Key: "basic",
@@ -42,7 +43,7 @@ func (m *mysqlPlugin) AuthForms(plugin.AuthFormsRequest) (plugin.AuthFormsRespon
 	return plugin.AuthFormsResponse{Forms: map[string]*plugin.AuthForm{"basic": &basic}}, nil
 }
 
-func (m *mysqlPlugin) Exec(req plugin.ExecRequest) (plugin.ExecResponse, error) {
+func (m *postgresqlPlugin) Exec(req plugin.ExecRequest) (plugin.ExecResponse, error) {
 	// Accept either a full DSN under key "dsn" (legacy) or a credential blob
 	// JSON (recommended) stored under "credential_blob" containing: {"form":"basic","values": { ... }}
 	dsn, ok := req.Connection["dsn"]
@@ -58,17 +59,17 @@ func (m *mysqlPlugin) Exec(req plugin.ExecRequest) (plugin.ExecResponse, error) 
 				if v, ok := payload.Values["dsn"]; ok && v != "" {
 					dsn = v
 				} else {
-					// build a simple DSN from common keys
+					// build a simple postgres connection string
 					host := payload.Values["host"]
 					user := payload.Values["user"]
 					pass := payload.Values["password"]
 					port := payload.Values["port"]
 					dbname := payload.Values["database"]
 					if port == "" {
-						port = "3306"
+						port = "5432"
 					}
 					if host != "" {
-						dsn = fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", user, pass, host, port, dbname)
+						dsn = fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", host, port, user, pass, dbname)
 					}
 				}
 			}
@@ -79,7 +80,8 @@ func (m *mysqlPlugin) Exec(req plugin.ExecRequest) (plugin.ExecResponse, error) 
 		return plugin.ExecResponse{Error: "missing dsn in connection"}, nil
 	}
 
-	db, err := sql.Open("mysql", dsn)
+	// open postgres driver
+	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		return plugin.ExecResponse{Error: fmt.Sprintf("open error: %v", err)}, nil
 	}
@@ -96,7 +98,12 @@ func (m *mysqlPlugin) Exec(req plugin.ExecRequest) (plugin.ExecResponse, error) 
 		return plugin.ExecResponse{Error: fmt.Sprintf("cols error: %v", err)}, nil
 	}
 
-	results := make([]map[string]interface{}, 0)
+	colMeta := make([]*plugin.Column, len(cols))
+	for i, c := range cols {
+		colMeta[i] = &plugin.Column{Name: c}
+	}
+
+	var rowResults []*plugin.Row
 	for rows.Next() {
 		vals := make([]interface{}, len(cols))
 		ptrs := make([]interface{}, len(cols))
@@ -106,28 +113,40 @@ func (m *mysqlPlugin) Exec(req plugin.ExecRequest) (plugin.ExecResponse, error) 
 		if err := rows.Scan(ptrs...); err != nil {
 			return plugin.ExecResponse{Error: fmt.Sprintf("scan error: %v", err)}, nil
 		}
-		row := map[string]interface{}{}
-		for i, c := range cols {
-			row[c] = vals[i]
+		strs := make([]string, len(cols))
+		for i, v := range vals {
+			if v == nil {
+				strs[i] = ""
+			} else {
+				strs[i] = fmt.Sprintf("%v", v)
+			}
 		}
-		results = append(results, row)
+		rowResults = append(rowResults, &plugin.Row{Values: strs})
 	}
 
-	b, _ := json.Marshal(results)
-	return plugin.ExecResponse{Result: string(b)}, nil
+	return plugin.ExecResponse{
+		Result: &plugin.ExecResult{
+			Payload: &pluginpb.PluginV1_ExecResult_Sql{
+				Sql: &plugin.SqlResult{
+					Columns: colMeta,
+					Rows: rowResults,
+				},
+			},
+		},
+	}, nil
 }
 
 func main() {
 	flag.Parse()
 	args := flag.Args()
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "Usage: mysql info | exec")
+		fmt.Fprintln(os.Stderr, "Usage: postgres info | exec | authforms")
 		os.Exit(2)
 	}
 
 	// Allow running via pkg/plugin.ServeCLI as well but keep a fallback CLI that
 	// decodes stdin and calls the implementation for direct builds.
-	impl := &mysqlPlugin{}
+	impl := &postgresqlPlugin{}
 	switch args[0] {
 	case "info":
 		info, _ := impl.Info()
@@ -145,7 +164,7 @@ func main() {
 		b, _ := json.Marshal(res)
 		os.Stdout.Write(b)
 	default:
-		fmt.Fprintln(os.Stderr, "Usage: mysql info | exec | authforms")
+		fmt.Fprintln(os.Stderr, "Usage: postgres info | exec | authforms")
 		os.Exit(2)
 	}
 }

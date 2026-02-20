@@ -163,8 +163,98 @@ export class PluginV1_AuthForm {
     }
 }
 
+/**
+ * ExecResponse contains the output of an Exec call,
+ * provide a typed, extensible envelope that can represent at least three
+ * common data models (SQL, document/JSON, and simple key-value maps).  The
+ * UI will examine the oneof field and render accordingly instead of relying
+ * on plugin-specific semantics.
+ */
+export class PluginV1_ExecResponse {
+    /**
+     * Creates a new PluginV1_ExecResponse instance.
+     * @param {Partial<PluginV1_ExecResponse>} [$$source = {}] - The source object to create the PluginV1_ExecResponse.
+     */
+    constructor($$source = {}) {
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {PluginV1_ExecResult | null | undefined}
+             */
+            this["result"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * optional error message
+             * @member
+             * @type {string | undefined}
+             */
+            this["error"] = undefined;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new PluginV1_ExecResponse instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {PluginV1_ExecResponse}
+     */
+    static createFrom($$source = {}) {
+        const $$createField0_0 = $$createType5;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("result" in $$parsedSource) {
+            $$parsedSource["result"] = $$createField0_0($$parsedSource["result"]);
+        }
+        return new PluginV1_ExecResponse(/** @type {Partial<PluginV1_ExecResponse>} */($$parsedSource));
+    }
+}
+
+/**
+ * ExecResult is a wrapper around the various result types supported by a
+ * plugin.  Only one field will be populated.
+ */
+export class PluginV1_ExecResult {
+    /**
+     * Creates a new PluginV1_ExecResult instance.
+     * @param {Partial<PluginV1_ExecResult>} [$$source = {}] - The source object to create the PluginV1_ExecResult.
+     */
+    constructor($$source = {}) {
+        if (!("Payload" in $$source)) {
+            /**
+             * Types that are valid to be assigned to Payload:
+             * 
+             * 	*PluginV1_ExecResult_Sql
+             * 	*PluginV1_ExecResult_Document
+             * 	*PluginV1_ExecResult_Kv
+             * @member
+             * @type {isPluginV1_ExecResult_Payload}
+             */
+            this["Payload"] = null;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new PluginV1_ExecResult instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {PluginV1_ExecResult}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new PluginV1_ExecResult(/** @type {Partial<PluginV1_ExecResult>} */($$parsedSource));
+    }
+}
+
+/**
+ * @typedef {any} isPluginV1_ExecResult_Payload
+ */
+
 // Private type creation functions
 const $$createType0 = $Create.Array($Create.Any);
 const $$createType1 = PluginV1_AuthField.createFrom;
 const $$createType2 = $Create.Nullable($$createType1);
 const $$createType3 = $Create.Array($$createType2);
+const $$createType4 = PluginV1_ExecResult.createFrom;
+const $$createType5 = $Create.Nullable($$createType4);

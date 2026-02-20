@@ -29,7 +29,7 @@ func (m *mysqlPlugin) Info() (plugin.InfoResponse, error) {
 func (m *mysqlPlugin) AuthForms(plugin.AuthFormsRequest) (plugin.AuthFormsResponse, error) {
 	// Provide two options: a `basic` property-based form and a `dsn` fallback.
 	basic := plugin.AuthForm{
-		Key: "basic",
+		Key:  "basic",
 		Name: "Basic",
 		Fields: []*plugin.AuthField{
 			{Type: plugin.AuthField_TEXT, Name: "host", Label: "Host", Required: true, Placeholder: "127.0.0.1"},
@@ -41,7 +41,7 @@ func (m *mysqlPlugin) AuthForms(plugin.AuthFormsRequest) (plugin.AuthFormsRespon
 	}
 
 	dsn := plugin.AuthForm{
-		Key: "dsn",
+		Key:  "dsn",
 		Name: "DSN",
 		Fields: []*plugin.AuthField{
 			{Type: plugin.AuthField_TEXT, Name: "dsn", Label: "DSN", Placeholder: "user:pass@tcp(host:port)/dbname"},
@@ -104,7 +104,13 @@ func (m *mysqlPlugin) Exec(req plugin.ExecRequest) (plugin.ExecResponse, error) 
 		return plugin.ExecResponse{Error: fmt.Sprintf("cols error: %v", err)}, nil
 	}
 
-	results := make([]map[string]interface{}, 0)
+	// prepare column metadata (type info currently unavailable, leave empty)
+	colMeta := make([]*plugin.Column, len(cols))
+	for i, c := range cols {
+		colMeta[i] = &plugin.Column{Name: c}
+	}
+
+	var rowResults []*plugin.Row
 	for rows.Next() {
 		vals := make([]interface{}, len(cols))
 		ptrs := make([]interface{}, len(cols))
@@ -114,22 +120,34 @@ func (m *mysqlPlugin) Exec(req plugin.ExecRequest) (plugin.ExecResponse, error) 
 		if err := rows.Scan(ptrs...); err != nil {
 			return plugin.ExecResponse{Error: fmt.Sprintf("scan error: %v", err)}, nil
 		}
-		row := map[string]interface{}{}
-		for i, c := range cols {
-			row[c] = vals[i]
+		strs := make([]string, len(cols))
+		for i, v := range vals {
+			if v == nil {
+				strs[i] = ""
+			} else {
+				strs[i] = fmt.Sprintf("%v", v)
+			}
 		}
-		results = append(results, row)
+		rowResults = append(rowResults, &plugin.Row{Values: strs})
 	}
 
-	b, _ := json.Marshal(results)
-	return plugin.ExecResponse{Result: string(b)}, nil
+	return plugin.ExecResponse{
+		Result: &plugin.ExecResult{
+			Payload: &pluginpb.PluginV1_ExecResult_Sql{
+				Sql: &plugin.SqlResult{
+					Columns: colMeta,
+					Rows:    rowResults,
+				},
+			},
+		},
+	}, nil
 }
 
 func main() {
 	flag.Parse()
 	args := flag.Args()
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "Usage: mysql info | exec")
+		fmt.Fprintln(os.Stderr, "Usage: mysql info | exec | authforms")
 		os.Exit(2)
 	}
 

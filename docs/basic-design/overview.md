@@ -29,7 +29,7 @@
 - Schema includes `created_at` and `updated_at` timestamps for audit tracking.
 
 ### 2.2 Execution Flow
-1. Frontend calls `PluginManager.ExecPlugin` with plugin name, connection parameters, and query.
+1. Frontend calls `PluginManager.ExecPlugin` with plugin name, connection parameters, and query. The returned ExecResponse includes a `result` field holding one of several payload types (sql, document, or kv) so the UI can handle them generically.
 2. PluginManager looks up the plugin executable in its registry (scanned from `bin/plugins`).
 3. Manager spawns the plugin as a subprocess: `plugin exec` with 30-second timeout.
 4. Plugin request is sent as JSON via stdin: `{"connection": {...}, "query": "..."}`.

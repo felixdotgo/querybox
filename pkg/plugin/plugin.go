@@ -13,8 +13,27 @@ import (
 // stable package (`github.com/felixdotgo/querybox/rpc/contracts/plugin/v1`) if they prefer. These aliases keep
 // the existing `pkg/plugin` API stable while aligning it with the .proto.
 type InfoResponse = pluginpb.PluginV1_InfoResponse
+
 type ExecRequest = pluginpb.PluginV1_ExecRequest
+// ExecResponse now contains a typed ExecResult which can represent SQL rows,
+// document lists, or key/value maps. Plugins should return one of those
+// payloads rather than a flat string.
 type ExecResponse = pluginpb.PluginV1_ExecResponse
+
+// result-specific helpers.  Exported for plugin authors and tests.
+type ExecResult = pluginpb.PluginV1_ExecResult
+
+type SqlResult = pluginpb.PluginV1_SqlResult
+
+type Column = pluginpb.PluginV1_Column
+
+type Row = pluginpb.PluginV1_Row
+
+type DocumentResult = pluginpb.PluginV1_DocumentResult
+
+type KeyValueResult = pluginpb.PluginV1_KeyValueResult
+
+// DriverType reuse from protobuf enum
 type DriverType = pluginpb.PluginV1_Type
 
 // Aliases for the new AuthForms protobuf messages

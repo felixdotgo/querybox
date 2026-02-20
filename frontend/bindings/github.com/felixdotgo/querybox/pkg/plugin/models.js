@@ -15,3 +15,9 @@ export const AuthForm = pluginpb$0.PluginV1_AuthForm;
 /**
  * @typedef {pluginpb$0.PluginV1_AuthForm} AuthForm
  */
+
+export const ExecResponse = pluginpb$0.PluginV1_ExecResponse;
+
+/**
+ * @typedef {pluginpb$0.PluginV1_ExecResponse} ExecResponse
+ */

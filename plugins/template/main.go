@@ -1,9 +1,8 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/felixdotgo/querybox/pkg/plugin"
+	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
 )
 
 // templatePlugin implements the pkg/plugin.Plugin interface for examples.
@@ -14,8 +13,20 @@ func (t *templatePlugin) Info() (plugin.InfoResponse, error) {
 }
 
 func (t *templatePlugin) Exec(req plugin.ExecRequest) (plugin.ExecResponse, error) {
-	// echo the query and connection keys for demonstration
-	return plugin.ExecResponse{Result: fmt.Sprintf("executed query: %s | connKeys=%v", req.Query, req.Connection)}, nil
+	// return a simple key/value map containing the query and connection for demo
+	data := map[string]string{"query": req.Query}
+	for k, v := range req.Connection {
+		data[k] = v
+	}
+	return plugin.ExecResponse{
+		Result: &plugin.ExecResult{
+			Payload: &pluginpb.PluginV1_ExecResult_Kv{
+				Kv: &plugin.KeyValueResult{
+					Data: data,
+				},
+			},
+		},
+	}, nil
 }
 
 func (t *templatePlugin) AuthForms(plugin.AuthFormsRequest) (plugin.AuthFormsResponse, error) {

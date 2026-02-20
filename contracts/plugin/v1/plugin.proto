@@ -3,6 +3,8 @@ package plugin.v1;
 
 option go_package = "plugin/v1;pluginpb";
 
+import "google/protobuf/struct.proto";
+
 // Contract for on-demand plugins (CLI-invoked). Plugins SHOULD implement
 service PluginService {
   // Info returns basic information about the plugin (type, name, version, description).
@@ -43,9 +45,59 @@ message PluginV1 {
     string query = 2; // Query or plugin-specific payload (SQL/NoSQL/etc.)
   }
 
+  // ExecResponse contains the output of an Exec call,
+  // provide a typed, extensible envelope that can represent at least three
+  // common data models (SQL, document/JSON, and simple key-value maps).  The
+  // UI will examine the oneof field and render accordingly instead of relying
+  // on plugin-specific semantics.
   message ExecResponse {
-    string result = 1; // plugin-serialized result (string/json)
+    ExecResult result = 1;
     string error = 2;  // optional error message
+  }
+
+  // ExecResult is a wrapper around the various result types supported by a
+  // plugin.  Only one field will be populated.
+  message ExecResult {
+    oneof payload {
+      SqlResult sql = 1;
+      DocumentResult document = 2;
+      KeyValueResult kv = 3;
+    }
+  }
+
+  // SqlResult describes a tabular result set with explicit columns and rows.
+  // All values are serialized as strings; plugins are free to format them as
+  // they wish (e.g. quoting) but the UI will treat them generically.
+  // Columns carry metadata about each field in a tabular SQL result.  Name is
+  // required; type is optional and may reflect the database's type name (e.g.
+  // "varchar", "int").  The UI can use this information to choose appropriate
+  // input/edit controls when presenting results or constructing inserts.
+  message Column {
+    string name = 1;
+    string type = 2;
+  }
+
+  message SqlResult {
+    repeated Column columns = 1;
+    repeated Row rows = 2;
+  }
+
+  message Row {
+    repeated string values = 1;
+  }
+
+  // DocumentResult is intended for document‑oriented databases (Mongo, Couch,
+  // etc.) where each entry is an object.  The google.protobuf.Struct type is
+  // used here to avoid prescribing a schema – it maps cleanly to JS objects
+  // and the frontend can iterate the fields dynamically.
+  message DocumentResult {
+    repeated google.protobuf.Struct documents = 1;
+  }
+
+  // KeyValueResult is a simple map of string→string appropriate for things like
+  // Redis or other key/value stores where the “row” concept isn’t meaningful.
+  message KeyValueResult {
+    map<string, string> data = 1;
   }
 
   // AuthField represents a single input field for authentication (e.g. host, user, password).
