@@ -1,9 +1,8 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 /* Small design-system helpers (desktop-first) */
-.btn-tw { @apply inline-flex items-center justify-center px-3 py-1.5 rounded-md bg-slate-700 text-sm text-white hover:bg-slate-600; }
-.input-tw { @apply px-3 py-1 rounded-md bg-slate-100 text-slate-900 border border-slate-300; }
-.card-tw { @apply bg-slate-800/40 p-4 rounded-lg shadow-lg; }
-
+@layer components {
+  .btn-tw { @apply inline-flex items-center justify-center px-3 py-1.5 rounded-md bg-slate-700 text-sm text-white hover:bg-slate-600; }
+  .input-tw { @apply px-3 py-1 rounded-md bg-slate-100 text-slate-900 border border-slate-300; }
+  .card-tw { @apply bg-slate-800/40 p-4 rounded-lg shadow-lg; }
+}
