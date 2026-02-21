@@ -2,6 +2,7 @@ package services
 
 import (
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/events"
 )
 
 type App struct {
@@ -23,12 +24,23 @@ func (a *App) NewConnectionsWindow() *application.WebviewWindow {
 		Hidden: true,
 		DisableResize: true,
 		MinWidth: 1024,
-		Frameless: true,
+		Frameless: false,
+		CloseButtonState: application.ButtonHidden,
+		MinimiseButtonState: application.ButtonHidden,
+		MaximiseButtonState: application.ButtonHidden,
 		Mac: application.MacWindow{
 			InvisibleTitleBarHeight: 50,
 			Backdrop:                application.MacBackdropTranslucent,
 			TitleBar:                application.MacTitleBarHiddenInset,
 		},
+	})
+
+	w.OnWindowEvent(events.Common.WindowClosing, func (e *application.WindowEvent) {
+		// Instead of closing the window, we hide it and send it to the back. This allows us to reuse the same window instance
+		// Cancel the close event to prevent the window from being destroyed
+		e.Cancel()
+		// 
+		a.CloseConnectionsWindow()
 	})
 
 	return w
@@ -69,7 +81,6 @@ func (a *App) ShowConnectionsWindow() {
 	}
 	a.ConnectionsWindow.Show()
 	a.ConnectionsWindow.Focus()
-	a.ConnectionsWindow.SetAlwaysOnTop(true)
 }
 
 // CloseConnectionsWindow hides the connections window and sends it to the back.
