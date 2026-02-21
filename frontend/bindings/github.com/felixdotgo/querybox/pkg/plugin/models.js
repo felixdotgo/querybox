@@ -16,8 +16,16 @@ export const AuthForm = pluginpb$0.PluginV1_AuthForm;
  * @typedef {pluginpb$0.PluginV1_AuthForm} AuthForm
  */
 
+/**
+ * ExecResponse now contains a typed ExecResult which can represent SQL rows,
+ * document lists, or key/value maps. Plugins should return one of those
+ * payloads rather than a flat string.
+ */
 export const ExecResponse = pluginpb$0.PluginV1_ExecResponse;
 
 /**
+ * ExecResponse now contains a typed ExecResult which can represent SQL rows,
+ * document lists, or key/value maps. Plugins should return one of those
+ * payloads rather than a flat string.
  * @typedef {pluginpb$0.PluginV1_ExecResponse} ExecResponse
  */

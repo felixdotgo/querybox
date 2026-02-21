@@ -55,32 +55,10 @@ func main() {
 		},
 	})
 
-	// Create a new window with the necessary options.
-	// 'Title' is the title of the window.
-	// 'Mac' options tailor the window when running on macOS.
-	// 'BackgroundColour' is the background colour of the window.
-	// 'URL' is the URL that will be loaded into the webview.
-	app.MainWindow = app.App.Window.NewWithOptions(application.WebviewWindowOptions{
-		Name:  "main",
-		Title: "QueryBox",
-		URL:   "/",
-		DisableResize: false,
-		MinWidth: 1280,
-		MinHeight: 720,
-		// Frameless: true,
-		Mac: application.MacWindow{
-			InvisibleTitleBarHeight: 50,
-			Backdrop:                application.MacBackdropTranslucent,
-			TitleBar:                application.MacTitleBarHiddenInset,
-		},
-	})
-	// Maximise the main window to use the full screen size by default when the application starts.
-	app.MainWindow.Maximise()
-
-	// Create a connections window that is hidden by default.
-	// This window will be shown when the user clicks the "Connections" button in the UI.
-	// or when there is no configured connection and the app needs to prompt the user to create one.
-	// See `services/app.go` for the `ShowConnectionsWindow` method that shows this window.
+	// Create default windows for the application.
+	// The main window is the primary interface,
+	// while the connections window is used for managing database connections.
+	app.MainWindow = app.NewMainWindow()
 	app.ConnectionsWindow = app.NewConnectionsWindow()
 
 	// Run the application. This blocks until the application has been exited.

@@ -43,10 +43,23 @@ export function MinimiseMainWindow() {
 }
 
 /**
+ * NewConnectionsWindow creates a new connections window with specific options and event handlers to manage its behavior.
+ * The window is initially hidden and configured to prevent resizing, maximising, and minimising.
+ * It also includes OS-specific options for the title bar and backdrop.
  * @returns {$CancellablePromise<application$0.WebviewWindow | null>}
  */
 export function NewConnectionsWindow() {
     return $Call.ByID(3366044994).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType1($result);
+    }));
+}
+
+/**
+ * NewMainWindow creates a new main application window with specific options and returns it.
+ * @returns {$CancellablePromise<application$0.WebviewWindow | null>}
+ */
+export function NewMainWindow() {
+    return $Call.ByID(3430597588).then(/** @type {($result: any) => any} */(($result) => {
         return $$createType1($result);
     }));
 }

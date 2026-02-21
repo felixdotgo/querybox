@@ -16,18 +16,24 @@ func NewAppService() *App {
 	return &App{}
 }
 
+// NewConnectionsWindow creates a new connections window with specific options and event handlers to manage its behavior.
+// The window is initially hidden and configured to prevent resizing, maximising, and minimising.
+// It also includes OS-specific options for the title bar and backdrop.
 func (a *App) NewConnectionsWindow() *application.WebviewWindow {
 	w := a.App.Window.NewWithOptions(application.WebviewWindowOptions{
-		Name:   "connections",
-		Title:  "Connections",
-		URL:    "/connections",
-		Hidden: true,
+		// Required options
+		Name:  "connections",
+		Title: "Connections",
+		URL:   "/connections",
+
+		// Optional options
+		Frameless:     false,
 		DisableResize: true,
-		MinWidth: 1024,
-		Frameless: false,
-		CloseButtonState: application.ButtonHidden,
-		MinimiseButtonState: application.ButtonHidden,
-		MaximiseButtonState: application.ButtonHidden,
+		Hidden:        true,
+		HideOnEscape:  true,
+		MinWidth:      1024,
+
+		// OS-specific options
 		Mac: application.MacWindow{
 			InvisibleTitleBarHeight: 50,
 			Backdrop:                application.MacBackdropTranslucent,
@@ -35,12 +41,45 @@ func (a *App) NewConnectionsWindow() *application.WebviewWindow {
 		},
 	})
 
-	w.OnWindowEvent(events.Common.WindowClosing, func (e *application.WindowEvent) {
-		// Instead of closing the window, we hide it and send it to the back. This allows us to reuse the same window instance
+	// Intercept the window close event to hide the window instead of closing it.
+	w.OnWindowEvent(events.Common.WindowClosing, func(e *application.WindowEvent) {
 		// Cancel the close event to prevent the window from being destroyed
 		e.Cancel()
-		// 
+		// Instead of closing the window, we hide it and send it to the back.
+		// This allows us to reuse the same window instance
 		a.CloseConnectionsWindow()
+	})
+
+	// Intercept maximise and minimise events to prevent the connections window from being maximised or minimised.
+	w.OnWindowEvent(events.Common.WindowMaximise, func(e *application.WindowEvent) {
+		e.Cancel()
+	})
+
+	w.OnWindowEvent(events.Common.WindowMinimise, func(e *application.WindowEvent) {
+		e.Cancel()
+	})
+
+	return w
+}
+
+// NewMainWindow creates a new main application window with specific options and returns it.
+func (a *App) NewMainWindow() *application.WebviewWindow {
+	w := a.App.Window.NewWithOptions(application.WebviewWindowOptions{
+		// Required options
+		Name:          "main",
+		Title:         "QueryBox",
+		URL:           "/",
+
+		// Optional options
+		MinWidth:      1280,
+		MinHeight:     720,
+
+		// OS-specific options
+		Mac: application.MacWindow{
+			InvisibleTitleBarHeight: 50,
+			Backdrop:                application.MacBackdropTranslucent,
+			TitleBar:                application.MacTitleBarHiddenInset,
+		},
 	})
 
 	return w
