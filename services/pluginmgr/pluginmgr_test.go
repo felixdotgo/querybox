@@ -254,3 +254,79 @@ cat > /dev/null
         t.Fatalf("unexpected exec result: %+v", res)
     }
 }
+
+// Legacy plugins sometimes emitted raw proto structs via encoding/json which
+// produced a "Payload" field instead of the expected variant name.  ExecPlugin
+// should repair that output so consumers see the real payload meaning.
+func TestExecPluginOldPayload(t *testing.T) {
+    d := t.TempDir()
+    bin := filepath.Join(d, "sh-old-json")
+    content := `#!/bin/sh
+if [ "$1" = "exec" ]; then
+  cat <<'EOF'
+{"result":{"Payload":{"kv":{"data":{"foo":"bar"}}}}}
+EOF
+  exit 0
+fi
+cat > /dev/null
+`
+    if err := os.WriteFile(bin, []byte(content), 0o755); err != nil {
+        t.Fatalf("write mock plugin: %v", err)
+    }
+
+    m := &Manager{
+        Dir:          d,
+        scanInterval: 10 * time.Millisecond,
+        plugins:      make(map[string]PluginInfo),
+        stopCh:       make(chan struct{}),
+    }
+    m.scanOnce()
+
+    res, err := m.ExecPlugin("sh-old-json", nil, "")
+    if err != nil {
+        t.Fatalf("ExecPlugin error: %v", err)
+    }
+    if res == nil || res.Result == nil || res.Result.Payload == nil {
+        t.Fatalf("unexpected exec result: %+v", res)
+    }
+    kv, ok := res.Result.Payload.(*pluginpb.PluginV1_ExecResult_Kv)
+    if !ok || kv.Kv.Data["foo"] != "bar" {
+        t.Fatalf("unexpected repaired payload: %+v", res)
+    }
+}
+
+func TestExecPluginUppercasePayload(t *testing.T) {
+    d := t.TempDir()
+    bin := filepath.Join(d, "sh-old-json2")
+    content := `#!/bin/sh
+if [ "$1" = "exec" ]; then
+  cat <<'EOF'
+{"result":{"Payload":{"Sql":{}}}}
+EOF
+  exit 0
+fi
+cat > /dev/null
+`
+    if err := os.WriteFile(bin, []byte(content), 0o755); err != nil {
+        t.Fatalf("write mock plugin: %v", err)
+    }
+
+    m := &Manager{
+        Dir:          d,
+        scanInterval: 10 * time.Millisecond,
+        plugins:      make(map[string]PluginInfo),
+        stopCh:       make(chan struct{}),
+    }
+    m.scanOnce()
+
+    res, err := m.ExecPlugin("sh-old-json2", nil, "")
+    if err != nil {
+        t.Fatalf("ExecPlugin error: %v", err)
+    }
+    if res == nil || res.Result == nil || res.Result.Payload == nil {
+        t.Fatalf("unexpected exec result: %+v", res)
+    }
+    if _, ok := res.Result.Payload.(*pluginpb.PluginV1_ExecResult_Sql); !ok {
+        t.Fatalf("expected Sql result, got %+v", res.Result.Payload)
+    }
+}

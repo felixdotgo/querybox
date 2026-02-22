@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -260,8 +261,35 @@ func (m *Manager) ExecPlugin(name string, connection map[string]string, query st
 		return resp, nil
 	}
 	// protobuf structs are better parsed with protojson which correctly
-	// handles oneof fields and enum names.
+	// handles oneof fields and enum names.  Older plugins that used
+	// `encoding/json` to marshal a proto struct would emit a top-level
+	// "Payload" field instead of the expected variant-specific name
+	// (e.g. "sql", "kv").  When that happens protojson.Unmarshal complains
+	// about an unknown field; we attempt to repair the JSON so the response
+	// can still be interpreted.
 	if err := protojson.Unmarshal(outB, resp); err != nil {
+		// attempt to correct common mis-formatting
+		if strings.Contains(err.Error(), "unknown field \"Payload\"") {
+			var raw map[string]interface{}
+			if jerr := json.Unmarshal(outB, &raw); jerr == nil {
+				if r, ok := raw["result"].(map[string]interface{}); ok {
+					if payload, ok2 := r["Payload"].(map[string]interface{}); ok2 {
+						// move inner keys (should be one of sql/document/kv) up
+						for k, v := range payload {
+							// older JSON produced by encoding/json used Go struct field names (Sql, Kv, Document).
+                                                        // lowercase them so protojson will match the proto name.
+                                                        r[strings.ToLower(k)] = v
+						}
+						delete(r, "Payload")
+						if fixed, merr := json.Marshal(raw); merr == nil {
+							if perr := protojson.Unmarshal(fixed, resp); perr == nil {
+								return resp, nil
+							}
+						}
+					}
+				}
+			}
+		}
 		fmt.Printf("ExecPlugin: JSON unmarshal failed: %v\n", err)
 		// fallback to embedding the raw output in a KV map under "_".
 		return &plugin.ExecResponse{Result: &pluginpb.PluginV1_ExecResult{Payload: &pluginpb.PluginV1_ExecResult_Kv{Kv: &pluginpb.PluginV1_KeyValueResult{Data: map[string]string{"_": string(outB)}}}}}, nil

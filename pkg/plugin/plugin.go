@@ -6,6 +6,8 @@ import (
 	"io"
 	"os"
 
+	"google.golang.org/protobuf/encoding/protojson"
+
 	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
 )
 
@@ -111,7 +113,7 @@ func ServeCLI(p Plugin) {
 			fmt.Fprintf(os.Stderr, "plugin: info error: %v\n", err)
 			os.Exit(1)
 		}
-		b, _ := json.Marshal(info)
+		b, _ := protojson.Marshal(&info)
 		_, _ = os.Stdout.Write(b)
 	case "exec":
 		in, err := io.ReadAll(os.Stdin)
@@ -125,7 +127,7 @@ func ServeCLI(p Plugin) {
 			os.Exit(1)
 		}
 		res, _ := p.Exec(&req)
-		b, _ := json.Marshal(res)
+		b, _ := protojson.Marshal(res)
 		_, _ = os.Stdout.Write(b)
 	case "authforms":
 		// no stdin input expected; plugins should return available forms
@@ -134,7 +136,7 @@ func ServeCLI(p Plugin) {
 			fmt.Fprintf(os.Stderr, "plugin: authforms error: %v\n", err)
 			os.Exit(1)
 		}
-		b, _ := json.Marshal(res)
+		b, _ := protojson.Marshal(res)
 		_, _ = os.Stdout.Write(b)
 	case "connection-tree", "tree":
 		in, err := io.ReadAll(os.Stdin)
@@ -148,7 +150,7 @@ func ServeCLI(p Plugin) {
 			os.Exit(1)
 		}
 		res, _ := p.ConnectionTree(&req)
-		b, _ := json.Marshal(res)
+		b, _ := protojson.Marshal(res)
 		_, _ = os.Stdout.Write(b)
 	default:
 		usage()
