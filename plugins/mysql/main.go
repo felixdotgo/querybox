@@ -208,15 +208,38 @@ func (m *mysqlPlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugin
 
 	var nodes []*plugin.ConnectionTreeNode
 	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
+		var dbname string
+		if err := rows.Scan(&dbname); err != nil {
 			continue
 		}
+		// for each database we expose a child list of tables; clicking a table
+		// will perform a SELECT * LIMIT 100 against it. we also keep the
+		// original `USE` action so the connection's default database can be
+		// switched if the host wants that behaviour.
+		tables := []*plugin.ConnectionTreeNode{}
+		// attempt to list tables, ignore errors so driver still works
+		tblRows, err := db.Query(fmt.Sprintf("SHOW TABLES FROM `%s`", dbname))
+		if err == nil {
+			for tblRows.Next() {
+				var tbl string
+				if tblRows.Scan(&tbl) == nil {
+					tables = append(tables, &plugin.ConnectionTreeNode{
+						Key:   dbname + "." + tbl,
+						Label: tbl,
+						Actions: []*plugin.ConnectionTreeAction{
+							{Type: plugin.ConnectionTreeActionSelect, Title: "Select", Query: fmt.Sprintf("SELECT * FROM `%s`.`%s` LIMIT 100;", dbname, tbl)},
+						},
+					})
+				}
+			}
+			tblRows.Close()
+		}
 		nodes = append(nodes, &plugin.ConnectionTreeNode{
-			Key:   name,
-			Label: name,
+			Key:   dbname,
+			Label: dbname,
+			Children: tables,
 			Actions: []*plugin.ConnectionTreeAction{
-				{Type: plugin.ConnectionTreeActionSelect, Title: "Use", Query: fmt.Sprintf("USE `%s`;", name)},
+				{Type: plugin.ConnectionTreeActionSelect, Title: "Use", Query: fmt.Sprintf("USE `%s`;", dbname)},
 			},
 		})
 	}

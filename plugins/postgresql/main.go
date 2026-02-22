@@ -185,13 +185,38 @@ func (m *postgresqlPlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*p
 
 	var nodes []*plugin.ConnectionTreeNode
 	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
+		var dbname string
+		if err := rows.Scan(&dbname); err != nil {
 			continue
 		}
+		// fetch tables for this db; note the DSN may already target a specific
+		// database so querying across databases may not work, but this is
+		// illustrative.
+		tables := []*plugin.ConnectionTreeNode{}
+		tblRows, err := db.Query(`
+SELECT tablename
+FROM pg_catalog.pg_tables
+WHERE schemaname NOT IN ('pg_catalog','information_schema')
+`)
+		if err == nil {
+			for tblRows.Next() {
+				var tbl string
+				if tblRows.Scan(&tbl) == nil {
+					tables = append(tables, &plugin.ConnectionTreeNode{
+					Key:   dbname + "." + tbl,
+					Label: tbl,
+					Actions: []*plugin.ConnectionTreeAction{
+						{Type: plugin.ConnectionTreeActionSelect, Title: "Select", Query: fmt.Sprintf("SELECT * FROM \"%s\".%s LIMIT 100;", dbname, tbl)},
+					},
+				})
+				}
+			}
+			tblRows.Close()
+		}
 		nodes = append(nodes, &plugin.ConnectionTreeNode{
-			Key:   name,
-			Label: name,
+			Key:   dbname,
+			Label: dbname,
+			Children: tables,
 			Actions: []*plugin.ConnectionTreeAction{
 				{Type: plugin.ConnectionTreeActionSelect, Title: "Query", Query: "SELECT 1"},
 			},

@@ -77,23 +77,46 @@
           <div class="w-0.5 h-full bg-transparent mx-auto"></div>
         </div>
 
-        <!-- Right column: placeholder (functional details to be decided later) -->
-        <div class="flex-1 p-4 min-h-0 overflow-auto">
+        <!-- Right column: workspace area with tabs for query results -->
+        <div class="flex-1 p-4 min-h-0 overflow-auto flex flex-col">
           <span class="text-lg font-semibold mb-2">Workspace</span>
-          <div
-            class="p-6 border border-dashed border-gray-200 rounded h-full flex items-center justify-center text-gray-500"
+
+          <!-- tab bar for open editors/results -->
+          <n-tabs
+            type="card"
+            v-model:value="activeTabKey"
+            @close="handleTabClose"
+            class="mb-4"
           >
+            <n-tab-pane
+              v-for="tab in tabs"
+              :key="tab.key"
+              :name="tab.key"
+              :title="tab.title || 'Untitled'"
+              closable
+            >
+              <template #default>
+                <ResultViewer v-if="tab.result" :result="tab.result" />
+                <pre v-else-if="tab.error" class="whitespace-pre-wrap">
+{{ tab.error }}
+                </pre>
+                <div v-else class="text-gray-500">
+                  No data to display
+                </div>
+              </template>
+            </n-tab-pane>
+          </n-tabs>
+
+          <!-- empty state when no tabs open -->
+          <div v-if="tabs.length === 0" class="p-6 border border-dashed border-gray-200 rounded h-full flex items-center justify-center text-gray-500">
             <div class="text-center">
               <div class="mb-2">
-                Right pane placeholder — functionality to be decided
+                Select a table (or other "select" action) from the tree to open a query tab.
               </div>
               <div v-if="selectedConnection" class="mt-4 text-left text-sm">
                 <div><strong>Name:</strong> {{ selectedConnection.name }}</div>
                 <div>
                   <strong>Driver:</strong> {{ selectedConnection.driver_type }}
-                </div>
-                <div class="opacity-70 text-xs mt-2">
-                  (Selecting a connection will later open editors / query tabs)
                 </div>
               </div>
             </div>
@@ -204,6 +227,9 @@ import {
   ExecTreeAction,
   ExecPlugin,
 } from "@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager"
+
+// components
+import ResultViewer from "@/components/ResultViewer.vue"
 import {
   ShowConnectionsWindow,
   MinimiseMainWindow,
@@ -270,6 +296,25 @@ const verticalResizer = createVerticalResizer({
 const defaultExpandedKeys = computed(() => {
   return treeData.value.map((g) => g.key)
 })
+
+// workspace/tab state --------------------------------------------------------
+const tabs = ref([])
+const activeTabKey = ref("")
+
+function openTab(title, result, error) {
+  const key = `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  tabs.value.push({ key, title, result, error })
+  activeTabKey.value = key
+}
+
+function handleTabClose(closedKey) {
+  // naive-ui emits tab key as first arg
+  tabs.value = tabs.value.filter((t) => t.key !== closedKey)
+  if (activeTabKey.value === closedKey) {
+    activeTabKey.value = tabs.value.length ? tabs.value[0].key : ""
+  }
+}
+
 
 const treeData = computed(() => {
   const groups = {}
@@ -438,9 +483,31 @@ async function runTreeAction(conn, action) {
     console.log("credential fetched", cred)
     const params = {}
     if (cred) params.credential_blob = cred
-    const res = await ExecTreeAction(conn.driver_type, params, action.query)
+    // if the action is a simple SELECT without an explicit LIMIT, apply
+    // a safety cap of 100 rows client-side.  plugins may already provide a
+    // limit; we don't want to double‑limit or mangle more complex statements.
+    let queryToRun = action.query || ""
+    if (
+      action.type === "select" &&
+      /^\s*select\b/i.test(queryToRun) &&
+      !/\blimit\b/i.test(queryToRun)
+    ) {
+      queryToRun = queryToRun.trim() + " LIMIT 100"
+    }
+
+    const res = await ExecTreeAction(conn.driver_type, params, queryToRun)
     console.log("action result", res)
-    // TODO: render result in workspace
+
+    // open a new tab for real SELECT statements only.  plugins sometimes
+    // misuse the generic "select" action type for things like `USE` which
+    // don't produce a result set; we don't want an empty tab in those cases.
+    if (
+      action.type === "select" &&
+      /^\s*select\b/i.test(action.query || "")
+    ) {
+      const title = action.title || action.query || "Query"
+      openTab(title, res.result, res.error)
+    }
   } catch (err) {
     console.error("ExecTreeAction", conn.id, err)
   }

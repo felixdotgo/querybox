@@ -176,8 +176,8 @@ Discover plugin executables, manage plugin registry, execute plugins on-demand w
 | `ListPlugins` | `() → []PluginInfo` | Return discovered plugins (does not spawn processes) |
 | `ExecPlugin` | `(name, connParams, query) → (ExecResponse, error)` | Execute plugin with 30s timeout; `ExecResponse` carries a typed result (sql/document/kv) that the UI can render generically |
 | `GetPluginAuthForms` | `(name) → (map[string]*AuthForm, error)` | Probe plugin for auth form definitions |
-| `GetConnectionTree` | `(name, connParams) → (ConnectionTreeResponse, error)` | Retrieve driver-defined tree for selected connection |
-| `ExecTreeAction` | `(name, connParams, query) → (ExecResponse, error)` | Convenience wrapper for executing tree‑node actions |
+| `GetConnectionTree` | `(name, connParams) → (ConnectionTreeResponse, error)` | Retrieve driver-defined tree for selected connection.  Nodes may include `select` actions; plugins are encouraged to return queries that fetch only a limited number of rows (e.g. top 100) as the frontend will open these results in a new workspace tab. |
+| `ExecTreeAction` | `(name, connParams, query) → (ExecResponse, error)` | Convenience wrapper for executing tree‑node actions. UI clients treat responses from `select` actions as query results and open them in workspace tabs (top‑100 rows by default). |
 | `Rescan` | `() → error` | Manual trigger for directory scan |
 
 ### Data Model
