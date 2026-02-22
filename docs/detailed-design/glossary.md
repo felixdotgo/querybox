@@ -8,13 +8,13 @@
 
 **ConnectionService**: Application-facing service exposing connection CRUD operations to the frontend via Wails bindings.
 
-**CredManager** (Credential Manager): Service managing secure credential storage using OS keyring (primary) with in-memory fallback (headless/test environments).
+**CredManager** (Credential Manager): Service managing secure credential storage using OS keyring (primary) with sqlite-file fallback (headless/test environments).
 
 **credential_key**: TEXT column in SQLite storing a keyring lookup key (format: `"connection:<uuid>"`); references the actual credential stored via CredManager.
 
 **Driver Type**: Identifier matching a plugin name (e.g., "mysql", "postgresql") used to select which plugin handles a connection.
 
-**Fallback Storage**: In-memory credential map (`sync.RWMutex`-protected) used when OS keyring unavailable; cleared on application restart.
+**Fallback Storage**: Persistent sqlite file (`data/credentials.db`) used when OS keyring unavailable; an in-memory map is only used if sqlite cannot be opened.
 
 **On-Demand Execution**: Plugin invocation model where executables are spawned per-request, execute, and exit (no persistent processes).
 

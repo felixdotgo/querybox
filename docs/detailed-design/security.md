@@ -16,18 +16,21 @@ QueryBox handles sensitive database credentials and implements multiple security
   - **Linux**: Secret Service (GNOME Keyring, KWallet, etc.)
 - Benefits: OS-level encryption, per-user isolation, platform security policies applied
 
-**Fallback: In-Memory Storage**
+**Fallback: Persistent SQLite File (with in-memory as last resort)**
 - Activated when OS keyring unavailable (server/headless/test environments)
-- Thread-safe implementation using `sync.RWMutex`
-- Credentials cleared on application restart
-- No disk persistence in fallback mode
-- Suitable for development/testing; production deployments should ensure keyring availability
+- Secrets written to `data/credentials.db` in a `credentials` table
+- Thread-safe access via Go's `database/sql` package; file opened once
+- Only if the database cannot be opened (permission error, etc.) does the
+  manager fall back to an in-memory map guarded by `sync.RWMutex`
+- Credentials persisted across restarts when sqlite is available
+- Fallback mode still acceptable for tests; production should prefer keyring
 
 ### Data Flow
 
 1. **Credential Creation**: Frontend sends credential JSON → ConnectionService → CredManager.Store()
 2. **Storage Attempt**: CredManager tries OS keyring first (keyring.Set)
-3. **Fallback**: If keyring fails, store in-memory map
+3. **Fallback**: If keyring fails, store in sqlite fallback file (or map if
+   the file cannot be used)
 4. **SQLite Persistence**: Only `credential_key` reference stored (e.g., "connection:uuid")
 5. **Credential Retrieval**: CredManager.Get() → check keyring, then fallback
 6. **Plugin Execution**: Credential passed via stdin (ephemeral, not logged)
@@ -87,7 +90,7 @@ QueryBox handles sensitive database credentials and implements multiple security
 | Credential exposure in logs | Credentials passed via stdin; no logging of secrets | ✅ Implemented |
 | Malicious plugin execution | User controls plugin directory; 30s timeout | ⚠️ Partial (no sandboxing) |
 | Memory dumps exposing credentials | Short-lived plugin processes; credentials scrubbed | ⚠️ Best-effort |
-| Keyring unavail ability in production | Automatic fallback to in-memory (restart clears) | ⚠️ Acceptable tradeoff |
+| Keyring availability in production | Automatic fallback to sqlite file (persistent) with map as emergency | ⚠️ Acceptable tradeoff |
 | Cross-user credential access | OS keyring per-user isolation | ✅ OS-dependent |
 | Plugin resource exhaustion | Context timeout enforcement | ✅ Implemented |
 

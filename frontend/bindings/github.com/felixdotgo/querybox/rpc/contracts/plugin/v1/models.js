@@ -163,6 +163,142 @@ export class PluginV1_AuthForm {
     }
 }
 
+export class PluginV1_ConnectionTreeAction {
+    /**
+     * Creates a new PluginV1_ConnectionTreeAction instance.
+     * @param {Partial<PluginV1_ConnectionTreeAction>} [$$source = {}] - The source object to create the PluginV1_ConnectionTreeAction.
+     */
+    constructor($$source = {}) {
+        if (/** @type {any} */(false)) {
+            /**
+             * machine name (e.g. "select", "describe")
+             * @member
+             * @type {string | undefined}
+             */
+            this["type"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * displayed in a context menu or double-click
+             * @member
+             * @type {string | undefined}
+             */
+            this["title"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * plugin-interpreted payload (often SQL)
+             * @member
+             * @type {string | undefined}
+             */
+            this["query"] = undefined;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new PluginV1_ConnectionTreeAction instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {PluginV1_ConnectionTreeAction}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new PluginV1_ConnectionTreeAction(/** @type {Partial<PluginV1_ConnectionTreeAction>} */($$parsedSource));
+    }
+}
+
+export class PluginV1_ConnectionTreeNode {
+    /**
+     * Creates a new PluginV1_ConnectionTreeNode instance.
+     * @param {Partial<PluginV1_ConnectionTreeNode>} [$$source = {}] - The source object to create the PluginV1_ConnectionTreeNode.
+     */
+    constructor($$source = {}) {
+        if (/** @type {any} */(false)) {
+            /**
+             * unique within the returned tree
+             * @member
+             * @type {string | undefined}
+             */
+            this["key"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * user-visible text
+             * @member
+             * @type {string | undefined}
+             */
+            this["label"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {(PluginV1_ConnectionTreeNode | null)[] | undefined}
+             */
+            this["children"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {(PluginV1_ConnectionTreeAction | null)[] | undefined}
+             */
+            this["actions"] = undefined;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new PluginV1_ConnectionTreeNode instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {PluginV1_ConnectionTreeNode}
+     */
+    static createFrom($$source = {}) {
+        const $$createField2_0 = $$createType6;
+        const $$createField3_0 = $$createType9;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("children" in $$parsedSource) {
+            $$parsedSource["children"] = $$createField2_0($$parsedSource["children"]);
+        }
+        if ("actions" in $$parsedSource) {
+            $$parsedSource["actions"] = $$createField3_0($$parsedSource["actions"]);
+        }
+        return new PluginV1_ConnectionTreeNode(/** @type {Partial<PluginV1_ConnectionTreeNode>} */($$parsedSource));
+    }
+}
+
+export class PluginV1_ConnectionTreeResponse {
+    /**
+     * Creates a new PluginV1_ConnectionTreeResponse instance.
+     * @param {Partial<PluginV1_ConnectionTreeResponse>} [$$source = {}] - The source object to create the PluginV1_ConnectionTreeResponse.
+     */
+    constructor($$source = {}) {
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {(PluginV1_ConnectionTreeNode | null)[] | undefined}
+             */
+            this["nodes"] = undefined;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new PluginV1_ConnectionTreeResponse instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {PluginV1_ConnectionTreeResponse}
+     */
+    static createFrom($$source = {}) {
+        const $$createField0_0 = $$createType6;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("nodes" in $$parsedSource) {
+            $$parsedSource["nodes"] = $$createField0_0($$parsedSource["nodes"]);
+        }
+        return new PluginV1_ConnectionTreeResponse(/** @type {Partial<PluginV1_ConnectionTreeResponse>} */($$parsedSource));
+    }
+}
+
 /**
  * ExecResponse contains the output of an Exec call,
  * provide a typed, extensible envelope that can represent at least three
@@ -201,7 +337,7 @@ export class PluginV1_ExecResponse {
      * @returns {PluginV1_ExecResponse}
      */
     static createFrom($$source = {}) {
-        const $$createField0_0 = $$createType5;
+        const $$createField0_0 = $$createType11;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("result" in $$parsedSource) {
             $$parsedSource["result"] = $$createField0_0($$parsedSource["result"]);
@@ -256,5 +392,11 @@ const $$createType0 = $Create.Array($Create.Any);
 const $$createType1 = PluginV1_AuthField.createFrom;
 const $$createType2 = $Create.Nullable($$createType1);
 const $$createType3 = $Create.Array($$createType2);
-const $$createType4 = PluginV1_ExecResult.createFrom;
+const $$createType4 = PluginV1_ConnectionTreeNode.createFrom;
 const $$createType5 = $Create.Nullable($$createType4);
+const $$createType6 = $Create.Array($$createType5);
+const $$createType7 = PluginV1_ConnectionTreeAction.createFrom;
+const $$createType8 = $Create.Nullable($$createType7);
+const $$createType9 = $Create.Array($$createType8);
+const $$createType10 = PluginV1_ExecResult.createFrom;
+const $$createType11 = $Create.Nullable($$createType10);

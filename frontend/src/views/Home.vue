@@ -49,11 +49,14 @@
             <div class="flex-1 overflow-auto mt-2 px-1 min-h-0">
               <n-tree
                 :data="filteredTreeData"
+                v-model:expanded-keys="expandedKeys"
                 :default-expanded-keys="defaultExpandedKeys"
                 node-key="key"
                 block-node
                 :show-selector="false"
-                @select="handleSelect"
+                :node-props="getNodeProps"
+                :render-label="renderLabel"
+                @update:selected-keys="handleSelect"
               />
               <div
                 v-if="connections.length === 0"
@@ -100,6 +103,22 @@
       </div>
     </main>
 
+  <!-- Delete confirmation overlay -->
+  <div
+    v-if="deleteModal.visible"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+    @click.self="deleteModal.visible = false"
+  >
+    <div class="bg-white rounded-lg shadow-xl p-6 w-80">
+      <div class="text-base font-semibold mb-2">Delete connection</div>
+      <div class="text-sm text-gray-600 mb-5">Delete <strong>{{ deleteModal.conn?.name }}</strong>? This cannot be undone.</div>
+      <div class="flex justify-end gap-2">
+        <button class="px-4 py-1.5 text-sm rounded border border-gray-300 hover:bg-gray-50" @click="deleteModal.visible = false">Cancel</button>
+        <button class="px-4 py-1.5 text-sm rounded bg-red-600 text-white hover:bg-red-700" @click="confirmDelete">Delete</button>
+      </div>
+    </div>
+  </div>
+
     <!-- Footer resizer -->
     <div
       class="h-1 -mt-1 cursor-row-resize bg-gray-200 hover:bg-sky-500"
@@ -137,9 +156,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from "vue"
+import { ref, computed, h, watch, onMounted, onUnmounted } from "vue"
+import { Events } from "@wailsio/runtime"
 import { useRouter } from "vue-router"
-import { ListConnections } from "@/bindings/github.com/felixdotgo/querybox/services/connectionservice"
+import { ListConnections, GetCredential, DeleteConnection } from "@/bindings/github.com/felixdotgo/querybox/services/connectionservice"
+// @ts-ignore: may be generated after adding new methods
+import { GetConnectionTree, ExecTreeAction, ExecPlugin } from "@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager"
 import { ShowConnectionsWindow, MinimiseMainWindow, ToggleFullScreenMainWindow, CloseMainWindow } from "@/bindings/github.com/felixdotgo/querybox/services/app"
 import { createHorizontalResizer, createVerticalResizer } from "@/composables/useResize"
 
@@ -161,6 +183,14 @@ const leftWidth = ref(0)
 const connections = ref([])
 const filter = ref("")
 const selectedConnection = ref(null)
+// map from connection ID to array of tree nodes returned by plugin
+const connectionTrees = ref({})
+
+// delete confirmation modal state
+const deleteModal = ref({ visible: false, conn: null })
+// keys which should be expanded in the tree (drivers + per-connection IDs)
+const expandedKeys = ref([])
+
 const footerCollapsed = ref(true)
 const footerHeight = ref(176)
 
@@ -196,7 +226,10 @@ const treeData = computed(() => {
   return Object.entries(groups).map(([driver, conns]) => ({
     key: `driver:${driver}`,
     label: `${driver} (${conns.length})`,
-    children: conns.map((cc) => ({ key: cc.id, label: cc.name })),
+    children: conns.map((cc) => {
+      const extra = connectionTrees.value[cc.id] || []
+      return { key: cc.id, label: cc.name, children: extra }
+    }),
   }))
 })
 
@@ -218,21 +251,198 @@ const filteredTreeData = computed(() => {
 async function loadConnections() {
   try {
     connections.value = (await ListConnections()) || []
+    // clear any cached trees so that double-clicks on the refreshed list
+    // will trigger a new fetch. this prevents stale state from previous
+    // connections interfering with the UI.
+    connectionTrees.value = {}
   } catch (err) {
     console.error("ListConnections", err)
     connections.value = []
+    connectionTrees.value = {}
   }
 }
 
-function handleSelect(key, node) {
+// NaiveUI tree fires @update:selected-keys with an array of selected keys
+function handleSelect(keys, options, meta) {
+  // extract the single key that was just acted on
+  const key = meta?.node?.key ?? (Array.isArray(keys) ? keys[0] : keys)
+  if (key == null) return
+  console.log("handleSelect", { key, meta, options })
+
   // leaf keys are connection IDs
   const conn = connections.value.find((c) => c.id === key)
-  selectedConnection.value = conn || null
+  if (conn) {
+    console.log("selected connection", conn)
+    selectedConnection.value = conn
+    // single-click: fetch the tree if not already loaded
+    fetchTreeFor(conn)
+    return
+  }
+
+  // if not a top-level connection, it may be a plugin-provided node with
+  // actions. `selectedConnection` holds the parent connection in that case.
+  const parentConn = selectedConnection.value
+  const node = meta?.node
+  if (parentConn && node && node.actions && node.actions.length > 0) {
+    // pick first action for now
+    const act = node.actions[0]
+    runTreeAction(parentConn, act)
+  }
+}
+
+// Returns per-node DOM props for double-click on connections.
+// shared helper invoked when the user double-clicks a connection node
+function handleConnectionDblclick(conn) {
+  if (!conn) return
+  console.log("dblclick connection", conn.id)
+  selectedConnection.value = conn
+
+  // clear cached tree so we always fetch fresh data
+  const copy = { ...connectionTrees.value }
+  delete copy[conn.id]
+  connectionTrees.value = copy
+
+  checkConnection(conn)
+  fetchTreeFor(conn)
+}
+
+function getNodeProps(node) {
+  const conn = connections.value.find((c) => c.id === node.key)
+  if (!conn) return {}
+  return {
+    // Vue's vnode props for events expect camelCase keys like `onDblclick`.
+    // using lowercase `ondblclick` did not always attach listener after
+    // the connections list was refreshed. switching to the proper key and
+    // mutating the tree state immutably ensures the handler is always
+    // registered and reactive updates fire.
+    onDblclick(e) {
+      e.stopPropagation()
+      handleConnectionDblclick(conn)
+    },
+  }
+}
+
+// Renders each tree node label; connection nodes get an inline hover delete button.
+function renderLabel({ option }) {
+  const conn = connections.value.find((c) => c.id === option.key)
+  if (!conn) {
+    // non-connection node (driver group or plugin child) — plain label
+    return option.label
+  }
+  return h(
+    'div',
+    {
+      class: 'flex items-center justify-between w-full group/conn pr-1',
+      onDblclick: (e) => {
+        e.stopPropagation()
+        handleConnectionDblclick(conn)
+      },
+    },
+    [
+      h('span', { class: 'truncate' }, option.label),
+      h(
+        'button',
+        {
+          class: 'opacity-0 group-hover/conn:opacity-100 ml-2 flex-shrink-0 text-gray-400 hover:text-red-500 transition-opacity leading-none',
+          title: 'Delete connection',
+          onClick(e) {
+            e.stopPropagation()
+            deleteModal.value = { visible: true, conn }
+          },
+        },
+        '×',
+      ),
+    ],
+  )
+}
+
+async function confirmDelete() {
+  const conn = deleteModal.value.conn
+  if (!conn) return
+  try {
+    await DeleteConnection(conn.id)
+    // remove from local state
+    connections.value = connections.value.filter((c) => c.id !== conn.id)
+    delete connectionTrees.value[conn.id]
+    if (selectedConnection.value?.id === conn.id) selectedConnection.value = null
+    // remove from expanded keys
+    expandedKeys.value = expandedKeys.value.filter((k) => k !== conn.id)
+  } catch (err) {
+    console.error('DeleteConnection', err)
+  } finally {
+    deleteModal.value = { visible: false, conn: null }
+  }
+}
+
+async function runTreeAction(conn, action) {
+  console.log("runTreeAction", conn.id, action)
+  try {
+    const cred = await GetCredential(conn.id)
+    console.log("credential fetched", cred)
+    const params = {}
+    if (cred) params.credential_blob = cred
+    const res = await ExecTreeAction(conn.driver_type, params, action.query)
+    console.log("action result", res)
+    // TODO: render result in workspace
+  } catch (err) {
+    console.error("ExecTreeAction", conn.id, err)
+  }
+}
+
+async function checkConnection(conn) {
+  console.log("checkConnection start", conn.id)
+  // attempt a simple query to verify connection validity; result is ignored
+  try {
+    const cred = await GetCredential(conn.id)
+    console.log("credential for check", cred)
+    const params = {}
+    if (cred) params.credential_blob = cred
+    const res = await ExecPlugin(conn.driver_type, params, "SELECT 1")
+    console.log("connection check result", conn.id, res)
+  } catch (err) {
+    console.error("connection check", conn.id, err)
+  }
+}
+
+async function fetchTreeFor(conn) {
+  console.log("fetchTreeFor", conn.id)
+  if (connectionTrees.value[conn.id]) {
+    console.log("tree already cached for", conn.id)
+    return
+  }
+  try {
+    const cred = await GetCredential(conn.id)
+    console.log("credential for tree", cred)
+    const params = {}
+    if (cred) params.credential_blob = cred
+    const resp = await GetConnectionTree(conn.driver_type, params)
+    console.log("got tree for", conn.id, resp)
+    // assign immutably to guarantee reactivity
+    connectionTrees.value = {
+      ...connectionTrees.value,
+      [conn.id]: resp.nodes || [],
+    }
+    // when nodes arrive, make sure the connection node is expanded so user
+    // sees the children without needing to click the arrow manually
+    if (!expandedKeys.value.includes(conn.id)) {
+      expandedKeys.value.push(conn.id)
+    }
+  } catch (err) {
+    console.error("GetConnectionTree", conn.id, err)
+    connectionTrees.value = { ...connectionTrees.value, [conn.id]: [] }
+  }
 }
 
 function startDrag(e) {
   horizontalResizer.start(e)
 }
+
+// keep tree expanded when a connection is selected manually
+watch(selectedConnection, (conn) => {
+  if (conn && !expandedKeys.value.includes(conn.id)) {
+    expandedKeys.value.push(conn.id)
+  }
+})
 
 function startFooterDrag(e) {
   if (footerCollapsed.value) footerCollapsed.value = false
@@ -258,6 +468,8 @@ const resizeHandler = () => {
   verticalResizer.clamp()
 }
 
+let offConnectionSaved = null
+
 onMounted(async () => {
   // initialize left column to 1/5 of container but at least 400px
   const rect = containerRef.value?.getBoundingClientRect()
@@ -268,6 +480,15 @@ onMounted(async () => {
   footerHeight.value = 176
 
   await loadConnections()
+
+  // Reload connections list whenever a new connection is saved from the
+  // Connections window.
+  offConnectionSaved = Events.On("connection:saved", () => {
+    loadConnections()
+  })
+
+  // make sure driver nodes start expanded when data arrives
+  expandedKeys.value = defaultExpandedKeys.value
 
   // ensure initial sizes are within computed bounds
   horizontalResizer.clamp()
@@ -280,5 +501,6 @@ onUnmounted(() => {
   window.removeEventListener("resize", resizeHandler)
   horizontalResizer.destroy()
   verticalResizer.destroy()
+  if (offConnectionSaved) offConnectionSaved()
 })
 </script>

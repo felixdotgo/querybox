@@ -93,7 +93,7 @@ cat > /dev/null
 		t.Fatalf("expected 1 form, got %d", len(forms))
 	}
 	f, ok := forms["basic"]
-	if !ok {
+	if !ok || f == nil {
 		t.Fatalf("missing basic form")
 	}
 	if f.Name != "Basic" {
@@ -132,8 +132,8 @@ cat > /dev/null
     if err != nil {
         t.Fatalf("ExecPlugin error: %v", err)
     }
-    if res.Result == nil {
-        t.Fatal("expected non-nil result")
+    if res == nil || res.Result == nil || res.Result.Payload == nil {
+        t.Fatalf("expected non-nil result, got %+v", res)
     }
     sql, ok := res.Result.Payload.(*pluginpb.PluginV1_ExecResult_Sql)
     if !ok {
@@ -173,8 +173,8 @@ cat > /dev/null
     if err != nil {
         t.Fatalf("ExecPlugin error: %v", err)
     }
-    if res.Result == nil {
-        t.Fatal("expected non-nil result")
+    if res == nil || res.Result == nil || res.Result.Payload == nil {
+        t.Fatalf("expected non-nil result, got %+v", res)
     }
     kv, ok := res.Result.Payload.(*pluginpb.PluginV1_ExecResult_Kv)
     if !ok {
@@ -182,5 +182,68 @@ cat > /dev/null
     }
     if kv.Kv.Data["_"] != "hello world\n" {
         t.Fatalf("unexpected raw payload: %v", kv.Kv.Data)
+    }
+}
+
+func TestConnectionTreeAndAction(t *testing.T) {
+    d := t.TempDir()
+    bin := filepath.Join(d, "sh-mock-tree")
+    content := `#!/bin/sh
+if [ "$1" = "info" ]; then
+  echo '{"type":1,"name":"sh-mock-tree","version":"0.1.0","description":"mock tree"}'
+  exit 0
+fi
+if [ "$1" = "connection-tree" ] || [ "$1" = "tree" ]; then
+  # read stdin but ignore
+  cat > /dev/null
+  cat <<'EOF'
+{"nodes":[{"key":"foo","label":"Foo","children":[],"actions":[{"type":"select","title":"Select","query":"SELECT 1"}]}]}
+EOF
+  exit 0
+fi
+if [ "$1" = "exec" ]; then
+  cat <<'EOF'
+{"result":{"kv":{"data":{"ok":"true"}}}}
+EOF
+  exit 0
+fi
+cat > /dev/null
+`
+    if err := os.WriteFile(bin, []byte(content), 0o755); err != nil {
+        t.Fatalf("write mock plugin: %v", err)
+    }
+
+    m := &Manager{
+        Dir:          d,
+        scanInterval: 10 * time.Millisecond,
+        plugins:      make(map[string]PluginInfo),
+        stopCh:       make(chan struct{}),
+    }
+    m.scanOnce()
+    // verify tree
+    tree, err := m.GetConnectionTree("sh-mock-tree", map[string]string{"a":"b"})
+    if err != nil {
+        t.Fatalf("GetConnectionTree error: %v", err)
+    }
+    if tree == nil || len(tree.Nodes) != 1 {
+        t.Fatalf("expected 1 root node, got %+v", tree)
+    }
+    if tree.Nodes[0].Key != "foo" {
+        t.Fatalf("unexpected node key: %s", tree.Nodes[0].Key)
+    }
+    if len(tree.Nodes[0].Actions) != 1 {
+        t.Fatalf("expected 1 action, got %d", len(tree.Nodes[0].Actions))
+    }
+    // test ExecTreeAction proxies to exec
+    res, err := m.ExecTreeAction("sh-mock-tree", nil, "anything")
+    if err != nil {
+        t.Fatalf("ExecTreeAction error: %v", err)
+    }
+    if res == nil || res.Result == nil || res.Result.Payload == nil {
+        t.Fatalf("unexpected exec result: %+v", res)
+    }
+    kv, ok := res.Result.Payload.(*pluginpb.PluginV1_ExecResult_Kv)
+    if !ok || kv.Kv.Data["ok"] != "true" {
+        t.Fatalf("unexpected exec result: %+v", res)
     }
 }

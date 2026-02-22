@@ -55,6 +55,22 @@ export function GetConnection(id) {
 }
 
 /**
+ * GetCredential retrieves the raw credential blob associated with the
+ * connection.  This is used by the frontend when it needs to establish a
+ * plugin connection (e.g. building a tree or executing a query). The value was
+ * originally supplied when the connection was created and is stored via
+ * CredManager.  Returning the credential to the caller is considered a
+ * security-sensitive operation, but the frontend already has full access to a
+ * saved connection (it can execute arbitrary queries), so this method simply
+ * fetches and returns whatever string is stored under the connection's key.
+ * @param {string} id
+ * @returns {$CancellablePromise<string>}
+ */
+export function GetCredential(id) {
+    return $Call.ByID(2539819102, id);
+}
+
+/**
  * ListConnections returns all stored connections ordered by creation time
  * (newest first).
  * @returns {$CancellablePromise<$models.Connection[]>}

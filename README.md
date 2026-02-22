@@ -78,7 +78,7 @@ QueryBox follows a service-oriented architecture:
 - **ConnectionService**: CRUD operations for database connections
 - **ConnectionManager**: SQLite-backed connection persistence
 - **PluginManager**: On-demand plugin discovery and execution
-- **CredentialManager**: Secure credential storage via `go-keyring`
+- **CredentialManager**: Secure credential storage via `go-keyring` with sqlite-file fallback
 
 ### Plugin System
 

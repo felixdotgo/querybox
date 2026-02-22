@@ -14,6 +14,7 @@ import (
 
 	"github.com/felixdotgo/querybox/pkg/plugin"
 	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // PluginInfo holds metadata that the UI can display for each plugin.
@@ -190,16 +191,19 @@ func (m *Manager) ListPlugins() []PluginInfo {
 // payload on stdin. The method returns the structured `plugin.ExecResponse` or
 // an error.  Historically this returned a raw string; callers may need to
 // examine the `Result` field to access rows, documents, or key/value data.
-func (m *Manager) ExecPlugin(name string, connection map[string]string, query string) (plugin.ExecResponse, error) {
+func (m *Manager) ExecPlugin(name string, connection map[string]string, query string) (*plugin.ExecResponse, error) {
+	fmt.Printf("ExecPlugin called name=%s query=%s connection=%v\n", name, query, connection)
 	m.mu.Lock()
 	info, ok := m.plugins[name]
 	m.mu.Unlock()
 	if !ok {
-		return plugin.ExecResponse{}, errors.New("plugin not found")
+		fmt.Printf("ExecPlugin: plugin %s not found\n", name)
+		return nil, errors.New("plugin not found")
 	}
 	full := info.Path
 	if !isExecutable(full) {
-		return plugin.ExecResponse{}, errors.New("plugin is not executable")
+		fmt.Printf("ExecPlugin: path %s not executable\n", full)
+		return nil, errors.New("plugin is not executable")
 	}
 
 	req := execRequest{Connection: connection, Query: query}
@@ -211,22 +215,24 @@ func (m *Manager) ExecPlugin(name string, connection map[string]string, query st
 	cmd.Env = append(os.Environ(), "QUERYBOX_PLUGIN_NAME="+name)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		return plugin.ExecResponse{}, err
+		return nil, err
 	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return plugin.ExecResponse{}, err
+		return nil, err
 	}
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		return plugin.ExecResponse{}, err
+		return nil, err
 	}
 
 	if err := cmd.Start(); err != nil {
-		return plugin.ExecResponse{}, err
+		fmt.Printf("ExecPlugin: start error: %v\n", err)
+		return nil, err
 	}
 
 	// send request
+	fmt.Printf("ExecPlugin: sending request to plugin %s: %s\n", name, string(b))
 	_, _ = stdin.Write(b)
 	_ = stdin.Close()
 
@@ -234,22 +240,34 @@ func (m *Manager) ExecPlugin(name string, connection map[string]string, query st
 	outB, _ := io.ReadAll(stdout)
 	errB, _ := io.ReadAll(stderr)
 
+	fmt.Printf("ExecPlugin: stdout=%s stderr=%s\n", string(outB), string(errB))
+
 	if err := cmd.Wait(); err != nil {
-		return plugin.ExecResponse{}, fmt.Errorf("plugin exited: %w - stderr: %s", err, string(errB))
+		if ctx.Err() == context.DeadlineExceeded {
+			// the context will have killed the process after 30s
+			fmt.Printf("ExecPlugin: plugin timed out after 30s\n")
+			return nil, fmt.Errorf("plugin timed out after 30s")
+		}
+		fmt.Printf("ExecPlugin: command wait error: %v\n", err)
+		return nil, fmt.Errorf("plugin exited: %w - stderr: %s", err, string(errB))
 	}
 
 	// if the plugin didn't emit JSON we still want to return something useful
 	// so wrap the raw output in a simple key/value result.  Older clients may
 	// still just render the string.
-	var resp plugin.ExecResponse
+	resp := &plugin.ExecResponse{}
 	if len(outB) == 0 {
-		return plugin.ExecResponse{}, nil
+		return resp, nil
 	}
-	if err := json.Unmarshal(outB, &resp); err != nil {
+	// protobuf structs are better parsed with protojson which correctly
+	// handles oneof fields and enum names.
+	if err := protojson.Unmarshal(outB, resp); err != nil {
+		fmt.Printf("ExecPlugin: JSON unmarshal failed: %v\n", err)
 		// fallback to embedding the raw output in a KV map under "_".
-		return plugin.ExecResponse{Result: &pluginpb.PluginV1_ExecResult{Payload: &pluginpb.PluginV1_ExecResult_Kv{Kv: &pluginpb.PluginV1_KeyValueResult{Data: map[string]string{"_": string(outB)}}}}}, nil
+		return &plugin.ExecResponse{Result: &pluginpb.PluginV1_ExecResult{Payload: &pluginpb.PluginV1_ExecResult_Kv{Kv: &pluginpb.PluginV1_KeyValueResult{Data: map[string]string{"_": string(outB)}}}}}, nil
 	}
 	if resp.Error != "" {
+		fmt.Printf("ExecPlugin: plugin returned error field: %s\n", resp.Error)
 		return resp, errors.New(resp.Error)
 	}
 	return resp, nil
@@ -261,11 +279,81 @@ func (m *Manager) Rescan() error {
 	return nil
 }
 
+// GetConnectionTree asks the named plugin for its connection tree.  The
+// request contains only the connection map; the plugin defines node structure
+// and actions.  A timeout guards misbehaving plugins.
+func (m *Manager) GetConnectionTree(name string, connection map[string]string) (*plugin.ConnectionTreeResponse, error) {
+	fmt.Printf("GetConnectionTree called name=%s connection=%v\n", name, connection)
+	m.mu.Lock()
+	info, ok := m.plugins[name]
+	m.mu.Unlock()
+	if !ok {
+		fmt.Printf("GetConnectionTree: plugin %s not found\n", name)
+		return nil, errors.New("plugin not found")
+	}
+	full := info.Path
+	if !isExecutable(full) {
+		return nil, errors.New("plugin is not executable")
+	}
+
+	req := plugin.ConnectionTreeRequest{Connection: connection}
+	b, _ := json.Marshal(&req)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, full, "connection-tree")
+	cmd.Env = append(os.Environ(), "QUERYBOX_PLUGIN_NAME="+name)
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, err
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+
+	_, _ = stdin.Write(b)
+	_ = stdin.Close()
+
+	outB, _ := io.ReadAll(stdout)
+	errB, _ := io.ReadAll(stderr)
+
+	if err := cmd.Wait(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return nil, fmt.Errorf("plugin timed out after 30s")
+		}
+		return nil, fmt.Errorf("plugin exited: %w - stderr: %s", err, string(errB))
+	}
+
+	resp := &plugin.ConnectionTreeResponse{}
+	if len(outB) == 0 {
+		return resp, nil
+	}
+	if err := protojson.Unmarshal(outB, resp); err != nil {
+		return nil, fmt.Errorf("invalid tree json: %w", err)
+	}
+	return resp, nil
+}
+
+// ExecTreeAction is a convenience wrapper for executing the query payload
+// attached to a tree node action.  It simply forwards to ExecPlugin.
+func (m *Manager) ExecTreeAction(name string, connection map[string]string, actionQuery string) (*plugin.ExecResponse, error) {
+	return m.ExecPlugin(name, connection, actionQuery)
+}
+
 // GetPluginAuthForms probes the plugin executable for supported authentication
 // forms by invoking `plugin authforms` and decoding the JSON response. If the
 // plugin doesn't implement the command or returns no forms an empty map is
 // returned.
-func (m *Manager) GetPluginAuthForms(name string) (map[string]plugin.AuthForm, error) {
+func (m *Manager) GetPluginAuthForms(name string) (map[string]*plugin.AuthForm, error) {
 	m.mu.Lock()
 	info, ok := m.plugins[name]
 	m.mu.Unlock()
@@ -289,16 +377,16 @@ func (m *Manager) GetPluginAuthForms(name string) (map[string]plugin.AuthForm, e
 		return nil, nil
 	}
 	var resp plugin.AuthFormsResponse
-	if err := json.Unmarshal(out, &resp); err != nil {
+	if err := protojson.Unmarshal(out, &resp); err != nil {
 		return nil, fmt.Errorf("invalid authforms json: %w", err)
 	}
-	// convert to non-pointer map for convenience
-	ret := make(map[string]plugin.AuthForm)
+	// convert to non-pointer map for convenience (pointer avoids lock copy)
+	ret := make(map[string]*plugin.AuthForm)
 	for k, v := range resp.Forms {
 		if v == nil {
 			continue
 		}
-		ret[k] = *v
+		ret[k] = v
 	}
 	return ret, nil
 }

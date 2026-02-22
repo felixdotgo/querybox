@@ -92,6 +92,8 @@ import {
   GetPluginAuthForms,
 } from "@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager"
 import { CloseConnectionsWindow } from "@/bindings/github.com/felixdotgo/querybox/services/app"
+import { CreateConnection } from "@/bindings/github.com/felixdotgo/querybox/services/connectionservice"
+import { Events } from "@wailsio/runtime"
 import AuthFormRenderer from "@/components/AuthFormRenderer.vue"
 
 const plugins = ref([])
@@ -198,14 +200,18 @@ async function selectPlugin(p) {
   }
 }
 
-// keep values in sync when user changes selected tab
+// Keep authValues in sync when the user switches auth form tabs.
+// Only initialise fields that have no value yet — this preserves values
+// the user already typed (common fields between tabs) and correctly
+// applies per-field defaults without wiping the parent's manual init.
 watch(selectedAuthForm, (newKey) => {
   if (!newKey) return
   const def = authForms.value[newKey]
-  authValues.value = {}
   if (!def) return
   for (const f of def.fields || []) {
-    authValues.value[f.name] = f.value || ""
+    if (authValues.value[f.name] === undefined || authValues.value[f.name] === null) {
+      authValues.value[f.name] = f.value ?? ""
+    }
   }
 })
 
@@ -234,14 +240,9 @@ async function saveConnection() {
       form.value.driver.trim(),
       form.value.cred.trim(),
     )
-    statusText.value = "Saved"
-    // reset form but keep driver selected
-    form.value = { name: "", driver: "", cred: "" }
-    resetAuthState()
-    await load()
-    setTimeout(() => {
-      statusText.value = ""
-    }, 1200)
+    // Notify other windows (e.g. Home) that a connection was saved, then close.
+    Events.Emit("connection:saved")
+    await CloseConnectionsWindow()
   } catch (err) {
     console.error("connect:", err)
     statusText.value = "Failed to save"

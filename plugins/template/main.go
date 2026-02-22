@@ -38,6 +38,23 @@ func (t *templatePlugin) AuthForms(plugin.AuthFormsRequest) (plugin.AuthFormsRes
 	return plugin.AuthFormsResponse{Forms: map[string]*plugin.AuthForm{"basic": &basic}}, nil
 }
 
+// ConnectionTree returns a trivial tree for demonstration purposes.  In a
+// real plugin the structure would be derived from the connection (e.g. list of
+// databases/tables).
+func (t *templatePlugin) ConnectionTree(req plugin.ConnectionTreeRequest) (plugin.ConnectionTreeResponse, error) {
+	return plugin.ConnectionTreeResponse{
+		Nodes: []*plugin.ConnectionTreeNode{
+			{
+				Key:   "dummy",
+				Label: "Dummy node",
+				Actions: []*plugin.ConnectionTreeAction{
+					{Type: "select", Title: "Echo query", Query: "SELECT 1"},
+				},
+			},
+		},
+	}, nil
+}
+
 func main() {
 	plugin.ServeCLI(&templatePlugin{})
 }

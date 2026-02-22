@@ -50,11 +50,39 @@ export function EnablePlugin(name) {
  * @param {string} name
  * @param {{ [_ in string]?: string }} connection
  * @param {string} query
- * @returns {$CancellablePromise<plugin$0.ExecResponse>}
+ * @returns {$CancellablePromise<plugin$0.ExecResponse | null>}
  */
 export function ExecPlugin(name, connection, query) {
     return $Call.ByID(2332402495, name, connection, query).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType0($result);
+        return $$createType1($result);
+    }));
+}
+
+/**
+ * ExecTreeAction is a convenience wrapper for executing the query payload
+ * attached to a tree node action.  It simply forwards to ExecPlugin.
+ * @param {string} name
+ * @param {{ [_ in string]?: string }} connection
+ * @param {string} actionQuery
+ * @returns {$CancellablePromise<plugin$0.ExecResponse | null>}
+ */
+export function ExecTreeAction(name, connection, actionQuery) {
+    return $Call.ByID(987162126, name, connection, actionQuery).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType1($result);
+    }));
+}
+
+/**
+ * GetConnectionTree asks the named plugin for its connection tree.  The
+ * request contains only the connection map; the plugin defines node structure
+ * and actions.  A timeout guards misbehaving plugins.
+ * @param {string} name
+ * @param {{ [_ in string]?: string }} connection
+ * @returns {$CancellablePromise<plugin$0.ConnectionTreeResponse | null>}
+ */
+export function GetConnectionTree(name, connection) {
+    return $Call.ByID(3147399459, name, connection).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType3($result);
     }));
 }
 
@@ -64,11 +92,11 @@ export function ExecPlugin(name, connection, query) {
  * plugin doesn't implement the command or returns no forms an empty map is
  * returned.
  * @param {string} name
- * @returns {$CancellablePromise<{ [_ in string]?: plugin$0.AuthForm }>}
+ * @returns {$CancellablePromise<{ [_ in string]?: plugin$0.AuthForm | null }>}
  */
 export function GetPluginAuthForms(name) {
     return $Call.ByID(545463133, name).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType2($result);
+        return $$createType6($result);
     }));
 }
 
@@ -78,7 +106,7 @@ export function GetPluginAuthForms(name) {
  */
 export function ListPlugins() {
     return $Call.ByID(668942975).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType4($result);
+        return $$createType8($result);
     }));
 }
 
@@ -100,7 +128,11 @@ export function Shutdown() {
 
 // Private type creation functions
 const $$createType0 = pluginpb$0.PluginV1_ExecResponse.createFrom;
-const $$createType1 = pluginpb$0.PluginV1_AuthForm.createFrom;
-const $$createType2 = $Create.Map($Create.Any, $$createType1);
-const $$createType3 = $models.PluginInfo.createFrom;
-const $$createType4 = $Create.Array($$createType3);
+const $$createType1 = $Create.Nullable($$createType0);
+const $$createType2 = pluginpb$0.PluginV1_ConnectionTreeResponse.createFrom;
+const $$createType3 = $Create.Nullable($$createType2);
+const $$createType4 = pluginpb$0.PluginV1_AuthForm.createFrom;
+const $$createType5 = $Create.Nullable($$createType4);
+const $$createType6 = $Create.Map($Create.Any, $$createType5);
+const $$createType7 = $models.PluginInfo.createFrom;
+const $$createType8 = $Create.Array($$createType7);

@@ -25,7 +25,7 @@ Stores connection metadata with references to credentials stored in OS keyring.
 | `updated_at` | DATETIME | DEFAULT now() | ISO8601 timestamp of last update |
 
 **Notes**:
-- `credential_key` references a secret stored via CredManager (OS keyring or in-memory fallback).
+- `credential_key` references a secret stored via CredManager (OS keyring with sqlite-file fallback).
 - No plaintext credentials or encrypted blobs stored in this table.
 - Legacy `credential_blob` column was removed after migration to keyring model.
 
@@ -92,9 +92,9 @@ CREATE TABLE IF NOT EXISTS connections (
 - **Delete**: Remove row, delete credential from keyring via CredManager
 
 ### Credential Operations
-- **Store**: `CredManager.Store(key, secret)` → OS keyring or in-memory fallback
-- **Retrieve**: `CredManager.Get(key)` → Check keyring first, then fallback
-- **Delete**: `CredManager.Delete(key)` → Remove from both keyring and fallback
+- **Store**: `CredManager.Store(key, secret)` → OS keyring or sqlite-file fallback
+- **Retrieve**: `CredManager.Get(key)` → Check keyring first, then sqlite, then memory
+- **Delete**: `CredManager.Delete(key)` → Remove from keyring, sqlite, and map
 
 ## Operational Notes
 

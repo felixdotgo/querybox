@@ -3,10 +3,8 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
-	"flag"
 	"fmt"
-	"io"
-	"os"
+	"net/url"
 
 	"github.com/felixdotgo/querybox/pkg/plugin"
 	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
@@ -26,7 +24,7 @@ func (m *postgresqlPlugin) Info() (plugin.InfoResponse, error) {
 	}, nil
 }
 
-func (m *postgresqlPlugin) AuthForms(plugin.AuthFormsRequest) (plugin.AuthFormsResponse, error) {
+func (m *postgresqlPlugin) AuthForms(*plugin.AuthFormsRequest) (*plugin.AuthFormsResponse, error) {
 	// Provide two options: a `basic` property-based form and a `dsn` fallback.
 	basic := plugin.AuthForm{
 		Key: "basic",
@@ -37,29 +35,30 @@ func (m *postgresqlPlugin) AuthForms(plugin.AuthFormsRequest) (plugin.AuthFormsR
 			{Type: plugin.AuthField_TEXT, Name: "user", Label: "User"},
 			{Type: plugin.AuthField_PASSWORD, Name: "password", Label: "Password"},
 			{Type: plugin.AuthField_TEXT, Name: "database", Label: "Database name"},
+			// allow tls and extra params similar to mysql
+			{Type: plugin.AuthField_TEXT, Name: "tls", Label: "TLS mode (e.g. disable/require)"},
+			{Type: plugin.AuthField_TEXT, Name: "params", Label: "Extra params", Placeholder: "connect_timeout=5&application_name=myapp"},
 		},
 	}
 
-	return plugin.AuthFormsResponse{Forms: map[string]*plugin.AuthForm{"basic": &basic}}, nil
+	return &plugin.AuthFormsResponse{Forms: map[string]*plugin.AuthForm{"basic": &basic}}, nil
 }
 
-func (m *postgresqlPlugin) Exec(req plugin.ExecRequest) (plugin.ExecResponse, error) {
-	// Accept either a full DSN under key "dsn" (legacy) or a credential blob
-	// JSON (recommended) stored under "credential_blob" containing: {"form":"basic","values": { ... }}
-	dsn, ok := req.Connection["dsn"]
+// buildConnString constructs a postgres connection string from the provided
+// connection map.  Reuses the same rules used by Exec and the connection tree
+// logic.
+func buildConnString(connection map[string]string) (string, error) {
+	dsn, ok := connection["dsn"]
 	if !ok || dsn == "" {
-		// try credential_blob
-		if blob, ok2 := req.Connection["credential_blob"]; ok2 && blob != "" {
+		if blob, ok2 := connection["credential_blob"]; ok2 && blob != "" {
 			var payload struct {
 				Form   string            `json:"form"`
 				Values map[string]string `json:"values"`
 			}
 			if err := json.Unmarshal([]byte(blob), &payload); err == nil {
-				// if plugin stored a dsn inside values, prefer that
 				if v, ok := payload.Values["dsn"]; ok && v != "" {
 					dsn = v
 				} else {
-					// build a simple postgres connection string
 					host := payload.Values["host"]
 					user := payload.Values["user"]
 					pass := payload.Values["password"]
@@ -72,30 +71,56 @@ func (m *postgresqlPlugin) Exec(req plugin.ExecRequest) (plugin.ExecResponse, er
 						dsn = fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", host, port, user, pass, dbname)
 					}
 				}
+				// append extra params analogous to mysql buildDSN
+				if dsn != "" {
+					params := url.Values{}
+					for k, v := range payload.Values {
+						switch k {
+						case "host", "user", "password", "port", "database", "dsn":
+							continue
+						}
+						if v != "" {
+							params.Add(k, v)
+						}
+					}
+					if params.Get("connect_timeout") == "" {
+						params.Set("connect_timeout", "5")
+					}
+					if len(params) > 0 {
+						dsn = dsn + " " + params.Encode()
+					}
+				}
 			}
 		}
 	}
+	return dsn, nil
+}
 
+func (m *postgresqlPlugin) Exec(req *plugin.ExecRequest) (*plugin.ExecResponse, error) {
+	dsn, err := buildConnString(req.Connection)
+	if err != nil {
+		return &plugin.ExecResponse{Error: fmt.Sprintf("invalid connection: %v", err)}, nil
+	}
 	if dsn == "" {
-		return plugin.ExecResponse{Error: "missing dsn in connection"}, nil
+		return &plugin.ExecResponse{Error: "missing dsn in connection"}, nil
 	}
 
 	// open postgres driver
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
-		return plugin.ExecResponse{Error: fmt.Sprintf("open error: %v", err)}, nil
+		return &plugin.ExecResponse{Error: fmt.Sprintf("open error: %v", err)}, nil
 	}
 	defer db.Close()
 
 	rows, err := db.Query(req.Query)
 	if err != nil {
-		return plugin.ExecResponse{Error: fmt.Sprintf("query error: %v", err)}, nil
+		return &plugin.ExecResponse{Error: fmt.Sprintf("query error: %v", err)}, nil
 	}
 	defer rows.Close()
 
 	cols, err := rows.Columns()
 	if err != nil {
-		return plugin.ExecResponse{Error: fmt.Sprintf("cols error: %v", err)}, nil
+		return &plugin.ExecResponse{Error: fmt.Sprintf("cols error: %v", err)}, nil
 	}
 
 	colMeta := make([]*plugin.Column, len(cols))
@@ -111,7 +136,7 @@ func (m *postgresqlPlugin) Exec(req plugin.ExecRequest) (plugin.ExecResponse, er
 			ptrs[i] = &vals[i]
 		}
 		if err := rows.Scan(ptrs...); err != nil {
-			return plugin.ExecResponse{Error: fmt.Sprintf("scan error: %v", err)}, nil
+			return &plugin.ExecResponse{Error: fmt.Sprintf("scan error: %v", err)}, nil
 		}
 		strs := make([]string, len(cols))
 		for i, v := range vals {
@@ -124,7 +149,7 @@ func (m *postgresqlPlugin) Exec(req plugin.ExecRequest) (plugin.ExecResponse, er
 		rowResults = append(rowResults, &plugin.Row{Values: strs})
 	}
 
-	return plugin.ExecResponse{
+	return &plugin.ExecResponse{
 		Result: &plugin.ExecResult{
 			Payload: &pluginpb.PluginV1_ExecResult_Sql{
 				Sql: &plugin.SqlResult{
@@ -136,35 +161,46 @@ func (m *postgresqlPlugin) Exec(req plugin.ExecRequest) (plugin.ExecResponse, er
 	}, nil
 }
 
-func main() {
-	flag.Parse()
-	args := flag.Args()
-	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "Usage: postgres info | exec | authforms")
-		os.Exit(2)
+// ConnectionTree returns a simple list of non-template databases.  The host
+// can display the names and optionally invoke the provided action if the
+// user requests it.  Errors or missing connection details result in an empty
+// response so the core treats the plugin as having no tree support.
+func (m *postgresqlPlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugin.ConnectionTreeResponse, error) {
+	dsn, err := buildConnString(req.Connection)
+	if err != nil || dsn == "" {
+		return &plugin.ConnectionTreeResponse{}, nil
 	}
 
-	// Allow running via pkg/plugin.ServeCLI as well but keep a fallback CLI that
-	// decodes stdin and calls the implementation for direct builds.
-	impl := &postgresqlPlugin{}
-	switch args[0] {
-	case "info":
-		info, _ := impl.Info()
-		b, _ := json.Marshal(info)
-		os.Stdout.Write(b)
-	case "exec":
-		var req plugin.ExecRequest
-		in, _ := io.ReadAll(os.Stdin)
-		_ = json.Unmarshal(in, &req)
-		res, _ := impl.Exec(req)
-		b, _ := json.Marshal(res)
-		os.Stdout.Write(b)
-	case "authforms":
-		res, _ := impl.AuthForms(plugin.AuthFormsRequest{})
-		b, _ := json.Marshal(res)
-		os.Stdout.Write(b)
-	default:
-		fmt.Fprintln(os.Stderr, "Usage: postgres info | exec | authforms")
-		os.Exit(2)
+	db, err := sql.Open("postgres", dsn)
+	if err != nil {
+		return &plugin.ConnectionTreeResponse{}, nil
 	}
+	defer db.Close()
+
+	rows, err := db.Query("SELECT datname FROM pg_database WHERE datistemplate = false")
+	if err != nil {
+		return &plugin.ConnectionTreeResponse{}, nil
+	}
+	defer rows.Close()
+
+	var nodes []*plugin.ConnectionTreeNode
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			continue
+		}
+		nodes = append(nodes, &plugin.ConnectionTreeNode{
+			Key:   name,
+			Label: name,
+			Actions: []*plugin.ConnectionTreeAction{
+				{Type: "select", Title: "Query", Query: "SELECT 1"},
+			},
+		})
+	}
+
+	return &plugin.ConnectionTreeResponse{Nodes: nodes}, nil
+}
+
+func main() {
+	plugin.ServeCLI(&postgresqlPlugin{})
 }

@@ -16,6 +16,12 @@ export const AuthForm = pluginpb$0.PluginV1_AuthForm;
  * @typedef {pluginpb$0.PluginV1_AuthForm} AuthForm
  */
 
+export const ConnectionTreeResponse = pluginpb$0.PluginV1_ConnectionTreeResponse;
+
+/**
+ * @typedef {pluginpb$0.PluginV1_ConnectionTreeResponse} ConnectionTreeResponse
+ */
+
 /**
  * ExecResponse now contains a typed ExecResult which can represent SQL rows,
  * document lists, or key/value maps. Plugins should return one of those

@@ -128,6 +128,7 @@ func (s *ConnectionService) hasColumn(col string) (bool, error) {
 // ListConnections returns all stored connections ordered by creation time
 // (newest first).
 func (s *ConnectionService) ListConnections(ctx context.Context) ([]Connection, error) {
+	fmt.Println("ListConnections called")
 	if !s.closeable() {
 		return nil, errors.New("database not initialized")
 	}
@@ -157,6 +158,7 @@ func (s *ConnectionService) ListConnections(ctx context.Context) ([]Connection, 
 
 // GetConnection retrieves a single connection by id.
 func (s *ConnectionService) GetConnection(ctx context.Context, id string) (Connection, error) {
+	fmt.Printf("GetConnection called id=%s\n", id)
 	if id == "" {
 		return Connection{}, errors.New("empty id")
 	}
@@ -207,9 +209,40 @@ func (s *ConnectionService) CreateConnection(ctx context.Context, name, driverTy
 	}, nil
 }
 
+// GetCredential retrieves the raw credential blob associated with the
+// connection.  This is used by the frontend when it needs to establish a
+// plugin connection (e.g. building a tree or executing a query). The value was
+// originally supplied when the connection was created and is stored via
+// CredManager.  Returning the credential to the caller is considered a
+// security-sensitive operation, but the frontend already has full access to a
+// saved connection (it can execute arbitrary queries), so this method simply
+// fetches and returns whatever string is stored under the connection's key.
+func (s *ConnectionService) GetCredential(ctx context.Context, id string) (string, error) {
+	fmt.Printf("GetCredential called id=%s\n", id)
+	if id == "" {
+		return "", errors.New("empty id")
+	}
+	if !s.closeable() {
+		return "", errors.New("database not initialized")
+	}
+	conn, err := s.GetConnection(ctx, id)
+	if err != nil {
+		return "", err
+	}
+	if conn.CredentialKey == "" {
+		return "", errors.New("no credential stored")
+	}
+	cred, err := s.cred.Get(conn.CredentialKey)
+	if err != nil {
+		return "", fmt.Errorf("fetch credential: %w", err)
+	}
+	return cred, nil
+}
+
 // DeleteConnection removes a connection by id and attempts to remove the
 // associated secret from the keyring as a best-effort cleanup.
 func (s *ConnectionService) DeleteConnection(ctx context.Context, id string) error {
+	fmt.Printf("DeleteConnection called id=%s\n", id)
 	if id == "" {
 		return errors.New("empty id")
 	}

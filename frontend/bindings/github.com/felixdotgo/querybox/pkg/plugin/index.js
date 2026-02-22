@@ -4,5 +4,6 @@
 
 export {
     AuthForm,
+    ConnectionTreeResponse,
     ExecResponse
 } from "./models.js";

@@ -42,6 +42,16 @@ type AuthForm = pluginpb.PluginV1_AuthForm
 type AuthFormsRequest = pluginpb.PluginV1_AuthFormsRequest
 type AuthFormsResponse = pluginpb.PluginV1_AuthFormsResponse
 
+// Connection‑tree aliases
+// these correspond to the `ConnectionTree` RPC introduced for browsing a
+// connection.  Each driver may return its own structure; the core simply
+// renders the nodes and forwards any action queries back to the plugin.
+
+type ConnectionTreeRequest = pluginpb.PluginV1_ConnectionTreeRequest
+type ConnectionTreeResponse = pluginpb.PluginV1_ConnectionTreeResponse
+type ConnectionTreeNode = pluginpb.PluginV1_ConnectionTreeNode
+type ConnectionTreeAction = pluginpb.PluginV1_ConnectionTreeAction
+
 const (
 	TypeDriver DriverType = pluginpb.PluginV1_DRIVER
 
@@ -63,11 +73,16 @@ type Plugin interface {
 	// The host will pass a query and a map of connection/authentication parameters (e.g. host, user, password)
 	// that the plugin can use to connect to a database or service and execute the query. The plugin is responsible
 	// for defining the expected connection parameters and handling the execution logic.
-	Exec(ExecRequest) (ExecResponse, error)
+	Exec(*ExecRequest) (*ExecResponse, error)
 
 	// AuthForms returns available authentication forms the plugin supports.
 	// Optional for existing plugins — implementations may return an empty map.
-	AuthForms(AuthFormsRequest) (AuthFormsResponse, error)
+	AuthForms(*AuthFormsRequest) (*AuthFormsResponse, error)
+
+	// ConnectionTree returns a driver-specific hierarchy of nodes and actions for
+ 	// a given connection.  Drivers that do not support browsing can return an
+ 	// empty Response or an error; the core will treat that as “no tree”.
+ 	ConnectionTree(*ConnectionTreeRequest) (*ConnectionTreeResponse, error)
 }
 
 // ServeCLI runs a Plugin implementation as a small CLI shim that supports
@@ -103,16 +118,30 @@ func ServeCLI(p Plugin) {
 			fmt.Fprintf(os.Stderr, "plugin: invalid request json: %v\n", err)
 			os.Exit(1)
 		}
-		res, _ := p.Exec(req)
+		res, _ := p.Exec(&req)
 		b, _ := json.Marshal(res)
 		_, _ = os.Stdout.Write(b)
 	case "authforms":
 		// no stdin input expected; plugins should return available forms
-		res, err := p.AuthForms(AuthFormsRequest{})
+		res, err := p.AuthForms(&AuthFormsRequest{})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "plugin: authforms error: %v\n", err)
 			os.Exit(1)
 		}
+		b, _ := json.Marshal(res)
+		_, _ = os.Stdout.Write(b)
+	case "connection-tree", "tree":
+		in, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "plugin: failed to read stdin: %v\n", err)
+			os.Exit(1)
+		}
+		var req ConnectionTreeRequest
+		if err := json.Unmarshal(in, &req); err != nil {
+			fmt.Fprintf(os.Stderr, "plugin: invalid tree request json: %v\n", err)
+			os.Exit(1)
+		}
+		res, _ := p.ConnectionTree(&req)
 		b, _ := json.Marshal(res)
 		_, _ = os.Stdout.Write(b)
 	default:

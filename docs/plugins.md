@@ -12,7 +12,8 @@ Developer flow
 
 Contract (CLI)
 - `plugin info` → plugin prints JSON: `{ name, version, description }`.
-- `plugin exec` → plugin reads JSON `{ connection, query }` from stdin and writes JSON `{ result, error }` to stdout.  `result` is now a structured object containing one of `sql`, `document`, or `kv` payloads; older plugins may still return a raw string which will be wrapped in a `kv` map by the host.
+- `plugin exec` → plugin reads JSON `{ connection, query }` from stdin and writes JSON `{ result, error }` to stdout.  `connection` may be a simple DSN string or a credential blob JSON; arbitrary extra query parameters (including `tls` settings for SSL) are allowed and appended by the host. `result` is now a structured object containing one of `sql`, `document`, or `kv` payloads; older plugins may still return a raw string which will be wrapped in a `kv` map by the host.
+- `plugin connection-tree` (or simply `plugin tree`) → plugin reads JSON `{ connection }` and returns `{ nodes: [...]}` describing a hierarchical browse structure.  Each node may include an `actions` array describing what the core should do when the user activates that node.
 
 Contract (proto)
 - `contracts/plugin/v1/plugin.proto` defines `Info` and `Exec` messages — the canonical proto for plugins (generated Go package: `rpc/contracts/plugin/v1`, `package pluginpb`).

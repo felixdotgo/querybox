@@ -19,6 +19,10 @@ service PluginService {
   // will render these forms (tabs) and send the selected form values back
   // to the plugin when creating a connection.
   rpc AuthForms(PluginV1.AuthFormsRequest) returns (PluginV1.AuthFormsResponse);
+
+  // ConnectionTree returns a driver-defined hierarchy of nodes and actions for
+  // a given connection.  The frontend uses this to render a browsable tree.
+  rpc ConnectionTree(PluginV1.ConnectionTreeRequest) returns (PluginV1.ConnectionTreeResponse);
 }
 
 // PluginV1 defines the data structures for plugin information, execution, and authentication forms.
@@ -137,5 +141,28 @@ message PluginV1 {
   message AuthFormsResponse {
     // map key is the form `key` (e.g. "basic").
     map<string, AuthForm> forms = 1;
+  }
+
+  // ConnectionTreeRequest is sent when the frontend wants to browse a
+  // connection.  The contents are purely driver-defined.
+  message ConnectionTreeRequest {
+    map<string,string> connection = 1;
+  }
+
+  message ConnectionTreeResponse {
+    repeated ConnectionTreeNode nodes = 1;
+  }
+
+  message ConnectionTreeNode {
+    string key       = 1;              // unique within the returned tree
+    string label     = 2;              // user-visible text
+    repeated ConnectionTreeNode children = 3;
+    repeated ConnectionTreeAction actions = 4;
+  }
+
+  message ConnectionTreeAction {
+    string type  = 1; // machine name (e.g. "select", "describe")
+    string title = 2; // displayed in a context menu or double-click
+    string query = 3; // plugin-interpreted payload (often SQL)
   }
 }

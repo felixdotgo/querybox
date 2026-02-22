@@ -72,6 +72,7 @@ Application-facing service exposing connection CRUD operations to frontend. Thin
 | `CreateConnection` | `(ctx, name, driverType, credential) → (Connection, error)` | Create new connection with credential storage |
 | `DeleteConnection` | `(ctx, id) → error` | Delete connection and associated credentials |
 | `GetConnection` | `(ctx, id) → (Connection, error)` | Retrieve single connection by ID |
+| `GetCredential` | `(ctx, id) → (string, error)` | Retrieve raw credential blob for use by plugins |
 
 ### Data Model (Frontend-visible)
 
@@ -125,11 +126,12 @@ Internal persistence layer managing connection metadata in SQLite and delegating
 **Location**: `services/credmanager/credmanager.go`
 
 ### Responsibility
-Secure credential storage abstraction with OS keyring (primary) and in-memory fallback.
+Secure credential storage abstraction with OS keyring (primary) and local sqlite-file fallback (in-memory only if sqlite cannot be opened).
 
 ### State
-- `fallback`: `map[string]string` (in-memory credential storage)
+- `fallback`: `map[string]string` (in-memory credential storage used when sqlite unavailable)
 - `fallbackMu`: `sync.RWMutex` (concurrent access protection)
+- `db`: `*sql.DB` (sqlite connection for persistent fallback)
 
 ### Constants
 - **Service Name**: `"querybox"` (used for keyring storage)
@@ -138,15 +140,15 @@ Secure credential storage abstraction with OS keyring (primary) and in-memory fa
 
 | Method | Behavior |
 |--------|----------|
-| `Store(key, secret)` | Try `keyring.Set()` → fallback to in-memory on failure |
-| `Get(key)` | Try `keyring.Get()` → fallback to in-memory → error if not found |
-| `Delete(key)` | Best-effort `keyring.Delete()` + remove from in-memory fallback |
+| `Store(key, secret)` | Try `keyring.Set()` → fallback to sqlite file on failure (map if db error) |
+| `Get(key)` | Try `keyring.Get()` → fallback to sqlite → in-memory → error if not found |
+| `Delete(key)` | Best-effort `keyring.Delete()` + remove from sqlite and in-memory |
 
 ### Platform Support
 - **macOS**: Keychain Services
 - **Windows**: Credential Manager
 - **Linux**: Secret Service (GNOME Keyring, KWallet)
-- **Fallback**: In-memory map (server/headless/test environments)
+- **Fallback**: Persistent sqlite file (`data/credentials.db`) when keyring unavailable; map used only if sqlite is unusable
 
 ### Error Handling
 - Keyring failures trigger automatic fallback (silent)
@@ -173,7 +175,9 @@ Discover plugin executables, manage plugin registry, execute plugins on-demand w
 |--------|-----------|-------------|
 | `ListPlugins` | `() → []PluginInfo` | Return discovered plugins (does not spawn processes) |
 | `ExecPlugin` | `(name, connParams, query) → (ExecResponse, error)` | Execute plugin with 30s timeout; `ExecResponse` carries a typed result (sql/document/kv) that the UI can render generically |
-| `GetPluginAuthForms` | `(name) → (map[string]AuthForm, error)` | Probe plugin for auth form definitions |
+| `GetPluginAuthForms` | `(name) → (map[string]*AuthForm, error)` | Probe plugin for auth form definitions |
+| `GetConnectionTree` | `(name, connParams) → (ConnectionTreeResponse, error)` | Retrieve driver-defined tree for selected connection |
+| `ExecTreeAction` | `(name, connParams, query) → (ExecResponse, error)` | Convenience wrapper for executing tree‑node actions |
 | `Rescan` | `() → error` | Manual trigger for directory scan |
 
 ### Data Model
