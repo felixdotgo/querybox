@@ -3,7 +3,6 @@ package pluginmgr
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -22,7 +21,7 @@ import (
 type PluginInfo struct {
 	Name        string `json:"name"`
 	Path        string `json:"path"`
-	Running     bool   `json:"running"` // always false in on-demand model
+	Running     bool   `json:"running"`        // always false in on-demand model
 	Type        int    `json:"type,omitempty"` // follows PluginV1.Type enum (DRIVER = 1)
 	Version     string `json:"version,omitempty"`
 	Description string `json:"description,omitempty"`
@@ -51,13 +50,13 @@ type execRequest struct {
 	Connection map[string]string `json:"connection"`
 	Query      string            `json:"query"`
 }
+
 // We reuse the generated protobuf alias for the response so we stay in sync
 // with any future changes.
 //
 // Note that plugin.ExecResponse is alias for pluginpb.PluginV1_ExecResponse.
 // Using it here allows json.Unmarshal to correctly populate the nested
 // ExecResult field.
-
 
 // New creates a Manager and starts a background scanner for the plugins folder.
 func New() *Manager {
@@ -193,18 +192,16 @@ func (m *Manager) ListPlugins() []PluginInfo {
 // an error.  Historically this returned a raw string; callers may need to
 // examine the `Result` field to access rows, documents, or key/value data.
 func (m *Manager) ExecPlugin(name string, connection map[string]string, query string) (*plugin.ExecResponse, error) {
-	fmt.Printf("ExecPlugin called name=%s query=%s connection=%v\n", name, query, connection)
 	m.mu.Lock()
 	info, ok := m.plugins[name]
 	m.mu.Unlock()
 	if !ok {
-		fmt.Printf("ExecPlugin: plugin %s not found\n", name)
-		return nil, errors.New("plugin not found")
+		return nil, fmt.Errorf("ExecPlugin: plugin %s not found\n", name)
 	}
 	full := info.Path
 	if !isExecutable(full) {
 		fmt.Printf("ExecPlugin: path %s not executable\n", full)
-		return nil, errors.New("plugin is not executable")
+		return nil, fmt.Errorf("ExecPlugin: plugin %s is not executable\n", name)
 	}
 
 	req := execRequest{Connection: connection, Query: query}
@@ -216,24 +213,23 @@ func (m *Manager) ExecPlugin(name string, connection map[string]string, query st
 	cmd.Env = append(os.Environ(), "QUERYBOX_PLUGIN_NAME="+name)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ExecPlugin: stdin pipe error: %w", err)
 	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ExecPlugin: stdout pipe error: %w", err)
 	}
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ExecPlugin: stderr pipe error: %w", err)
 	}
 
 	if err := cmd.Start(); err != nil {
 		fmt.Printf("ExecPlugin: start error: %v\n", err)
-		return nil, err
+		return nil, fmt.Errorf("ExecPlugin: start error: %w", err)
 	}
 
 	// send request
-	fmt.Printf("ExecPlugin: sending request to plugin %s: %s\n", name, string(b))
 	_, _ = stdin.Write(b)
 	_ = stdin.Close()
 
@@ -241,16 +237,12 @@ func (m *Manager) ExecPlugin(name string, connection map[string]string, query st
 	outB, _ := io.ReadAll(stdout)
 	errB, _ := io.ReadAll(stderr)
 
-	fmt.Printf("ExecPlugin: stdout=%s stderr=%s\n", string(outB), string(errB))
-
 	if err := cmd.Wait(); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			// the context will have killed the process after 30s
-			fmt.Printf("ExecPlugin: plugin timed out after 30s\n")
-			return nil, fmt.Errorf("plugin timed out after 30s")
+			return nil, fmt.Errorf("ExecPlugin: plugin timed out after 30s")
 		}
-		fmt.Printf("ExecPlugin: command wait error: %v\n", err)
-		return nil, fmt.Errorf("plugin exited: %w - stderr: %s", err, string(errB))
+		return nil, fmt.Errorf("ExecPlugin: plugin exited: %w - stderr: %s", err, string(errB))
 	}
 
 	// if the plugin didn't emit JSON we still want to return something useful
@@ -277,8 +269,8 @@ func (m *Manager) ExecPlugin(name string, connection map[string]string, query st
 						// move inner keys (should be one of sql/document/kv) up
 						for k, v := range payload {
 							// older JSON produced by encoding/json used Go struct field names (Sql, Kv, Document).
-                                                        // lowercase them so protojson will match the proto name.
-                                                        r[strings.ToLower(k)] = v
+							// lowercase them so protojson will match the proto name.
+							r[strings.ToLower(k)] = v
 						}
 						delete(r, "Payload")
 						if fixed, merr := json.Marshal(raw); merr == nil {
@@ -292,11 +284,19 @@ func (m *Manager) ExecPlugin(name string, connection map[string]string, query st
 		}
 		fmt.Printf("ExecPlugin: JSON unmarshal failed: %v\n", err)
 		// fallback to embedding the raw output in a KV map under "_".
-		return &plugin.ExecResponse{Result: &pluginpb.PluginV1_ExecResult{Payload: &pluginpb.PluginV1_ExecResult_Kv{Kv: &pluginpb.PluginV1_KeyValueResult{Data: map[string]string{"_": string(outB)}}}}}, nil
+		return &plugin.ExecResponse{
+			Result: &pluginpb.PluginV1_ExecResult{
+				Payload: &pluginpb.PluginV1_ExecResult_Kv{
+					Kv: &pluginpb.PluginV1_KeyValueResult{
+						Data: map[string]string{"_": string(outB)},
+					},
+				},
+			},
+		}, nil
 	}
 	if resp.Error != "" {
 		fmt.Printf("ExecPlugin: plugin returned error field: %s\n", resp.Error)
-		return resp, errors.New(resp.Error)
+		return resp, fmt.Errorf("ExecPlugin: plugin error: %s", resp.Error)
 	}
 	return resp, nil
 }
@@ -311,17 +311,15 @@ func (m *Manager) Rescan() error {
 // request contains only the connection map; the plugin defines node structure
 // and actions.  A timeout guards misbehaving plugins.
 func (m *Manager) GetConnectionTree(name string, connection map[string]string) (*plugin.ConnectionTreeResponse, error) {
-	fmt.Printf("GetConnectionTree called name=%s connection=%v\n", name, connection)
 	m.mu.Lock()
 	info, ok := m.plugins[name]
 	m.mu.Unlock()
 	if !ok {
-		fmt.Printf("GetConnectionTree: plugin %s not found\n", name)
-		return nil, errors.New("plugin not found")
+		return nil, fmt.Errorf("GetConnectionTree: plugin %s not found", name)
 	}
 	full := info.Path
 	if !isExecutable(full) {
-		return nil, errors.New("plugin is not executable")
+		return nil, fmt.Errorf("GetConnectionTree: plugin %s is not executable", name)
 	}
 
 	req := plugin.ConnectionTreeRequest{Connection: connection}
@@ -356,9 +354,9 @@ func (m *Manager) GetConnectionTree(name string, connection map[string]string) (
 
 	if err := cmd.Wait(); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			return nil, fmt.Errorf("plugin timed out after 30s")
+			return nil, fmt.Errorf("GetConnectionTree: plugin timed out after 30s")
 		}
-		return nil, fmt.Errorf("plugin exited: %w - stderr: %s", err, string(errB))
+		return nil, fmt.Errorf("GetConnectionTree: plugin exited: %w - stderr: %s", err, string(errB))
 	}
 
 	resp := &plugin.ConnectionTreeResponse{}
@@ -366,7 +364,7 @@ func (m *Manager) GetConnectionTree(name string, connection map[string]string) (
 		return resp, nil
 	}
 	if err := protojson.Unmarshal(outB, resp); err != nil {
-		return nil, fmt.Errorf("invalid tree json: %w", err)
+		return nil, fmt.Errorf("GetConnectionTree: invalid tree json: %w", err)
 	}
 	return resp, nil
 }
@@ -386,11 +384,11 @@ func (m *Manager) GetPluginAuthForms(name string) (map[string]*plugin.AuthForm, 
 	info, ok := m.plugins[name]
 	m.mu.Unlock()
 	if !ok {
-		return nil, errors.New("plugin not found")
+		return nil, fmt.Errorf("GetPluginAuthForms: plugin %s not found", name)
 	}
 	full := info.Path
 	if !isExecutable(full) {
-		return nil, errors.New("plugin is not executable")
+		return nil, fmt.Errorf("GetPluginAuthForms: plugin %s is not executable", name)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -406,7 +404,7 @@ func (m *Manager) GetPluginAuthForms(name string) (map[string]*plugin.AuthForm, 
 	}
 	var resp plugin.AuthFormsResponse
 	if err := protojson.Unmarshal(out, &resp); err != nil {
-		return nil, fmt.Errorf("invalid authforms json: %w", err)
+		return nil, fmt.Errorf("GetPluginAuthForms: invalid authforms json: %w", err)
 	}
 	// convert to non-pointer map for convenience (pointer avoids lock copy)
 	ret := make(map[string]*plugin.AuthForm)
@@ -421,12 +419,12 @@ func (m *Manager) GetPluginAuthForms(name string) (map[string]*plugin.AuthForm, 
 
 // EnablePlugin is not applicable for on-demand execution model.
 func (m *Manager) EnablePlugin(name string) error {
-	return errors.New("enable/disable not supported for on-demand plugins")
+	return fmt.Errorf("EnablePlugin: enable/disable not supported for on-demand plugins")
 }
 
 // DisablePlugin is not applicable for on-demand execution model.
 func (m *Manager) DisablePlugin(name string) error {
-	return errors.New("enable/disable not supported for on-demand plugins")
+	return fmt.Errorf("DisablePlugin: enable/disable not supported for on-demand plugins")
 }
 
 // Shutdown stops background scanning.

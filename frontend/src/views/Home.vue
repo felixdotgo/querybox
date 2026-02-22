@@ -26,8 +26,7 @@
             <!-- small toolbar -->
             <div class="flex items-center justify-between gap-2">
               <div class="flex items-center gap-2">
-                <h3 class="text-lg font-semibold m-0">Connections</h3>
-                <small class="opacity-70">Tree</small>
+                <span class="text-lg font-semibold m-0">Databases</span>
               </div>
               <div class="flex items-center gap-2">
                 <n-button
@@ -79,8 +78,8 @@
         </div>
 
         <!-- Right column: placeholder (functional details to be decided later) -->
-        <div class="flex-1 p-6 min-h-0 overflow-auto">
-          <h3 class="text-lg font-semibold mb-2">Workspace</h3>
+        <div class="flex-1 p-4 min-h-0 overflow-auto">
+          <span class="text-lg font-semibold mb-2">Workspace</span>
           <div
             class="p-6 border border-dashed border-gray-200 rounded h-full flex items-center justify-center text-gray-500"
           >

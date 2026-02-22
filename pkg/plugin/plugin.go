@@ -57,17 +57,17 @@ type ConnectionTreeAction = pluginpb.PluginV1_ConnectionTreeAction
 const (
 	TypeDriver DriverType = pluginpb.PluginV1_DRIVER
 
-	AuthField_TEXT     = pluginpb.PluginV1_AuthField_TEXT
-	AuthField_NUMBER   = pluginpb.PluginV1_AuthField_NUMBER
-	AuthField_PASSWORD = pluginpb.PluginV1_AuthField_PASSWORD
-	AuthField_SELECT   = pluginpb.PluginV1_AuthField_SELECT
-	AuthField_CHECKBOX = pluginpb.PluginV1_AuthField_CHECKBOX
+	AuthFieldText     = pluginpb.PluginV1_AuthField_TEXT
+	AuthFieldNumber   = pluginpb.PluginV1_AuthField_NUMBER
+	AuthFieldPassword = pluginpb.PluginV1_AuthField_PASSWORD
+	AuthFieldSelect   = pluginpb.PluginV1_AuthField_SELECT
+	AuthFieldCheckbox = pluginpb.PluginV1_AuthField_CHECKBOX
 
 	// common action types for ConnectionTree nodes.  Plugins should use
 	// these constants rather than hardcoding strings to avoid typos and to
 	// document the set of recognised actions.
-	ConnectionTreeAction_SELECT   = "select"
-	ConnectionTreeAction_DESCRIBE = "describe"
+	ConnectionTreeActionSelect   = "select"
+	ConnectionTreeActionDescribe = "describe"
 )
 
 // Plugin describes the minimal contract a plugin should implement. Keeping

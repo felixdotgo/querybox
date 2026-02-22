@@ -30,14 +30,14 @@ func (m *postgresqlPlugin) AuthForms(*plugin.AuthFormsRequest) (*plugin.AuthForm
 		Key: "basic",
 		Name: "Basic",
 		Fields: []*plugin.AuthField{
-			{Type: plugin.AuthField_TEXT, Name: "host", Label: "Host", Required: true, Placeholder: "127.0.0.1"},
-			{Type: plugin.AuthField_NUMBER, Name: "port", Label: "Port", Placeholder: "5432"},
-			{Type: plugin.AuthField_TEXT, Name: "user", Label: "User"},
-			{Type: plugin.AuthField_PASSWORD, Name: "password", Label: "Password"},
-			{Type: plugin.AuthField_TEXT, Name: "database", Label: "Database name"},
+			{Type: plugin.AuthFieldText, Name: "host", Label: "Host", Required: true, Placeholder: "127.0.0.1"},
+			{Type: plugin.AuthFieldNumber, Name: "port", Label: "Port", Placeholder: "5432"},
+			{Type: plugin.AuthFieldText, Name: "user", Label: "User"},
+			{Type: plugin.AuthFieldPassword, Name: "password", Label: "Password"},
+			{Type: plugin.AuthFieldText, Name: "database", Label: "Database name"},
 			// allow tls and extra params similar to mysql
-			{Type: plugin.AuthField_TEXT, Name: "tls", Label: "TLS mode (e.g. disable/require)"},
-			{Type: plugin.AuthField_TEXT, Name: "params", Label: "Extra params", Placeholder: "connect_timeout=5&application_name=myapp"},
+			{Type: plugin.AuthFieldText, Name: "tls", Label: "TLS mode (e.g. disable/require)"},
+			{Type: plugin.AuthFieldText, Name: "params", Label: "Extra params", Placeholder: "connect_timeout=5&application_name=myapp"},
 		},
 	}
 
@@ -193,7 +193,7 @@ func (m *postgresqlPlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*p
 			Key:   name,
 			Label: name,
 			Actions: []*plugin.ConnectionTreeAction{
-				{Type: plugin.ConnectionTreeAction_SELECT, Title: "Query", Query: "SELECT 1"},
+				{Type: plugin.ConnectionTreeActionSelect, Title: "Query", Query: "SELECT 1"},
 			},
 		})
 	}

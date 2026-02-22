@@ -31,9 +31,9 @@ func (t *templatePlugin) Exec(req plugin.ExecRequest) (plugin.ExecResponse, erro
 
 func (t *templatePlugin) AuthForms(*plugin.AuthFormsRequest) (*plugin.AuthFormsResponse, error) {
 	basic := plugin.AuthForm{Key: "basic", Name: "Basic", Fields: []*plugin.AuthField{
-		{Type: plugin.AuthField_TEXT, Name: "host", Label: "Host", Required: true, Placeholder: "127.0.0.1"},
-		{Type: plugin.AuthField_TEXT, Name: "user", Label: "User"},
-		{Type: plugin.AuthField_PASSWORD, Name: "password", Label: "Password"},
+		{Type: plugin.AuthFieldText, Name: "host", Label: "Host", Required: true, Placeholder: "127.0.0.1"},
+		{Type: plugin.AuthFieldText, Name: "user", Label: "User"},
+		{Type: plugin.AuthFieldPassword, Name: "password", Label: "Password"},
 	}}
 	return &plugin.AuthFormsResponse{Forms: map[string]*plugin.AuthForm{"basic": &basic}}, nil
 }
@@ -48,7 +48,7 @@ func (t *templatePlugin) ConnectionTree(req plugin.ConnectionTreeRequest) (*plug
 				Key:   "dummy",
 				Label: "Dummy node",
 				Actions: []*plugin.ConnectionTreeAction{
-					{Type: plugin.ConnectionTreeAction_SELECT, Title: "Echo query", Query: "SELECT 1"},
+					{Type: plugin.ConnectionTreeActionSelect, Title: "Echo query", Query: "SELECT 1"},
 				},
 			},
 		},

@@ -40,13 +40,11 @@ type ConnectionService struct {
 func NewConnectionService() *ConnectionService {
 	const dbPath = "data/connections.db"
 	if err := os.MkdirAll("data", 0o755); err != nil {
-		fmt.Printf("warning: unable to create data directory: %v\n", err)
 		return &ConnectionService{cred: credmanager.New()}
 	}
 
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
-		fmt.Printf("warning: unable to open sqlite db: %v\n", err)
 		return &ConnectionService{cred: credmanager.New()}
 	}
 
@@ -63,7 +61,6 @@ func NewConnectionService() *ConnectionService {
 		updated_at DATETIME DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 	);`
 	if _, err := db.Exec(create); err != nil {
-		fmt.Printf("warning: failed to create connections table: %v\n", err)
 		_ = db.Close()
 		return &ConnectionService{cred: credmanager.New()}
 	}
@@ -101,7 +98,7 @@ func (s *ConnectionService) closeable() bool { return s.db != nil }
 // `col`.
 func (s *ConnectionService) hasColumn(col string) (bool, error) {
 	if !s.closeable() {
-		return false, errors.New("database not initialized")
+		return false, errors.New("connections database not initialized")
 	}
 	rows, err := s.db.Query(`PRAGMA table_info(connections)`)
 	if err != nil {
@@ -128,9 +125,8 @@ func (s *ConnectionService) hasColumn(col string) (bool, error) {
 // ListConnections returns all stored connections ordered by creation time
 // (newest first).
 func (s *ConnectionService) ListConnections(ctx context.Context) ([]Connection, error) {
-	fmt.Println("ListConnections called")
 	if !s.closeable() {
-		return nil, errors.New("database not initialized")
+		return nil, errors.New("connections database not initialized")
 	}
 	rows, err := s.db.QueryContext(ctx, `SELECT id, name, driver_type, credential_key, created_at, updated_at FROM connections ORDER BY created_at DESC`)
 	if err != nil {
@@ -143,7 +139,7 @@ func (s *ConnectionService) ListConnections(ctx context.Context) ([]Connection, 
 		var r Connection
 		var credKey sql.NullString
 		if err := rows.Scan(&r.ID, &r.Name, &r.DriverType, &credKey, &r.CreatedAt, &r.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan connection: %w", err)
+			return nil, fmt.Errorf("scan connections: %w", err)
 		}
 		if credKey.Valid {
 			r.CredentialKey = credKey.String
@@ -158,21 +154,20 @@ func (s *ConnectionService) ListConnections(ctx context.Context) ([]Connection, 
 
 // GetConnection retrieves a single connection by id.
 func (s *ConnectionService) GetConnection(ctx context.Context, id string) (Connection, error) {
-	fmt.Printf("GetConnection called id=%s\n", id)
 	if id == "" {
-		return Connection{}, errors.New("empty id")
+		return Connection{}, errors.New("empty database connection id")
 	}
 	if !s.closeable() {
-		return Connection{}, errors.New("database not initialized")
+		return Connection{}, errors.New("connections database not initialized")
 	}
 	var r Connection
 	var credKey sql.NullString
 	row := s.db.QueryRowContext(ctx, `SELECT id, name, driver_type, credential_key, created_at, updated_at FROM connections WHERE id = ?`, id)
 	if err := row.Scan(&r.ID, &r.Name, &r.DriverType, &credKey, &r.CreatedAt, &r.UpdatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return Connection{}, fmt.Errorf("not found")
+			return Connection{}, fmt.Errorf("database connection not found")
 		}
-		return Connection{}, fmt.Errorf("scan connection: %w", err)
+		return Connection{}, fmt.Errorf("scan connections: %w", err)
 	}
 	if credKey.Valid {
 		r.CredentialKey = credKey.String
@@ -188,7 +183,7 @@ func (s *ConnectionService) CreateConnection(ctx context.Context, name, driverTy
 		return Connection{}, errors.New("name and driverType are required")
 	}
 	if !s.closeable() {
-		return Connection{}, errors.New("database not initialized")
+		return Connection{}, errors.New("connections database not initialized")
 	}
 	id := uuid.New().String()
 	now := time.Now().UTC().Format(time.RFC3339Nano)
@@ -197,7 +192,7 @@ func (s *ConnectionService) CreateConnection(ctx context.Context, name, driverTy
 		return Connection{}, fmt.Errorf("store credential: %w", err)
 	}
 	if _, err := s.db.ExecContext(ctx, `INSERT INTO connections (id, name, driver_type, credential_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`, id, name, driverType, key, now, now); err != nil {
-		return Connection{}, fmt.Errorf("insert connection: %w", err)
+		return Connection{}, fmt.Errorf("insert database connection: %w", err)
 	}
 	return Connection{
 		ID:            id,
@@ -218,12 +213,11 @@ func (s *ConnectionService) CreateConnection(ctx context.Context, name, driverTy
 // saved connection (it can execute arbitrary queries), so this method simply
 // fetches and returns whatever string is stored under the connection's key.
 func (s *ConnectionService) GetCredential(ctx context.Context, id string) (string, error) {
-	fmt.Printf("GetCredential called id=%s\n", id)
 	if id == "" {
 		return "", errors.New("empty id")
 	}
 	if !s.closeable() {
-		return "", errors.New("database not initialized")
+		return "", errors.New("connections database not initialized")
 	}
 	conn, err := s.GetConnection(ctx, id)
 	if err != nil {
@@ -242,29 +236,28 @@ func (s *ConnectionService) GetCredential(ctx context.Context, id string) (strin
 // DeleteConnection removes a connection by id and attempts to remove the
 // associated secret from the keyring as a best-effort cleanup.
 func (s *ConnectionService) DeleteConnection(ctx context.Context, id string) error {
-	fmt.Printf("DeleteConnection called id=%s\n", id)
 	if id == "" {
 		return errors.New("empty id")
 	}
 	if !s.closeable() {
-		return errors.New("database not initialized")
+		return errors.New("connections database not initialized")
 	}
 	// fetch credential_key (if any) so we can delete the secret from the keyring
 	var credKey sql.NullString
 	row := s.db.QueryRowContext(ctx, `SELECT credential_key FROM connections WHERE id = ?`, id)
 	if err := row.Scan(&credKey); err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return fmt.Errorf("lookup connection before delete: %w", err)
+		return fmt.Errorf("lookup database connection before delete: %w", err)
 	}
 	if credKey.Valid && credKey.String != "" {
 		_ = s.cred.Delete(credKey.String) // best-effort
 	}
 	res, err := s.db.ExecContext(ctx, `DELETE FROM connections WHERE id = ?`, id)
 	if err != nil {
-		return fmt.Errorf("delete connection: %w", err)
+		return fmt.Errorf("delete database connection: %w", err)
 	}
 	n, _ := res.RowsAffected()
 	if n == 0 {
-		return fmt.Errorf("not found")
+		return fmt.Errorf("database connection not found")
 	}
 	return nil
 }

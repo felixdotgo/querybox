@@ -212,7 +212,7 @@ fi
 cat > /dev/null
 `
     // insert constant into script
-    content = fmt.Sprintf(content, plugin.ConnectionTreeAction_SELECT)
+    content = fmt.Sprintf(content, plugin.ConnectionTreeActionSelect)
     if err := os.WriteFile(bin, []byte(content), 0o755); err != nil {
         t.Fatalf("write mock plugin: %v", err)
     }
@@ -238,7 +238,7 @@ cat > /dev/null
     if len(tree.Nodes[0].Actions) != 1 {
         t.Fatalf("expected 1 action, got %d", len(tree.Nodes[0].Actions))
     }
-    if tree.Nodes[0].Actions[0].Type != plugin.ConnectionTreeAction_SELECT {
+    if tree.Nodes[0].Actions[0].Type != plugin.ConnectionTreeActionSelect {
         t.Fatalf("unexpected action type: %s", tree.Nodes[0].Actions[0].Type)
     }
     // test ExecTreeAction proxies to exec

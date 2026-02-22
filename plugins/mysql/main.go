@@ -31,14 +31,14 @@ func (m *mysqlPlugin) AuthForms(*plugin.AuthFormsRequest) (*plugin.AuthFormsResp
 		Key:  "basic",
 		Name: "Basic",
 		Fields: []*plugin.AuthField{
-			{Type: plugin.AuthField_TEXT, Name: "host", Label: "Host", Required: true, Placeholder: "127.0.0.1", Value: "127.0.0.1"},
+			{Type: plugin.AuthFieldText, Name: "host", Label: "Host", Required: true, Placeholder: "127.0.0.1", Value: "127.0.0.1"},
 			{Type: pluginpb.PluginV1_AuthField_NUMBER, Name: "port", Label: "Port", Placeholder: "3306", Value: "3306"},
-			{Type: plugin.AuthField_TEXT, Name: "user", Label: "User", Value: "root"},
-			{Type: plugin.AuthField_PASSWORD, Name: "password", Label: "Password"},
-			{Type: plugin.AuthField_TEXT, Name: "database", Label: "Database name"},
+			{Type: plugin.AuthFieldText, Name: "user", Label: "User", Value: "root"},
+			{Type: plugin.AuthFieldPassword, Name: "password", Label: "Password"},
+			{Type: plugin.AuthFieldText, Name: "database", Label: "Database name"},
 			// allow users to specify extra params such as tls=skip-verify
-			{Type: plugin.AuthField_TEXT, Name: "tls", Label: "TLS mode (e.g. skip-verify)"},
-			{Type: plugin.AuthField_TEXT, Name: "params", Label: "Extra params", Placeholder: "charset=utf8&parseTime=true"},
+			{Type: plugin.AuthFieldText, Name: "tls", Label: "TLS mode (e.g. skip-verify)"},
+			{Type: plugin.AuthFieldText, Name: "params", Label: "Extra params", Placeholder: "charset=utf8&parseTime=true"},
 		},
 	}
 
@@ -46,7 +46,7 @@ func (m *mysqlPlugin) AuthForms(*plugin.AuthFormsRequest) (*plugin.AuthFormsResp
 		Key:  "dsn",
 		Name: "DSN",
 		Fields: []*plugin.AuthField{
-			{Type: plugin.AuthField_TEXT, Name: "dsn", Label: "DSN", Placeholder: "user:pass@tcp(host:port)/dbname"},
+			{Type: plugin.AuthFieldText, Name: "dsn", Label: "DSN", Placeholder: "user:pass@tcp(host:port)/dbname"},
 		},
 	}
 	return &plugin.AuthFormsResponse{Forms: map[string]*plugin.AuthForm{"basic": &basic, "dsn": &dsn}}, nil
@@ -216,7 +216,7 @@ func (m *mysqlPlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugin
 			Key:   name,
 			Label: name,
 			Actions: []*plugin.ConnectionTreeAction{
-				{Type: plugin.ConnectionTreeAction_SELECT, Title: "Use", Query: fmt.Sprintf("USE `%s`;", name)},
+				{Type: plugin.ConnectionTreeActionSelect, Title: "Use", Query: fmt.Sprintf("USE `%s`;", name)},
 			},
 		})
 	}
