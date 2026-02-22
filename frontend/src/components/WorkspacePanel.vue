@@ -14,6 +14,7 @@
         :title="tab.title || 'Untitled'"
         closable
       >
+
         <template #default>
           <ResultViewer v-if="tab.result" :result="tab.result" />
           <pre v-else-if="tab.error" class="whitespace-pre-wrap">
@@ -40,9 +41,63 @@ const emit = defineEmits(["tab-closed"])
 const tabs = ref([])
 const activeTabKey = ref("")
 
-function openTab(title, result, error) {
-  const key = `${Date.now()}-${Math.random().toString(36).slice(2)}`
-  tabs.value.push({ key, title, result, error })
+function openTab(title, result, error, tabKey, version) {
+  // sanitize human title just in case it still contains a prefix
+  const sanitize = (t) => (t ? t.split(":").pop() : t)
+  title = sanitize(title)
+
+  // `tabKey` is a stable identifier used internally to avoid opening
+  // duplicate tabs. the human‑readable title shown on the tab is always
+  // supplied separately (usually the node.key such as "db.table").
+  // only when `tabKey` is absent do we fall back to the title, and as a
+  // last resort we generate a random id.
+  let key
+  if (tabKey) {
+    key = tabKey
+  } else if (title) {
+    key = title
+  } else {
+    key = `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  }
+
+  // migration support for older tabs that used the title as the key.
+  let existing = tabs.value.find((t) => t.key === key)
+  if (!existing && tabKey && title) {
+    const alt = tabs.value.find((t) => t.key === title)
+    if (alt) {
+      // promote alt to the new key. the old tab may have been created when
+      // we used the title as the key; if that title contained a connection
+      // hash we no longer want to show it, so update the stored title too.
+      alt.key = key
+      alt.title = title
+      existing = alt
+    }
+  }
+
+  // ignore stale responses; each emit from the connection panel now
+  // includes a `version` timestamp so the most recent result wins.
+  if (
+    existing &&
+    typeof version === "number" &&
+    typeof existing.version === "number" &&
+    existing.version > version
+  ) {
+    // an older query finished after a newer one; drop it
+    return
+  }
+
+  const newTab = { key, title, result, error, version: version || Date.now() }
+
+  if (existing) {
+    const idx = tabs.value.findIndex((t) => t.key === key)
+    if (idx !== -1) {
+      tabs.value.splice(idx, 1, newTab)
+    } else {
+      tabs.value.push(newTab)
+    }
+  } else {
+    tabs.value.push(newTab)
+  }
   activeTabKey.value = key
 }
 

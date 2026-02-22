@@ -166,6 +166,7 @@ async function loadConnections() {
 
 function handleSelect(keys, options, meta) {
   const key = meta?.node?.key ?? (Array.isArray(keys) ? keys[0] : keys)
+  console.debug("handleSelect key", key, "meta.node", meta?.node)
   if (key == null) return
 
   // top‑level connection selected
@@ -204,7 +205,7 @@ function handleSelect(keys, options, meta) {
 
   if (parentConn && node && node.actions && node.actions.length > 0) {
     const act = node.actions[0]
-    runTreeAction(parentConn, act)
+    runTreeAction(parentConn, act, node)
   }
 }
 
@@ -220,14 +221,43 @@ function handleConnectionDblclick(conn) {
 }
 
 function getNodeProps(node) {
+  const props = {}
   const conn = connections.value.find((c) => c.id === node.key)
-  if (!conn) return {}
-  return {
-    onDblclick(e) {
+  if (conn) {
+    // double‑click on a connection header opens the connections window
+    props.onDblclick = (e) => {
       e.stopPropagation()
       handleConnectionDblclick(conn)
-    },
+    }
   }
+
+  // any node with actions should execute the first action when clicked or
+  // double‑clicked.  n-tree will not fire `update:selected-keys` if the
+  // user selects an already‑selected node, so we attach explicit listeners
+  // so the user can reload the same table by clicking again.
+  if (node.actions && node.actions.length > 0) {
+    const clickHandler = (e) => {
+      e.stopPropagation()
+      handleSelect([node.key], null, { node })
+    }
+    props.onClick = clickHandler
+    // always attach clickHandler to the dblclick event too. some tree
+    // implementations will only send the dblclick and not the intermediate
+    // click events, so relying on two browser click events proved
+    // unreliable; this ensures double‑clicking the same node always causes
+    // a refresh.
+    if (props.onDblclick) {
+      const originalDbl = props.onDblclick
+      props.onDblclick = (e) => {
+        originalDbl(e)
+        clickHandler(e)
+      }
+    } else {
+      props.onDblclick = clickHandler
+    }
+  }
+
+  return props
 }
 
 function renderLabel({ option }) {
@@ -280,7 +310,11 @@ async function confirmDelete() {
   }
 }
 
-async function runTreeAction(conn, action) {
+async function runTreeAction(conn, action, node) {
+  // mark invocation time before hitting the network so we can compare
+  // request ordering regardless of return speed.
+  const invocationVersion = Date.now()
+
   try {
     const cred = await GetCredential(conn.id)
     const params = {}
@@ -322,13 +356,30 @@ async function runTreeAction(conn, action) {
     }
     payload = normalizeKeys(payload)
 
-    const title = action.title || action.query || "Query"
-    console.debug("runTreeAction result", action, queryToRun, res, payload)
+    // compute a stable identifier for this action so repeated clicks
+    // reuse the same tab rather than opening a new one. nodes from the
+    // connection tree include a `key` property (e.g. "dbname.table").
+    // prefix with connection id to avoid collisions across different
+    // servers.
+    // stable identifier used to dedupe tabs across clicks. we keep it
+    // separate from the human-readable title below.
+    const tabKey = conn.id + ":" + (node && node.key ? node.key : action.query || Date.now())
+    // prefer the node key (which for tables is a stable "db.table" string),
+    // fall back to any title provided by the plugin, then the raw query text.
+    let title = (node && node.key) || action.title || action.query || "Query"
+    // strip any accidental connection prefix from the title so users never
+    // see the hashed connection ID.
+    title = title.split(":").pop()
+    // use the version we captured at the start; the response time may
+    // not reflect request order, so this guarantees the later-initiated
+    // query cannot be accidentally overwritten by an earlier one.
+    const version = invocationVersion
+    console.debug("runTreeAction result", action, queryToRun, res, payload, tabKey, version)
 
     if (res.error) {
-      emit("query-result", title, null, res.error)
+      emit("query-result", title, null, res.error, tabKey, version)
     } else {
-      emit("query-result", title, payload, null)
+      emit("query-result", title, payload, null, tabKey, version)
     }
   } catch (err) {
     console.error("ExecTreeAction", conn.id, err)

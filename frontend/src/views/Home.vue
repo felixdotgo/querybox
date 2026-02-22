@@ -155,8 +155,9 @@ const verticalResizer = createVerticalResizer({
 // workspace reference used to add tabs via exposed method
 const workspaceRef = ref(null)
 
-function openTab(title, result, error) {
-  workspaceRef.value?.openTab(title, result, error)
+function openTab(title, result, error, tabKey, version) {
+  // pass the optional version through so workspace can ignore stale data
+  workspaceRef.value?.openTab(title, result, error, tabKey, version)
 }
 
 

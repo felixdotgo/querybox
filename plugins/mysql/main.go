@@ -223,7 +223,8 @@ func (m *mysqlPlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugin
 						Key:   dbname + "." + tbl,
 						Label: tbl,
 						Actions: []*plugin.ConnectionTreeAction{
-							{Type: plugin.ConnectionTreeActionSelect, Title: "Select", Query: fmt.Sprintf("SELECT * FROM `%s`.`%s` LIMIT 100;", dbname, tbl)},
+							// use fully qualified name for clarity
+							{Type: plugin.ConnectionTreeActionSelect, Title: fmt.Sprintf("%s.%s", dbname, tbl), Query: fmt.Sprintf("SELECT * FROM `%s`.`%s` LIMIT 100;", dbname, tbl)},
 						},
 					})
 				}

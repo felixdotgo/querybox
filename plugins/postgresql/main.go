@@ -202,7 +202,7 @@ WHERE schemaname NOT IN ('pg_catalog','information_schema')
 					Key:   dbname + "." + tbl,
 					Label: tbl,
 					Actions: []*plugin.ConnectionTreeAction{
-						{Type: plugin.ConnectionTreeActionSelect, Title: "Select", Query: fmt.Sprintf("SELECT * FROM \"%s\".%s LIMIT 100;", dbname, tbl)},
+						{Type: plugin.ConnectionTreeActionSelect, Title: fmt.Sprintf("%s.%s", dbname, tbl), Query: fmt.Sprintf("SELECT * FROM \"%s\".%s LIMIT 100;", dbname, tbl)},
 					},
 				})
 				}
