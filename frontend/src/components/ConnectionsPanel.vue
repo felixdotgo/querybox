@@ -27,7 +27,7 @@
         :data="filteredTreeData"
         v-model:expanded-keys="expandedKeys"
         :default-expanded-keys="defaultExpandedKeys"
-        node-key="key"
+        :node-key="node => node.key"
         block-node
         :show-selector="false"
         :node-props="getNodeProps"
@@ -299,8 +299,34 @@ async function runTreeAction(conn, action) {
       action.type === "select" &&
       /^\s*select\b/i.test(action.query || "")
     ) {
+      // some generated bindings/protojson produce a capitalized payload
+      // object (Sql/Document/Kv).  The ResultViewer expects lowercase
+      // fields so normalize here before emitting.
+      // the ExecTreeAction response occasionally wraps the result in a
+      // PluginV1_ExecResult instance, which stores its data under the
+      // `Payload` property (see generated bindings).  Unwrap first.
+      let payload = res.result || {}
+      if (payload && payload.Payload) {
+        payload = payload.Payload
+      }
+
+      if (payload.Sql) payload = payload.Sql
+      else if (payload.Document) payload = payload.Document
+      else if (payload.Kv) payload = payload.Kv
+
+      // convert any capitalized field names (protojson output) to lowercase
+      const normalizeKeys = (obj) => {
+        if (!obj || typeof obj !== "object") return obj
+        const out = {}
+        for (const key of Object.keys(obj)) {
+          const lower = key.charAt(0).toLowerCase() + key.slice(1) // keep rest
+          out[lower] = obj[key]
+        }
+        return out
+      }
+      payload = normalizeKeys(payload)
+
       const title = action.title || action.query || "Query"
-      emit("query-result", title, res.result, res.error)
     }
   } catch (err) {
     console.error("ExecTreeAction", conn.id, err)

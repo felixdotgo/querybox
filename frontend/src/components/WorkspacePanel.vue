@@ -25,24 +25,6 @@
         </template>
       </n-tab-pane>
     </n-tabs>
-
-    <!-- empty state when no tabs open -->
-    <div
-      v-if="tabs.length === 0"
-      class="p-6 border border-dashed border-gray-200 rounded h-full flex items-center justify-center text-gray-500"
-    >
-      <div class="text-center">
-        <div class="mb-2">
-          Select a table (or other "select" action) from the tree to open a query tab.
-        </div>
-        <div v-if="selectedConnection" class="mt-4 text-left text-sm">
-          <div><strong>Name:</strong> {{ selectedConnection.name }}</div>
-          <div>
-            <strong>Driver:</strong> {{ selectedConnection.driver_type }}
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
