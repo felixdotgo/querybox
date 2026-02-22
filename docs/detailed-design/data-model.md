@@ -31,9 +31,9 @@ Stores connection metadata with references to credentials stored in OS keyring.
 
 ## Credential Storage (CredManager)
 
-Credentials are NOT stored in SQLite. Instead, CredManager handles secret storage:
+Credentials are NOT stored in the connections SQLite. Instead, CredManager handles secret storage with a **3-tier fallback chain**:
 
-### Primary: OS Keyring (via go-keyring)
+### Tier 1: OS Keyring (via go-keyring) — Primary
 - **Service Name**: `"querybox"`
 - **Key**: Value from `connections.credential_key` (e.g., `"connection:abc123"`)
 - **Platforms**:
@@ -41,10 +41,16 @@ Credentials are NOT stored in SQLite. Instead, CredManager handles secret storag
   - Windows: Credential Manager
   - Linux: Secret Service (GNOME Keyring, KWallet, etc.)
 
-### Fallback: In-Memory Map
-- Used when OS keyring unavailable (server/headless/test environments)
+### Tier 2: Persistent SQLite File — Secondary Fallback
+- **Location**: `data/credentials.db`
+- **Used when**: OS keyring is unavailable (server/CI/headless environments)
+- **Schema**: single `credentials` table with `key` (PRIMARY KEY) and `secret` columns
+- **Persistence**: survives application restarts
+
+### Tier 3: In-Memory Map — Last-Resort Fallback
+- Used only when both OS keyring and the sqlite fallback file cannot be used
 - Thread-safe access via `sync.RWMutex`
-- Cleared on application restart
+- Cleared on application restart — ephemeral
 - No disk persistence
 
 ## Migration Path
@@ -87,14 +93,14 @@ CREATE TABLE IF NOT EXISTS connections (
 
 ### Connection CRUD
 - **Create**: Insert row with generated UUID, store credential via CredManager
-- **Read**: Query by `id` or list all, fetch credential separately via CredManager
+- **Read**: Query by `id` or list all; fetch credential via `ConnectionService.GetCredential(id)` which calls `CredManager.Get`
 - **Update**: Modify row, optionally update credential in keyring
 - **Delete**: Remove row, delete credential from keyring via CredManager
 
 ### Credential Operations
-- **Store**: `CredManager.Store(key, secret)` → OS keyring or sqlite-file fallback
-- **Retrieve**: `CredManager.Get(key)` → Check keyring first, then sqlite, then memory
-- **Delete**: `CredManager.Delete(key)` → Remove from keyring, sqlite, and map
+- **Store**: `CredManager.Store(key, secret)` → OS keyring → sqlite fallback → in-memory map
+- **Retrieve**: `CredManager.Get(key)` → Check keyring first, then sqlite file, then in-memory map
+- **Delete**: `CredManager.Delete(key)` → Remove from keyring (best-effort), sqlite fallback, and in-memory map
 
 ## Operational Notes
 
@@ -109,10 +115,10 @@ CREATE TABLE IF NOT EXISTS connections (
 - Credentials persist in keyring until explicitly deleted
 
 ### Security Properties
-- No plaintext secrets in SQLite
-- No encrypted blobs requiring master key management
+- No plaintext secrets in `data/connections.db` (metadata only)
+- `data/credentials.db` is an additional fallback for environments without OS keyring; stored secrets are unencrypted in this file — access should be restricted via filesystem permissions
 - OS-level keyring security (platform-dependent)
-- In-memory fallback cleared on restart (acceptable for development/testing)
+- In-memory map is ephemeral — acceptable for development/testing; cleared on restart
 
 ## Example Data Flow
 

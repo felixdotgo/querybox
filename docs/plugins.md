@@ -16,8 +16,8 @@ Contract (CLI)
 - `plugin connection-tree` (or simply `plugin tree`) → plugin reads JSON `{ connection }` and returns `{ nodes: [...]}` describing a hierarchical browse structure.  Each node may include an `actions` array describing what the core should do when the user activates that node.
 
 Contract (proto)
-- `contracts/plugin/v1/plugin.proto` defines `Info` and `Exec` messages — the canonical proto for plugins (generated Go package: `rpc/contracts/plugin/v1`, `package pluginpb`).
-- `pkg/plugin` provides a small Go shim (`ServeCLI`) and type aliases to `pluginpb` for plugin authors who prefer a Go helper.
+- `contracts/plugin/v1/plugin.proto` defines `Info`, `Exec`, `AuthForms`, and `ConnectionTree` messages — the canonical proto for plugins (generated Go package: `rpc/contracts/plugin/v1`, `package pluginpb`).
+- `pkg/plugin` provides a small Go shim (`ServeCLI`), type aliases to `pluginpb`, and the `FormatSQLValue(v interface{}) string` utility for safely converting `database/sql` scan values to human-readable strings (handles `[]byte` → UTF-8 string or hex).
 
 Auth forms
 - Plugins can now expose structured authentication forms via `authforms` (CLI) / `AuthForms` (proto).
@@ -29,7 +29,9 @@ Runtime contract
 
 Host-side
 - `services/pluginmgr` discovers available executables and invokes them on-demand using the CLI contract.
-- `ListPlugins`, `Rescan`, and `ExecPlugin` are available from the manager for UI integration.
+- `ListPlugins`, `Rescan`, `ExecPlugin`, `GetConnectionTree`, `ExecTreeAction`, and `GetPluginAuthForms` are available from the manager for UI integration.
+- `GetConnectionTree(name, connection)` — spawns `plugin connection-tree`; returns `ConnectionTreeResponse` (list of nodes with optional actions).
+- `ExecTreeAction(name, connection, actionQuery)` — convenience wrapper; delegates to `ExecPlugin` with the action’s query string.
 
 Notes
 - On-demand model = simpler lifecycle, easier hot-swap, and predictable resource usage.

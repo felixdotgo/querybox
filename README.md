@@ -43,29 +43,37 @@ Build plugins separately:
 
 ```bash
 task build:plugins
+# or directly:
+bash scripts/build-plugins.sh
 ```
 
-Plugin executables are placed in `bin/plugins/` and automatically discovered at runtime.
+Plugin executables are placed in `bin/plugins/` and automatically discovered at runtime on a 2-second scan interval.
 
 ## Project Structure
 
 ```
-├── main.go                # Application entry point
-├── services/              # Application services/features
-├── pkg/plugin/            # Plugin SDK and contracts
-├── plugins/               # Database driver plugins
-│   ├── mysql/             # MySQL driver plugin
-│   ├── postgresql/        # PostgreSQL driver plugin
-│   └── template/          # Plugin template
-├── contracts/plugin/      # Protobuf definitions
-├── rpc/contracts/plugin/  # Generated gRPC code
-├── frontend/              # Vue.js frontend
+├── main.go                     # Application entry point
+├── services/                   # Core services
+│   ├── app.go                  # Window management (App service)
+│   ├── connection.go           # ConnectionService (CRUD + SQLite + keyring)
+│   ├── events.go               # LogEntry / emitLog shared helpers
+│   ├── credmanager/            # CredManager (OS keyring + sqlite + in-memory)
+│   └── pluginmgr/              # PluginManager (discovery + execution)
+├── pkg/plugin/                 # Plugin SDK — type aliases, ServeCLI helper
+├── plugins/                    # Database driver plugins
+│   ├── mysql/                  # MySQL driver plugin
+│   ├── postgresql/             # PostgreSQL driver plugin
+│   └── template/               # Plugin template / starter
+├── contracts/plugin/v1/        # Protobuf source definitions
+├── rpc/contracts/plugin/v1/    # Generated Go (pluginpb) code
+├── frontend/                   # Vue.js frontend (Wails)
 │   ├── src/
-│   │   ├── views/         # UI views (Home, Connections)
-│   │   └── components/    # Reusable components
-│   └── bindings/          # Auto-generated TypeScript bindings
-├── docs/                  # Architecture and design docs
-└── build/                 # Build configuration and assets
+│   │   ├── views/              # UI views (Home, Connections)
+│   │   └── components/         # Reusable components
+│   └── bindings/               # Auto-generated TypeScript bindings
+├── docs/                       # Architecture and design docs
+├── scripts/                    # Build helper scripts
+└── build/                      # Build configuration and platform assets
 ```
 
 ## Architecture
@@ -74,21 +82,22 @@ Plugin executables are placed in `bin/plugins/` and automatically discovered at 
 
 QueryBox follows a service-oriented architecture:
 
-- **App Service**: Window lifecycle management (maximize, minimize, fullscreen)
-- **ConnectionService**: CRUD operations for database connections
-- **ConnectionManager**: SQLite-backed connection persistence
-- **PluginManager**: On-demand plugin discovery and execution
-- **CredentialManager**: Secure credential storage via `go-keyring` with sqlite-file fallback
+- **App Service**: Window lifecycle management (maximize, minimize, fullscreen, connections window)
+- **ConnectionService**: CRUD operations for database connections, plus SQLite persistence and credential retrieval. Exposes `CreateConnection`, `ListConnections`, `GetConnection`, `GetCredential`, `DeleteConnection`.
+- **PluginManager**: On-demand plugin discovery and execution. Exposes `ListPlugins`, `Rescan`, `ExecPlugin`, `GetPluginAuthForms`, `GetConnectionTree`, `ExecTreeAction`.
+- **CredentialManager**: Secure credential storage with 3-tier fallback — OS keyring (`go-keyring`) → persistent sqlite file (`data/credentials.db`) → in-memory map.
+- **Event System**: `app:log` Wails event carries `LogEntry{Level, Message, Timestamp}` from all services to the frontend.  Registered in `main.go` for typed TypeScript bindings.
 
 ### Plugin System
 
 Plugins are standalone executables implementing a simple CLI interface:
 
-- `plugin info` - Returns metadata (name, version, description)
-- `plugin exec` - Executes query against database
-- `plugin authforms` - Provides authentication form definitions
+- `plugin info` — Returns metadata (name, version, description, type)
+- `plugin exec` — Reads `{connection, query}` JSON from stdin; writes a typed `ExecResponse` (sql / document / kv payload) to stdout
+- `plugin authforms` — Returns structured authentication form definitions
+- `plugin connection-tree` — Reads `{connection}` JSON from stdin; returns `{nodes:[…]}` describing a hierarchical tree of database objects with optional `actions` arrays
 
-Plugins communicate via JSON stdin/stdout. See [pkg/plugin/plugin.go](pkg/plugin/plugin.go) for the contract.
+Plugins communicate via JSON stdin/stdout using proto-derived types from `rpc/contracts/plugin/v1`. See [pkg/plugin/plugin.go](pkg/plugin/plugin.go) for the full contract and type aliases.
 
 ## Development Workflow
 
