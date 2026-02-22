@@ -14,6 +14,8 @@ import (
 
 	"github.com/felixdotgo/querybox/pkg/plugin"
 	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
+	"github.com/felixdotgo/querybox/services"
+	"github.com/wailsapp/wails/v3/pkg/application"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -38,6 +40,25 @@ type Manager struct {
 	plugins map[string]PluginInfo
 
 	stopCh chan struct{}
+	app    *application.App
+}
+
+// SetApp injects the Wails application reference so the Manager can emit
+// log events to the frontend. Call this after application.New returns.
+func (m *Manager) SetApp(app *application.App) {
+	m.app = app
+}
+
+// emitLog is a nil-safe helper that emits an app:log event on the Wails app.
+func (m *Manager) emitLog(level, message string) {
+	if m.app == nil {
+		return
+	}
+	m.app.Event.Emit("app:log", services.LogEntry{
+		Level:     services.LogLevel(level),
+		Message:   message,
+		Timestamp: time.Now().UTC().Format(time.RFC3339Nano),
+	})
 }
 
 // exec request/response used for CLI JSON interchange with plugins.
@@ -196,13 +217,22 @@ func (m *Manager) ExecPlugin(name string, connection map[string]string, query st
 	info, ok := m.plugins[name]
 	m.mu.Unlock()
 	if !ok {
+		m.emitLog("error", fmt.Sprintf("ExecPlugin: plugin '%s' not found", name))
 		return nil, fmt.Errorf("ExecPlugin: plugin %s not found\n", name)
 	}
 	full := info.Path
 	if !isExecutable(full) {
 		fmt.Printf("ExecPlugin: path %s not executable\n", full)
+		m.emitLog("error", fmt.Sprintf("ExecPlugin: plugin '%s' is not executable", name))
 		return nil, fmt.Errorf("ExecPlugin: plugin %s is not executable\n", name)
 	}
+
+	// Truncate long queries in log output to keep messages readable
+	logQuery := query
+	if len(logQuery) > 80 {
+		logQuery = logQuery[:80] + "..."
+	}
+	m.emitLog("info", fmt.Sprintf("ExecPlugin: driver=%s query=%q", name, logQuery))
 
 	req := execRequest{Connection: connection, Query: query}
 	b, _ := json.Marshal(&req)
@@ -226,6 +256,7 @@ func (m *Manager) ExecPlugin(name string, connection map[string]string, query st
 
 	if err := cmd.Start(); err != nil {
 		fmt.Printf("ExecPlugin: start error: %v\n", err)
+		m.emitLog("error", fmt.Sprintf("ExecPlugin: failed to start plugin '%s': %v", name, err))
 		return nil, fmt.Errorf("ExecPlugin: start error: %w", err)
 	}
 
@@ -240,8 +271,10 @@ func (m *Manager) ExecPlugin(name string, connection map[string]string, query st
 	if err := cmd.Wait(); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			// the context will have killed the process after 30s
+			m.emitLog("error", fmt.Sprintf("ExecPlugin: plugin '%s' timed out after 30s", name))
 			return nil, fmt.Errorf("ExecPlugin: plugin timed out after 30s")
 		}
+		m.emitLog("error", fmt.Sprintf("ExecPlugin: plugin '%s' exited with error: %v", name, err))
 		return nil, fmt.Errorf("ExecPlugin: plugin exited: %w - stderr: %s", err, string(errB))
 	}
 
@@ -296,8 +329,10 @@ func (m *Manager) ExecPlugin(name string, connection map[string]string, query st
 	}
 	if resp.Error != "" {
 		fmt.Printf("ExecPlugin: plugin returned error field: %s\n", resp.Error)
+		m.emitLog("error", fmt.Sprintf("ExecPlugin: plugin '%s' returned error: %s", name, resp.Error))
 		return resp, fmt.Errorf("ExecPlugin: plugin error: %s", resp.Error)
 	}
+	m.emitLog("info", fmt.Sprintf("ExecPlugin: driver=%s completed successfully", name))
 	return resp, nil
 }
 
@@ -315,12 +350,15 @@ func (m *Manager) GetConnectionTree(name string, connection map[string]string) (
 	info, ok := m.plugins[name]
 	m.mu.Unlock()
 	if !ok {
+		m.emitLog("error", fmt.Sprintf("GetConnectionTree: plugin '%s' not found", name))
 		return nil, fmt.Errorf("GetConnectionTree: plugin %s not found", name)
 	}
 	full := info.Path
 	if !isExecutable(full) {
+		m.emitLog("error", fmt.Sprintf("GetConnectionTree: plugin '%s' is not executable", name))
 		return nil, fmt.Errorf("GetConnectionTree: plugin %s is not executable", name)
 	}
+	m.emitLog("info", fmt.Sprintf("GetConnectionTree: fetching tree for driver=%s", name))
 
 	req := plugin.ConnectionTreeRequest{Connection: connection}
 	b, _ := json.Marshal(&req)
@@ -354,18 +392,23 @@ func (m *Manager) GetConnectionTree(name string, connection map[string]string) (
 
 	if err := cmd.Wait(); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
+			m.emitLog("error", fmt.Sprintf("GetConnectionTree: plugin '%s' timed out after 30s", name))
 			return nil, fmt.Errorf("GetConnectionTree: plugin timed out after 30s")
 		}
+		m.emitLog("error", fmt.Sprintf("GetConnectionTree: plugin '%s' exited with error: %v", name, err))
 		return nil, fmt.Errorf("GetConnectionTree: plugin exited: %w - stderr: %s", err, string(errB))
 	}
 
 	resp := &plugin.ConnectionTreeResponse{}
 	if len(outB) == 0 {
+		m.emitLog("info", fmt.Sprintf("GetConnectionTree: driver=%s returned empty tree", name))
 		return resp, nil
 	}
 	if err := protojson.Unmarshal(outB, resp); err != nil {
+		m.emitLog("error", fmt.Sprintf("GetConnectionTree: invalid tree JSON from '%s': %v", name, err))
 		return nil, fmt.Errorf("GetConnectionTree: invalid tree json: %w", err)
 	}
+	m.emitLog("info", fmt.Sprintf("GetConnectionTree: driver=%s returned %d node(s)", name, len(resp.Nodes)))
 	return resp, nil
 }
 

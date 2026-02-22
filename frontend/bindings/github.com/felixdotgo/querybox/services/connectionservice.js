@@ -16,6 +16,10 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as application$0 from "../../../wailsapp/wails/v3/pkg/application/models.js";
+
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as $models from "./models.js";
 
 /**
@@ -79,6 +83,16 @@ export function ListConnections() {
     return $Call.ByID(3704832906).then(/** @type {($result: any) => any} */(($result) => {
         return $$createType1($result);
     }));
+}
+
+/**
+ * SetApp injects the Wails application reference so the service can emit
+ * log events to the frontend. Call this after application.New returns.
+ * @param {application$0.App | null} app
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetApp(app) {
+    return $Call.ByID(1095751446, app);
 }
 
 // Private type creation functions

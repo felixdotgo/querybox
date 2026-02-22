@@ -3,20 +3,20 @@
     <!-- Header (application menu placeholder) -->
     <header
       ref="headerRef"
-      :class="['w-full border-b border-gray-200 pr-2 flex items-center flex-shrink-0', isMac ? 'pl-30 py-4 gap-2' : 'pl-2 gap-4 py-2']"
+      :class="[
+        'w-full border-b border-gray-200 pr-2 flex items-center flex-shrink-0',
+        isMac ? 'pl-30 py-4 gap-2' : 'pl-2 gap-4 py-2',
+      ]"
     >
-        <n-button size="tiny" quaternary>File</n-button>
-        <n-button size="tiny" quaternary>Edit</n-button>
-        <n-button size="tiny" quaternary>View</n-button>
-        <n-button size="tiny" quaternary>Help</n-button>
+      <n-button size="tiny" quaternary>File</n-button>
+      <n-button size="tiny" quaternary>Edit</n-button>
+      <n-button size="tiny" quaternary>View</n-button>
+      <n-button size="tiny" quaternary>Help</n-button>
     </header>
 
     <!-- Content: two-column resizable layout -->
     <main class="flex-1 min-h-0">
-      <div
-        ref="containerRef"
-        class="flex w-full h-full overflow-hidden"
-      >
+      <div ref="containerRef" class="flex w-full h-full overflow-hidden">
         <!-- Left column: toolbar + tree -->
         <div
           class="flex-shrink-0"
@@ -102,32 +102,45 @@
       </div>
     </main>
 
-  <!-- Delete confirmation overlay -->
-  <div
-    v-if="deleteModal.visible"
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-    @click.self="deleteModal.visible = false"
-  >
-    <div class="bg-white rounded-lg shadow-xl p-6 w-80">
-      <div class="text-base font-semibold mb-2">Delete connection</div>
-      <div class="text-sm text-gray-600 mb-5">Delete <strong>{{ deleteModal.conn?.name }}</strong>? This cannot be undone.</div>
-      <div class="flex justify-end gap-2">
-        <button class="px-4 py-1.5 text-sm rounded border border-gray-300 hover:bg-gray-50" @click="deleteModal.visible = false">Cancel</button>
-        <button class="px-4 py-1.5 text-sm rounded bg-red-600 text-white hover:bg-red-700" @click="confirmDelete">Delete</button>
+    <!-- Delete confirmation overlay -->
+    <div
+      v-if="deleteModal.visible"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      @click.self="deleteModal.visible = false"
+    >
+      <div class="bg-white rounded-lg shadow-xl p-6 w-80">
+        <div class="text-base font-semibold mb-2">Delete connection</div>
+        <div class="text-sm text-gray-600 mb-5">
+          Delete <strong>{{ deleteModal.conn?.name }}</strong
+          >? This cannot be undone.
+        </div>
+        <div class="flex justify-end gap-2">
+          <button
+            class="px-4 py-1.5 text-sm rounded border border-gray-300 hover:bg-gray-50"
+            @click="deleteModal.visible = false"
+          >
+            Cancel
+          </button>
+          <button
+            class="px-4 py-1.5 text-sm rounded bg-red-600 text-white hover:bg-red-700"
+            @click="confirmDelete"
+          >
+            Delete
+          </button>
+        </div>
       </div>
     </div>
-  </div>
 
     <!-- Footer resizer -->
     <div
-      class="h-1 -mt-1 cursor-row-resize bg-gray-200 hover:bg-sky-500"
+      class="relative z-10 h-1 cursor-row-resize bg-gray-200 hover:bg-sky-500"
       @pointerdown="startFooterDrag"
     >
       <div class="w-10 h-0.5 bg-transparent mx-auto"></div>
     </div>
 
     <!-- Footer: collapsible log / debug area -->
-    <footer class="w-full bg-white transition-all duration-200">
+    <footer class="w-full bg-white">
       <div class="flex items-center justify-between px-4 py-2">
         <div class="flex items-center gap-3">
           <button class="text-sm text-gray-600" @click="toggleFooter">
@@ -141,30 +154,68 @@
 
       <div
         v-show="!footerCollapsed"
-        class="bg-gray-50 p-3 overflow-auto"
+        class="bg-gray-50 overflow-auto font-mono text-xs"
         :style="{ height: footerHeight + 'px' }"
       >
-        <div class="text-sm text-gray-600">Log viewer (placeholder)</div>
-        <div class="mt-2 text-xs opacity-60">
-          Application logs, debug output and runtime diagnostics will appear
-          here.
+        <div v-if="logs.length === 0" class="p-3 text-gray-400 italic">
+          Waiting for log output…
         </div>
+        <div v-else class="p-2 space-y-0.5">
+          <div
+            v-for="(entry, i) in logs"
+            :key="i"
+            class="flex items-start gap-2 leading-5"
+          >
+            <span class="flex-shrink-0 text-gray-400">{{
+              formatTime(entry.timestamp)
+            }}</span>
+            <span
+              :class="[
+                'flex-shrink-0 uppercase font-semibold w-10 text-center rounded px-1',
+                entry.level === 'error'
+                  ? 'bg-red-100 text-red-700'
+                  : entry.level === 'warn'
+                    ? 'bg-yellow-100 text-yellow-700'
+                    : 'bg-green-100 text-green-700',
+              ]"
+              >{{ entry.level }}</span
+            >
+            <span class="text-gray-700 break-all">{{ entry.message }}</span>
+          </div>
+        </div>
+        <div ref="logsEndRef" />
       </div>
     </footer>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, h, watch, onMounted, onUnmounted } from "vue"
+import { ref, computed, h, watch, onMounted, onUnmounted, nextTick } from "vue"
 import { Events } from "@wailsio/runtime"
 import { useRouter } from "vue-router"
-import { ListConnections, GetCredential, DeleteConnection } from "@/bindings/github.com/felixdotgo/querybox/services/connectionservice"
+import {
+  ListConnections,
+  GetCredential,
+  DeleteConnection,
+} from "@/bindings/github.com/felixdotgo/querybox/services/connectionservice"
 // @ts-ignore: may be generated after adding new methods
-import { GetConnectionTree, ExecTreeAction, ExecPlugin } from "@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager"
-import { ShowConnectionsWindow, MinimiseMainWindow, ToggleFullScreenMainWindow, CloseMainWindow } from "@/bindings/github.com/felixdotgo/querybox/services/app"
-import { createHorizontalResizer, createVerticalResizer } from "@/composables/useResize"
+import {
+  GetConnectionTree,
+  ExecTreeAction,
+  ExecPlugin,
+} from "@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager"
+import {
+  ShowConnectionsWindow,
+  MinimiseMainWindow,
+  ToggleFullScreenMainWindow,
+  CloseMainWindow,
+} from "@/bindings/github.com/felixdotgo/querybox/services/app"
+import {
+  createHorizontalResizer,
+  createVerticalResizer,
+} from "@/composables/useResize"
 
-const isMac = navigator.userAgent.includes('Mac')
+const isMac = navigator.userAgent.includes("Mac")
 
 const router = useRouter()
 async function openConnections() {
@@ -192,6 +243,11 @@ const expandedKeys = ref([])
 
 const footerCollapsed = ref(true)
 const footerHeight = ref(176)
+
+// log entries streamed from the Go backend via the app:log event
+const logs = ref([])
+const logsEndRef = ref(null)
+let offAppLog = null
 
 // reusable resizers (horizontal + vertical)
 const horizontalResizer = createHorizontalResizer({
@@ -329,27 +385,28 @@ function renderLabel({ option }) {
     return option.label
   }
   return h(
-    'div',
+    "div",
     {
-      class: 'flex items-center justify-between w-full group/conn pr-1',
+      class: "flex items-center justify-between w-full group/conn pr-1",
       onDblclick: (e) => {
         e.stopPropagation()
         handleConnectionDblclick(conn)
       },
     },
     [
-      h('span', { class: 'truncate' }, option.label),
+      h("span", { class: "truncate" }, option.label),
       h(
-        'button',
+        "button",
         {
-          class: 'opacity-0 group-hover/conn:opacity-100 ml-2 flex-shrink-0 text-gray-400 hover:text-red-500 transition-opacity leading-none',
-          title: 'Delete connection',
+          class:
+            "opacity-0 group-hover/conn:opacity-100 ml-2 flex-shrink-0 text-gray-400 hover:text-red-500 transition-opacity leading-none",
+          title: "Delete connection",
           onClick(e) {
             e.stopPropagation()
             deleteModal.value = { visible: true, conn }
           },
         },
-        '×',
+        "×",
       ),
     ],
   )
@@ -363,11 +420,12 @@ async function confirmDelete() {
     // remove from local state
     connections.value = connections.value.filter((c) => c.id !== conn.id)
     delete connectionTrees.value[conn.id]
-    if (selectedConnection.value?.id === conn.id) selectedConnection.value = null
+    if (selectedConnection.value?.id === conn.id)
+      selectedConnection.value = null
     // remove from expanded keys
     expandedKeys.value = expandedKeys.value.filter((k) => k !== conn.id)
   } catch (err) {
-    console.error('DeleteConnection', err)
+    console.error("DeleteConnection", err)
   } finally {
     deleteModal.value = { visible: false, conn: null }
   }
@@ -462,6 +520,24 @@ function toggleFooter() {
   }
 }
 
+// Format an RFC3339 timestamp to a short HH:MM:SS.mmm string.
+// Go's RFC3339Nano uses 9-digit nanoseconds; JS Date only parses up to 3,
+// so we truncate fractional seconds to 3 digits before constructing the Date.
+function formatTime(ts) {
+  try {
+    const normalized = ts.replace(/(\.\d{3})\d+/, "$1")
+    const d = new Date(normalized)
+    if (isNaN(d.getTime())) return ts
+    const hh = String(d.getHours()).padStart(2, "0")
+    const mm = String(d.getMinutes()).padStart(2, "0")
+    const ss = String(d.getSeconds()).padStart(2, "0")
+    const ms = String(d.getMilliseconds()).padStart(3, "0")
+    return `${hh}:${mm}:${ss}.${ms}`
+  } catch {
+    return ts
+  }
+}
+
 const resizeHandler = () => {
   horizontalResizer.clamp()
   verticalResizer.clamp()
@@ -486,6 +562,17 @@ onMounted(async () => {
     loadConnections()
   })
 
+  // Stream Go backend log events into the Logs tab.
+  // Events.On callback receives a WailsEvent; the actual payload is in .data.
+  offAppLog = Events.On("app:log", (event) => {
+    const entry = event?.data ?? event
+    if (!entry) return
+    logs.value.push(entry)
+    if (!footerCollapsed.value) {
+      nextTick(() => logsEndRef.value?.scrollIntoView({ behavior: "smooth" }))
+    }
+  })
+
   // make sure driver nodes start expanded when data arrives
   expandedKeys.value = defaultExpandedKeys.value
 
@@ -501,5 +588,6 @@ onUnmounted(() => {
   horizontalResizer.destroy()
   verticalResizer.destroy()
   if (offConnectionSaved) offConnectionSaved()
+  if (offAppLog) offAppLog()
 })
 </script>

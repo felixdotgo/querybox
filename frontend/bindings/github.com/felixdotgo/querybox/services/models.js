@@ -73,3 +73,65 @@ export class Connection {
         return new Connection(/** @type {Partial<Connection>} */($$parsedSource));
     }
 }
+
+/**
+ * LogEntry is the payload emitted on the "app:log" event to the frontend.
+ */
+export class LogEntry {
+    /**
+     * Creates a new LogEntry instance.
+     * @param {Partial<LogEntry>} [$$source = {}] - The source object to create the LogEntry.
+     */
+    constructor($$source = {}) {
+        if (!("level" in $$source)) {
+            /**
+             * @member
+             * @type {LogLevel}
+             */
+            this["level"] = LogLevel.$zero;
+        }
+        if (!("message" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["message"] = "";
+        }
+        if (!("timestamp" in $$source)) {
+            /**
+             * RFC3339Nano UTC
+             * @member
+             * @type {string}
+             */
+            this["timestamp"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new LogEntry instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {LogEntry}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new LogEntry(/** @type {Partial<LogEntry>} */($$parsedSource));
+    }
+}
+
+/**
+ * LogLevel represents the severity of a log entry.
+ * @readonly
+ * @enum {string}
+ */
+export const LogLevel = {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero: "",
+
+    LogLevelInfo: "info",
+    LogLevelWarn: "warn",
+    LogLevelError: "error",
+};

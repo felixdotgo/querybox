@@ -10,5 +10,7 @@ export {
 };
 
 export {
-    Connection
+    Connection,
+    LogEntry,
+    LogLevel
 } from "./models.js";

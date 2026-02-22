@@ -18,6 +18,9 @@ import * as plugin$0 from "../../pkg/plugin/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as pluginpb$0 from "../../rpc/contracts/plugin/v1/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as application$0 from "../../../../wailsapp/wails/v3/pkg/application/models.js";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -116,6 +119,16 @@ export function ListPlugins() {
  */
 export function Rescan() {
     return $Call.ByID(3306130489);
+}
+
+/**
+ * SetApp injects the Wails application reference so the Manager can emit
+ * log events to the frontend. Call this after application.New returns.
+ * @param {application$0.App | null} app
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetApp(app) {
+    return $Call.ByID(384494566, app);
 }
 
 /**
