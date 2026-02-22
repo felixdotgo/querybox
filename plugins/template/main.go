@@ -29,30 +29,46 @@ func (t *templatePlugin) Exec(req plugin.ExecRequest) (plugin.ExecResponse, erro
 	}, nil
 }
 
-func (t *templatePlugin) AuthForms(plugin.AuthFormsRequest) (plugin.AuthFormsResponse, error) {
+func (t *templatePlugin) AuthForms(*plugin.AuthFormsRequest) (*plugin.AuthFormsResponse, error) {
 	basic := plugin.AuthForm{Key: "basic", Name: "Basic", Fields: []*plugin.AuthField{
 		{Type: plugin.AuthField_TEXT, Name: "host", Label: "Host", Required: true, Placeholder: "127.0.0.1"},
 		{Type: plugin.AuthField_TEXT, Name: "user", Label: "User"},
 		{Type: plugin.AuthField_PASSWORD, Name: "password", Label: "Password"},
 	}}
-	return plugin.AuthFormsResponse{Forms: map[string]*plugin.AuthForm{"basic": &basic}}, nil
+	return &plugin.AuthFormsResponse{Forms: map[string]*plugin.AuthForm{"basic": &basic}}, nil
 }
 
 // ConnectionTree returns a trivial tree for demonstration purposes.  In a
 // real plugin the structure would be derived from the connection (e.g. list of
 // databases/tables).
-func (t *templatePlugin) ConnectionTree(req plugin.ConnectionTreeRequest) (plugin.ConnectionTreeResponse, error) {
-	return plugin.ConnectionTreeResponse{
+func (t *templatePlugin) ConnectionTree(req plugin.ConnectionTreeRequest) (*plugin.ConnectionTreeResponse, error) {
+	return &plugin.ConnectionTreeResponse{
 		Nodes: []*plugin.ConnectionTreeNode{
 			{
 				Key:   "dummy",
 				Label: "Dummy node",
 				Actions: []*plugin.ConnectionTreeAction{
-					{Type: "select", Title: "Echo query", Query: "SELECT 1"},
+					{Type: plugin.ConnectionTreeAction_SELECT, Title: "Echo query", Query: "SELECT 1"},
 				},
 			},
 		},
 	}, nil
+}
+
+// ConnectionTreeAction simply echoes back the action's query for demo purposes.
+// In a real plugin this would execute the query and return results or perform some other side effect.
+func (t *templatePlugin) ConnectionTreeAction(req *plugin.ConnectionTreeAction) (*plugin.ExecResponse, error) {
+	// simply echo back the action's query for demo purposes
+	data := map[string]string{"action_query": req.Query}
+	return &plugin.ExecResponse{
+		Result: &plugin.ExecResult{
+			Payload: &pluginpb.PluginV1_ExecResult_Kv{
+				Kv: &plugin.KeyValueResult{
+					Data: data,
+				},
+			},
+		}, nil
+	}
 }
 
 func main() {

@@ -193,7 +193,7 @@ func (m *postgresqlPlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*p
 			Key:   name,
 			Label: name,
 			Actions: []*plugin.ConnectionTreeAction{
-				{Type: "select", Title: "Query", Query: "SELECT 1"},
+				{Type: plugin.ConnectionTreeAction_SELECT, Title: "Query", Query: "SELECT 1"},
 			},
 		})
 	}

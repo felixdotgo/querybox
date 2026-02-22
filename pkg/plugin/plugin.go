@@ -60,6 +60,12 @@ const (
 	AuthField_PASSWORD = pluginpb.PluginV1_AuthField_PASSWORD
 	AuthField_SELECT   = pluginpb.PluginV1_AuthField_SELECT
 	AuthField_CHECKBOX = pluginpb.PluginV1_AuthField_CHECKBOX
+
+	// common action types for ConnectionTree nodes.  Plugins should use
+	// these constants rather than hardcoding strings to avoid typos and to
+	// document the set of recognised actions.
+	ConnectionTreeAction_SELECT   = "select"
+	ConnectionTreeAction_DESCRIBE = "describe"
 )
 
 // Plugin describes the minimal contract a plugin should implement. Keeping

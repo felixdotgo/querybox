@@ -44,7 +44,7 @@ func TestBuildDSNWithParams(t *testing.T) {
 
 func TestConnectionTreeNoConnection(t *testing.T) {
     m := &mysqlPlugin{}
-    res, err := m.ConnectionTree(plugin.ConnectionTreeRequest{})
+    res, err := m.ConnectionTree(&plugin.ConnectionTreeRequest{})
     if err != nil {
         t.Fatalf("ConnectionTree returned error: %v", err)
     }

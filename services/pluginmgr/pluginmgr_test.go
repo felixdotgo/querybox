@@ -1,11 +1,13 @@
 package pluginmgr
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/felixdotgo/querybox/pkg/plugin"
 	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
 )
 
@@ -197,7 +199,7 @@ if [ "$1" = "connection-tree" ] || [ "$1" = "tree" ]; then
   # read stdin but ignore
   cat > /dev/null
   cat <<'EOF'
-{"nodes":[{"key":"foo","label":"Foo","children":[],"actions":[{"type":"select","title":"Select","query":"SELECT 1"}]}]}
+{"nodes":[{"key":"foo","label":"Foo","children":[],"actions":[{"type":"%s","title":"Select","query":"SELECT 1"}]}]}
 EOF
   exit 0
 fi
@@ -209,6 +211,8 @@ EOF
 fi
 cat > /dev/null
 `
+    // insert constant into script
+    content = fmt.Sprintf(content, plugin.ConnectionTreeAction_SELECT)
     if err := os.WriteFile(bin, []byte(content), 0o755); err != nil {
         t.Fatalf("write mock plugin: %v", err)
     }
@@ -233,6 +237,9 @@ cat > /dev/null
     }
     if len(tree.Nodes[0].Actions) != 1 {
         t.Fatalf("expected 1 action, got %d", len(tree.Nodes[0].Actions))
+    }
+    if tree.Nodes[0].Actions[0].Type != plugin.ConnectionTreeAction_SELECT {
+        t.Fatalf("unexpected action type: %s", tree.Nodes[0].Actions[0].Type)
     }
     // test ExecTreeAction proxies to exec
     res, err := m.ExecTreeAction("sh-mock-tree", nil, "anything")

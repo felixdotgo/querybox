@@ -216,7 +216,7 @@ func (m *mysqlPlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugin
 			Key:   name,
 			Label: name,
 			Actions: []*plugin.ConnectionTreeAction{
-				{Type: "select", Title: "Use", Query: fmt.Sprintf("USE `%s`;", name)},
+				{Type: plugin.ConnectionTreeAction_SELECT, Title: "Use", Query: fmt.Sprintf("USE `%s`;", name)},
 			},
 		})
 	}

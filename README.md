@@ -95,9 +95,8 @@ Plugins communicate via JSON stdin/stdout. See [pkg/plugin/plugin.go](pkg/plugin
 1. **Modify frontend**: Edit files in [frontend/src/](frontend/src/)
 2. **Add backend logic**: Update services in [services/](services/)
 3. **Create plugins**: Use [plugins/template/](plugins/template/) as a starting point
-4. **Run tests**: `go test ./...`
-5. **See changes**: `wails3 dev` for hot-reload
-6. **Build**: `wails3 build` for production executable
+4. **See changes**: `wails3 dev` for hot-reload
+5. **Build**: `wails3 build` for production executable
 
 ## References
 

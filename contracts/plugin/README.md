@@ -25,6 +25,7 @@ Notes
 ```
 
 - `ExecResponse` was enhanced to return a typed result envelope (`sql`, `document`, or `kv`) instead of a raw string. SQL results now include `Column` metadata with names and optional types.
+- Connection tree nodes accept action objects where the `type` field is a machine name such as `"select"` or `"describe"`. Go authors can now use the constants defined in `pkg/plugin` (e.g. `plugin.ConnectionTreeAction_SELECT`) instead of hardcoding the strings.
 - To regenerate Go code after changing the proto, run `task proto:generate` (requires `protoc`, `protoc-gen-go`, `protoc-gen-go-grpc`).
 - To implement CLI helpers in Go, use `pkg/plugin.ServeCLI` which now supports the `authforms` command.
 - When adding fields/options, prefer conservative defaults so older UI versions still behave predictably.
