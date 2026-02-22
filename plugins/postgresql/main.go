@@ -140,11 +140,7 @@ func (m *postgresqlPlugin) Exec(req *plugin.ExecRequest) (*plugin.ExecResponse, 
 		}
 		strs := make([]string, len(cols))
 		for i, v := range vals {
-			if v == nil {
-				strs[i] = ""
-			} else {
-				strs[i] = fmt.Sprintf("%v", v)
-			}
+			strs[i] = plugin.FormatSQLValue(v)
 		}
 		rowResults = append(rowResults, &plugin.Row{Values: strs})
 	}

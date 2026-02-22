@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-
-	"google.golang.org/protobuf/encoding/protojson"
+	"unicode/utf8"
 
 	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // Reuse proto-derived types (aliases) so plugin authors import a single
@@ -23,6 +23,33 @@ type ExecRequest = pluginpb.PluginV1_ExecRequest
 type ExecResponse = pluginpb.PluginV1_ExecResponse
 
 // result-specific helpers.  Exported for plugin authors and tests.
+// FormatSQLValue translates a value returned by `database/sql` Row.Scan
+// into a human-readable string suitable for presenting in the host UI. The
+// built-in drivers often return []byte for text columns, so we convert those
+// to strings rather than letting fmt.Sprintf render them as numeric byte
+// slices. A nil value becomes the empty string.
+func FormatSQLValue(v interface{}) string {
+    if v == nil {
+        return ""
+    }
+    switch t := v.(type) {
+    case []byte:
+        // Drivers commonly return []byte for text columns. Convert to
+        // string when the bytes represent valid UTF-8; otherwise encode as a
+        // hex string so the frontend can still display something sensible and
+        // avoid embedding potentially invalid/unprintable data in the JSON
+        // payload.
+        if utf8.Valid(t) {
+            return string(t)
+        }
+        // show binary data as hex prefixed with 0x (similar to SQL conventions)
+        return fmt.Sprintf("0x%x", t)
+    default:
+        // Fallback to the generic formatter used previously.
+        return fmt.Sprintf("%v", v)
+    }
+}
+
 type ExecResult = pluginpb.PluginV1_ExecResult
 
 type SqlResult = pluginpb.PluginV1_SqlResult
