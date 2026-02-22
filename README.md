@@ -1,4 +1,4 @@
-# QueryBox
+# QueryBox (Current under development - Not released)
 
 **QueryBox** is a lightweight database management tool for executing and managing queries across multiple database systems through a plugin-based architecture.
 
