@@ -74,7 +74,7 @@
 </template>
 
 <script setup>
-import { ref, computed, h, watch, onMounted, onUnmounted } from "vue"
+import { ref, computed, h, watch, onMounted, onUnmounted, defineEmits } from "vue"
 import { Events } from "@wailsio/runtime"
 import { useRouter } from "vue-router"
 import {
@@ -91,6 +91,13 @@ import {
 import {
   ShowConnectionsWindow,
 } from "@/bindings/github.com/felixdotgo/querybox/services/app"
+
+// declare events emitted by this component
+const emit = defineEmits([
+  "connection-selected",
+  "query-result",
+  "connection-dblclick",
+])
 
 const router = useRouter()
 async function openConnections() {
@@ -161,6 +168,7 @@ function handleSelect(keys, options, meta) {
   const key = meta?.node?.key ?? (Array.isArray(keys) ? keys[0] : keys)
   if (key == null) return
 
+  // top‑level connection selected
   const conn = connections.value.find((c) => c.id === key)
   if (conn) {
     selectedConnection.value = conn
@@ -169,8 +177,31 @@ function handleSelect(keys, options, meta) {
     return
   }
 
-  const parentConn = selectedConnection.value
+  // determine which connection the clicked tree node belongs to.  normally
+  // `selectedConnection` will already be set (user clicked the connection
+  // parent first), but if not we attempt to infer it by walking the cached
+  // tree data. this makes the behaviour a little more forgiving.
+  let parentConn = selectedConnection.value
   const node = meta?.node
+  if (!parentConn) {
+    for (const c of connections.value) {
+      const nodes = connectionTrees.value[c.id] || []
+      const finder = (list) => {
+        for (const n of list) {
+          if (n.key === key) return true
+          if (n.children && finder(n.children)) return true
+        }
+        return false
+      }
+      if (finder(nodes)) {
+        parentConn = c
+        // ensure we have a tree available so runTreeAction has metadata
+        fetchTreeFor(c)
+        break
+      }
+    }
+  }
+
   if (parentConn && node && node.actions && node.actions.length > 0) {
     const act = node.actions[0]
     runTreeAction(parentConn, act)
