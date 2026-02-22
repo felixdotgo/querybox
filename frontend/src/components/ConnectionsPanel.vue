@@ -295,38 +295,40 @@ async function runTreeAction(conn, action) {
     }
 
     const res = await ExecTreeAction(conn.driver_type, params, queryToRun)
-    if (
-      action.type === "select" &&
-      /^\s*select\b/i.test(action.query || "")
-    ) {
-      // some generated bindings/protojson produce a capitalized payload
-      // object (Sql/Document/Kv).  The ResultViewer expects lowercase
-      // fields so normalize here before emitting.
-      // the ExecTreeAction response occasionally wraps the result in a
-      // PluginV1_ExecResult instance, which stores its data under the
-      // `Payload` property (see generated bindings).  Unwrap first.
-      let payload = res.result || {}
-      if (payload && payload.Payload) {
-        payload = payload.Payload
+
+    // regardless of query type we unwrap and normalise any result that came
+    // back; the workspace will decide how to render it (or just show an
+    // error if `res.error` is set).  this makes behaviour consistent for
+    // non-SELECT actions like 'USE' if we ever want to display feedback.
+    let payload = res.result || {}
+    if (payload && payload.Payload) {
+      payload = payload.Payload
+    }
+
+    if (payload.Sql) payload = payload.Sql
+    else if (payload.Document) payload = payload.Document
+    else if (payload.Kv) payload = payload.Kv
+
+    // capitalised keys (protojson output) confuse the viewer; lowercase
+    // everything once so callers don't have to care.
+    const normalizeKeys = (obj) => {
+      if (!obj || typeof obj !== "object") return obj
+      const out = {}
+      for (const key of Object.keys(obj)) {
+        const lower = key.charAt(0).toLowerCase() + key.slice(1)
+        out[lower] = obj[key]
       }
+      return out
+    }
+    payload = normalizeKeys(payload)
 
-      if (payload.Sql) payload = payload.Sql
-      else if (payload.Document) payload = payload.Document
-      else if (payload.Kv) payload = payload.Kv
+    const title = action.title || action.query || "Query"
+    console.debug("runTreeAction result", action, queryToRun, res, payload)
 
-      // convert any capitalized field names (protojson output) to lowercase
-      const normalizeKeys = (obj) => {
-        if (!obj || typeof obj !== "object") return obj
-        const out = {}
-        for (const key of Object.keys(obj)) {
-          const lower = key.charAt(0).toLowerCase() + key.slice(1) // keep rest
-          out[lower] = obj[key]
-        }
-        return out
-      }
-      payload = normalizeKeys(payload)
-
-      const title = action.title || action.query || "Query"
+    if (res.error) {
+      emit("query-result", title, null, res.error)
+    } else {
+      emit("query-result", title, payload, null)
     }
   } catch (err) {
     console.error("ExecTreeAction", conn.id, err)
