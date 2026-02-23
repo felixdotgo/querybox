@@ -104,6 +104,13 @@
 - Inputs and forms should rely on `input-tw` (light background / dark text) and primary actions may use `btn-tw`.
 - Document any deliberate deviations from the default Tailwind palette in design docs and PR descriptions.
 
+#### Typography
+- **UI font**: [Inter](https://rsms.me/inter/) — professional, developer-focused sans-serif (same as MongoDB Compass). Loaded via `vfonts/Inter.css`.
+- **Mono font**: [Fira Code](https://github.com/tonsky/FiraCode) — for code cells, query editors, and result tables with identifiers. Loaded via `vfonts/FiraCode.css`.
+- Both are injected globally in `frontend/src/main.js` and set as the default `fontFamily` / `fontFamilyMono` in the Naive UI `themeOverrides` in `App.vue`.
+- Tailwind's `@layer base` in `tailwind.css` mirrors the same font stack so that Tailwind-styled elements are consistent.
+- Inter `cv02–cv11` OpenType features are enabled for improved readability at small sizes; Fira Code ligatures (`liga`, `calt`) are enabled for code contexts.
+
 ### 3.5 Icon System
 
 **Library**: `@vicons/ionicons5` wrapped in Naive UI's `<n-icon>` component.
