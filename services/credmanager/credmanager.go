@@ -21,21 +21,42 @@ var (
 
 const (
 	serviceName   = "querybox"
+	probeKey      = "__availability_probe__"
+	probeValue    = "__probe__"
 	defaultDBDir  = "data"
 	defaultDBFile = "credentials.db"
 )
 
-// CredManager provides a thin abstraction over the OS keyring. When the OS
-// keyring isn't available the manager falls back to a persistent SQLite file
-// (and if that cannot be opened, an in-memory map) so the application remains
-// usable in headless/test environments.
+// CredManager provides a credential store backed by the OS keyring when
+// available (Keychain on macOS, Credential Manager on Windows, libsecret /
+// KWallet on Linux). When the keyring is not usable – headless servers,
+// containers, CI environments – it falls back to a persistent SQLite file,
+// and finally to an in-memory map if even the database cannot be opened.
 type CredManager struct {
-	mu       sync.RWMutex // guards fallback map
-	fallback map[string]string
-	// db holds the sqlite connection for persistent fallback storage.  May be
-	// nil if initialization failed; code will still operate using the in-memory
-	// map in that case.
+	useKeyring bool
+	mu         sync.RWMutex // guards fallback map
+	fallback   map[string]string
+	// db holds the sqlite connection for persistent fallback storage. Only
+	// opened when the keyring probe fails. May be nil if initialisation
+	// failed; operations fall through to the in-memory map in that case.
 	db *sql.DB
+}
+
+// probeKeyring checks whether the OS keyring daemon / service is actually
+// reachable by writing, reading, and deleting a sentinel key. It uses the
+// same function variables as the rest of the package so that tests can inject
+// fakes.
+func probeKeyring() bool {
+	if err := keyringSet(serviceName, probeKey, probeValue); err != nil {
+		fmt.Printf("warning: OS keyring probe failed: %v\n", err)
+		return false
+	}
+	_, err := keyringGet(serviceName, probeKey)
+	if err != nil {
+		fmt.Printf("warning: OS keyring probe failed: %v\n", err)
+	}
+	_ = keyringDelete(serviceName, probeKey)
+	return err == nil
 }
 
 // New constructs a credential manager using the default database path
@@ -45,13 +66,21 @@ func New() *CredManager {
 	return NewWithPath(path)
 }
 
-// NewWithPath constructs a credential manager that persists fallback secrets
-// in the sqlite file at dbPath. If the directory cannot be created or the
-// database fails to open the manager will continue operating with an in-memory
-// map and will print a warning.  This helper exists primarily for testing.
+// NewWithPath constructs a credential manager. If the OS keyring probe
+// succeeds the manager uses the keyring exclusively and the SQLite file is
+// never opened. If the probe fails the manager operates entirely through
+// SQLite (or in-memory if the database cannot be opened either).
 func NewWithPath(dbPath string) *CredManager {
 	c := &CredManager{fallback: make(map[string]string)}
-	// ensure parent directory exists
+
+	if probeKeyring() {
+		c.useKeyring = true
+		return c
+	}
+
+	fmt.Printf("warning: OS keyring unavailable, falling back to SQLite at %s\n", dbPath)
+
+	// Keyring unavailable – initialise the SQLite fallback.
 	dir := filepath.Dir(dbPath)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		fmt.Printf("warning: unable to create credential db directory: %v\n", err)
@@ -80,17 +109,15 @@ func NewWithPath(dbPath string) *CredManager {
 	return c
 }
 
-// Store saves `secret` under `key`. Prefer the OS keyring and fall back to
-// a persistent sqlite file if the keyring call fails. The map is only used if
-// the database itself cannot be opened.
+// Store saves secret under key. Uses the OS keyring when available, otherwise
+// the SQLite fallback, and finally the in-memory map.
 func (c *CredManager) Store(key string, secret string) error {
 	if key == "" {
 		return errors.New("empty key")
 	}
-	if err := keyringSet(serviceName, key, secret); err == nil {
-		return nil
+	if c.useKeyring {
+		return keyringSet(serviceName, key, secret)
 	}
-	// keyring unavailable; attempt db fallback
 	if c.db != nil {
 		_, err := c.db.Exec(`INSERT OR REPLACE INTO credentials (key, secret) VALUES (?, ?)`, key, secret)
 		if err == nil {
@@ -98,22 +125,19 @@ func (c *CredManager) Store(key string, secret string) error {
 		}
 		// fall through to in-memory if db write fails
 	}
-	// in-memory fallback
 	c.mu.Lock()
 	c.fallback[key] = secret
 	c.mu.Unlock()
 	return nil
 }
 
-// Get retrieves a secret previously stored with Store. The method prefers the
-// OS keyring; if that fails it checks the sqlite fallback and finally the
-// in-memory map.
+// Get retrieves a secret previously stored with Store.
 func (c *CredManager) Get(key string) (string, error) {
 	if key == "" {
 		return "", errors.New("empty key")
 	}
-	if s, err := keyringGet(serviceName, key); err == nil {
-		return s, nil
+	if c.useKeyring {
+		return keyringGet(serviceName, key)
 	}
 	if c.db != nil {
 		var secret string
@@ -131,13 +155,14 @@ func (c *CredManager) Get(key string) (string, error) {
 	return "", errors.New("secret not found")
 }
 
-// Delete removes a secret (best-effort). If the OS keyring delete fails we
-// attempt to remove it from the sqlite fallback and/or in-memory map.
+// Delete removes a secret. Only the active backend is consulted.
 func (c *CredManager) Delete(key string) error {
 	if key == "" {
 		return errors.New("empty key")
 	}
-	_ = keyringDelete(serviceName, key) // ignore error
+	if c.useKeyring {
+		return keyringDelete(serviceName, key)
+	}
 	if c.db != nil {
 		_, _ = c.db.Exec(`DELETE FROM credentials WHERE key = ?`, key)
 	}
@@ -146,6 +171,19 @@ func (c *CredManager) Delete(key string) error {
 	c.mu.Unlock()
 	return nil
 }
+
+// Backend returns a human-readable label for the active credential backend.
+// Useful for logging and diagnostics.
+func (c *CredManager) Backend() string {
+	if c.useKeyring {
+		return "keyring"
+	}
+	if c.db != nil {
+		return "sqlite"
+	}
+	return "memory"
+}
+
 // Close shuts down the underlying database if one is open. It is safe to call
 // multiple times.
 func (c *CredManager) Close() error {
