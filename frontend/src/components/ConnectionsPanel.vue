@@ -113,6 +113,9 @@ const connectionTrees = ref({})
 const selectedConnection = ref(null)
 const expandedKeys = ref([])
 const deleteModal = ref({ visible: false, conn: null })
+// Keys recently actioned by handleSelect; used to prevent getNodeProps.onClick
+// from double-firing the same action when handleSelect already handled the click.
+const recentlyHandledLeafKeys = new Set()
 
 const defaultExpandedKeys = computed(() => {
   return treeData.value.map((g) => g.key)
@@ -177,13 +180,7 @@ function handleSelect(keys, options, meta) {
     return
   }
 
-  // determine which connection the clicked tree node belongs to by walking
-  // the cached tree data first.  relying solely on selectedConnection can
-  // cause the wrong plugin to be invoked when the user switches between
-  // connections without clicking the parent connection node first (e.g.
-  // connect postgres → connect mysql → click mysql table without re-selecting
-  // the mysql connection header, which would leave selectedConnection pointing
-  // at the postgres entry and trigger pq errors from the mysql plugin).
+  // determine which connection owns the clicked tree node
   const node = meta?.node
   let parentConn = null
   for (const c of connections.value) {
@@ -200,21 +197,17 @@ function handleSelect(keys, options, meta) {
       break
     }
   }
-  // fall back to selectedConnection when the node is not found in any cached
-  // tree (e.g. tree not yet loaded, or key belongs to the connection itself).
-  if (!parentConn) {
-    parentConn = selectedConnection.value
-  }
+  if (!parentConn) parentConn = selectedConnection.value
 
-  // execute the first action for leaf nodes (nodes with no children).
-  // non-leaf nodes (databases, schemas, etc.) are only used for navigation
-  // so clicking them should not trigger a query.
+  // Execute the first action for leaf nodes on first click.
+  // Re-clicks are handled by getNodeProps.onClick (n-tree won't re-emit for
+  // an already-selected key). A short-lived Set prevents double-firing.
   const isLeaf = !node?.children || node.children.length === 0
   if (parentConn && node && isLeaf && node.actions && node.actions.length > 0) {
-    const act = node.actions[0]
-    runTreeAction(parentConn, act, node)
+    recentlyHandledLeafKeys.add(key)
+    setTimeout(() => recentlyHandledLeafKeys.delete(key), 100)
+    runTreeAction(parentConn, node.actions[0], node)
   }
-
 }
 
 function handleConnectionDblclick(conn) {
@@ -237,6 +230,34 @@ function getNodeProps(node) {
     props.onDblclick = (e) => {
       e.stopPropagation()
       handleConnectionDblclick(conn)
+    }
+  }
+
+  // onClick handles re-clicks on an already-selected leaf node — n-tree won't
+  // re-emit update:selected-keys in that case, so handleSelect never fires.
+  // recentlyHandledLeafKeys guards against double-firing when handleSelect
+  // already actioned this click (first-click scenario).
+  const isLeaf = !node?.children || node.children.length === 0
+  if (isLeaf && node.actions && node.actions.length > 0) {
+    props.onClick = () => {
+      if (recentlyHandledLeafKeys.has(node.key)) return
+      let parentConn = null
+      for (const c of connections.value) {
+        const nodes = connectionTrees.value[c.id] || []
+        const finder = (list) => {
+          for (const n of list) {
+            if (n.key === node.key) return true
+            if (n.children && finder(n.children)) return true
+          }
+          return false
+        }
+        if (finder(nodes)) {
+          parentConn = c
+          break
+        }
+      }
+      if (!parentConn) parentConn = selectedConnection.value
+      if (parentConn) runTreeAction(parentConn, node.actions[0], node)
     }
   }
 

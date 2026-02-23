@@ -43,11 +43,10 @@ const props = defineProps({
   },
 })
 
-// unwrap potential ExecResult envelope produced by core-service
-const result = props.result || {}
-console.debug("ResultViewer received result prop", result)
-
 const payload = computed(() => {
+  // unwrap potential ExecResult envelope produced by core-service
+  const result = props.result || {}
+  console.debug("ResultViewer received result prop", result)
   // The result coming from the backend may be:
   //   { columns:…, rows:… }            -- already unwrapped
   //   { sql: {…} }                      -- lowercase wrapper
