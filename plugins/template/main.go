@@ -12,13 +12,13 @@ func (t *templatePlugin) Info() (plugin.InfoResponse, error) {
 	return plugin.InfoResponse{Name: "template", Version: "0.1.0", Description: "Template plugin (on-demand)"}, nil
 }
 
-func (t *templatePlugin) Exec(req plugin.ExecRequest) (plugin.ExecResponse, error) {
+func (t *templatePlugin) Exec(req *plugin.ExecRequest) (*plugin.ExecResponse, error) {
 	// return a simple key/value map containing the query and connection for demo
 	data := map[string]string{"query": req.Query}
 	for k, v := range req.Connection {
 		data[k] = v
 	}
-	return plugin.ExecResponse{
+	return &plugin.ExecResponse{
 		Result: &plugin.ExecResult{
 			Payload: &pluginpb.PluginV1_ExecResult_Kv{
 				Kv: &plugin.KeyValueResult{
@@ -41,7 +41,7 @@ func (t *templatePlugin) AuthForms(*plugin.AuthFormsRequest) (*plugin.AuthFormsR
 // ConnectionTree returns a trivial tree for demonstration purposes.  In a
 // real plugin the structure would be derived from the connection (e.g. list of
 // databases/tables).
-func (t *templatePlugin) ConnectionTree(req plugin.ConnectionTreeRequest) (*plugin.ConnectionTreeResponse, error) {
+func (t *templatePlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugin.ConnectionTreeResponse, error) {
 	return &plugin.ConnectionTreeResponse{
 		Nodes: []*plugin.ConnectionTreeNode{
 			{
@@ -67,8 +67,14 @@ func (t *templatePlugin) ConnectionTreeAction(req *plugin.ConnectionTreeAction) 
 					Data: data,
 				},
 			},
-		}, nil
-	}
+		},
+	}, nil
+}
+
+// TestConnection always succeeds for the template plugin. Real plugins should
+// open the data store and verify credentials.
+func (t *templatePlugin) TestConnection(req *plugin.TestConnectionRequest) (*plugin.TestConnectionResponse, error) {
+	return &plugin.TestConnectionResponse{Ok: true, Message: "Connection successful (template stub)"}, nil
 }
 
 func main() {

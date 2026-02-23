@@ -66,14 +66,22 @@
 
     <!-- Bottom action bar, always visible -->
     <div class="shrink-0 p-4 bg-white border-t border-slate-200 shadow-sm">
-      <n-flex justify="space-between">
-        <n-button class="w-32 ml-auto" quaternary @click="CloseConnectionsWindow">
+      <n-flex justify="space-between" align="center">
+        <n-button class="w-32" quaternary @click="CloseConnectionsWindow">
           Cancel
         </n-button>
-        <n-flex>
-          <n-button class="w-32 ml-2" quaternary @click="clearForm">Reset</n-button>
+        <n-flex align="center" class="gap-3">
+          <n-button class="w-32" quaternary @click="clearForm">Reset</n-button>
           <n-button
-            class="w-32 ml-2"
+            class="w-40"
+            @click="testConnection"
+            :disabled="!canConnect || testingConnection"
+            :loading="testingConnection"
+          >
+            Test Connection
+          </n-button>
+          <n-button
+            class="w-40"
             type="primary"
             @click="saveConnection"
             :disabled="!canConnect"
@@ -82,6 +90,13 @@
           </n-button>
         </n-flex>
       </n-flex>
+      <div
+        v-if="testResult"
+        :class="testResult.ok ? 'text-green-600' : 'text-red-500'"
+        class="mt-2 text-sm text-right"
+      >
+        {{ testResult.ok ? '✓' : '✗' }} {{ testResult.message }}
+      </div>
     </div>
   </div>
 </template>
@@ -91,6 +106,7 @@ import { ref, computed, onMounted, watch } from "vue"
 import {
   ListPlugins,
   GetPluginAuthForms,
+  TestConnection,
 } from "@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager"
 import { CloseConnectionsWindow } from "@/bindings/github.com/felixdotgo/querybox/services/app"
 import { CreateConnection } from "@/bindings/github.com/felixdotgo/querybox/services/connectionservice"
@@ -100,6 +116,8 @@ const plugins = ref([])
 const pluginFilter = ref("")
 const selectedDriver = ref(null)
 const statusText = ref("")
+const testingConnection = ref(false)
+const testResult = ref(null) // null | { ok: boolean, message: string }
 
 // AuthForms state
 const authForms = ref({})
@@ -177,6 +195,7 @@ async function load() {
 async function selectPlugin(p) {
   selectedDriver.value = p
   form.value.driver = p.name || ""
+  testResult.value = null
 
   // probe plugin for auth forms (graceful fallback to DSN input)
   resetAuthState()
@@ -219,6 +238,34 @@ function clearForm() {
   form.value = { name: "", driver: "", cred: "" }
   selectedDriver.value = null
   statusText.value = ""
+  testResult.value = null
+}
+
+async function testConnection() {
+  if (!canConnect.value) {
+    alert("Please select a driver and fill in all required fields")
+    return
+  }
+  testingConnection.value = true
+  testResult.value = null
+  try {
+    let cred = form.value.cred
+    if (Object.keys(authForms.value || {}).length > 0) {
+      const blob = { form: selectedAuthForm.value, values: authValues.value }
+      cred = JSON.stringify(blob)
+    }
+    const params = { credential_blob: cred }
+    const res = await TestConnection(form.value.driver.trim(), params)
+    if (res) {
+      testResult.value = { ok: res.ok, message: res.message || (res.ok ? "Connection successful" : "Connection failed") }
+    } else {
+      testResult.value = { ok: false, message: "No response from plugin" }
+    }
+  } catch (err) {
+    testResult.value = { ok: false, message: err?.message || String(err) }
+  } finally {
+    testingConnection.value = false
+  }
 }
 
 async function saveConnection() {

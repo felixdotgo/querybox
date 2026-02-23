@@ -143,6 +143,25 @@ func (m *sqlitePlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugi
 	return &plugin.ConnectionTreeResponse{Nodes: nodes}, nil
 }
 
+// TestConnection opens a SQLite file and pings the handle to verify the file
+// path is accessible. Nothing is persisted (SQLite creates the file on open,
+// but the caller's path must exist for a database-backed connection).
+func (m *sqlitePlugin) TestConnection(req *plugin.TestConnectionRequest) (*plugin.TestConnectionResponse, error) {
+	path := filePath(req.Connection)
+	if path == "" {
+		return &plugin.TestConnectionResponse{Ok: false, Message: "missing file path in connection"}, nil
+	}
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		return &plugin.TestConnectionResponse{Ok: false, Message: fmt.Sprintf("open error: %v", err)}, nil
+	}
+	defer db.Close()
+	if err := db.Ping(); err != nil {
+		return &plugin.TestConnectionResponse{Ok: false, Message: fmt.Sprintf("ping error: %v", err)}, nil
+	}
+	return &plugin.TestConnectionResponse{Ok: true, Message: "Connection successful"}, nil
+}
+
 func main() {
 	plugin.ServeCLI(&sqlitePlugin{})
 }

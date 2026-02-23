@@ -35,3 +35,9 @@ export const ExecResponse = pluginpb$0.PluginV1_ExecResponse;
  * payloads rather than a flat string.
  * @typedef {pluginpb$0.PluginV1_ExecResponse} ExecResponse
  */
+
+export const TestConnectionResponse = pluginpb$0.PluginV1_TestConnectionResponse;
+
+/**
+ * @typedef {pluginpb$0.PluginV1_TestConnectionResponse} TestConnectionResponse
+ */

@@ -7,7 +7,7 @@ graph LR
     subgraph PluginSystem ["Plugin System (on-demand)"]
         SCAN["Plugin Scanner<br/>(scans bin/plugins every 2s)"]
         EXEC["Plugin Executor<br/>(30s timeout per exec)"]
-        PLUGIN["Plugin Process<br/>(CLI: info/exec/authforms/connection-tree)"]
+        PLUGIN["Plugin Process<br/>(CLI: info/exec/authforms/connection-tree/test-connection)"]
         DB[(Remote DB)]
     end
 
@@ -30,7 +30,7 @@ graph LR
 
     FE -->|Wails bindings| BIND
     BIND -->|CreateConnection, ListConnections, GetCredential| CONN
-    BIND -->|ExecPlugin, ListPlugins, GetConnectionTree, ExecTreeAction| PLUGMGR
+    BIND -->|ExecPlugin, ListPlugins, GetConnectionTree, ExecTreeAction, TestConnection| PLUGMGR
     BIND -->|Window controls| APP
 
     CONN -->|persist metadata + credential_key| SQLITE
@@ -102,7 +102,16 @@ graph LR
    - Plugin returns `{"nodes": [...]}` — hierarchical tree with optional `actions` per node.
    - When user activates a tree-node action, frontend calls `PluginManager.ExecTreeAction(pluginName, connectionParams, actionQuery)` which delegates to `ExecPlugin`.
 
-6. **Connection Deletion**:
+6. **Connection Test** (no persistence):
+   - Frontend calls `PluginManager.TestConnection(pluginName, connectionParams)` from the New Connection form.
+   - PluginManager looks up plugin path from registry.
+   - Spawns subprocess: `plugin test-connection` with **15-second** context timeout.
+   - Sends JSON via stdin: `{"connection": {...}}`.
+   - Plugin attempts `db.Open` + `db.Ping()` (SQL drivers) or equivalent connectivity check and writes `{"ok": true|false, "message": "..."}` to stdout.
+   - PluginManager unmarshals the `TestConnectionResponse`, emits an `app:log` entry, and returns the response to the frontend.
+   - **No connection metadata or credential is persisted.** Plugin process exits after response.
+
+7. **Connection Deletion**:
    - Frontend calls `ConnectionService.DeleteConnection(id)`.
    - ConnectionService looks up `credential_key` from SQLite, then calls `CredManager.Delete(credential_key)`.
    - CredManager removes from keyring (best-effort), sqlite fallback, and in-memory map.
@@ -282,7 +291,7 @@ emit("toggle-logs")
 - **Credential Storage**: `CredManager` uses a 3-tier fallback — OS keyring (`go-keyring`) → persistent sqlite file (`data/credentials.db`) → in-memory map. Only the last tier is ephemeral (cleared on restart).
 - **No Plaintext on Disk**: `data/connections.db` stores only `credential_key` references (TEXT), never plaintext secrets or encrypted blobs.
 - **Plugin Communication**: CLI-based JSON interchange via stdin/stdout using proto-derived types. Plugins are short-lived (30s timeout max).
-- **Plugin Contract**: Four commands — `info` (metadata), `exec` (query execution), `authforms` (auth form definitions), `connection-tree` (hierarchical browse structure).
+- **Plugin Contract**: Five commands — `info` (metadata), `exec` (query execution), `authforms` (auth form definitions), `connection-tree` (hierarchical browse structure), `test-connection` (connectivity probe — returns `{ok, message}`, no side-effects).
 - **Schema Migration**: Automatic migration from old `credential_blob` column to `credential_key` + keyring model on startup.
 - **Concurrent Safety**: CredManager uses `sync.RWMutex` for thread-safe fallback map access.
 - **Event System**: Services emit structured `app:log` events (`LogEntry{Level, Message, Timestamp}`) to the frontend via Wails; registered as typed TypeScript bindings in `main.go`.

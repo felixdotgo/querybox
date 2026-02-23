@@ -139,6 +139,23 @@ export function Shutdown() {
     return $Call.ByID(976093531);
 }
 
+/**
+ * TestConnection invokes the named plugin's `test-connection` command to verify
+ * that the supplied connection parameters are valid. The plugin is expected to
+ * open and ping the underlying data store without persisting anything.
+ * Old plugins that do not implement the command will exit non-zero; in that
+ * case TestConnection returns an error rather than a failed response so the
+ * caller can distinguish "unsupported" from "tested and failed".
+ * @param {string} name
+ * @param {{ [_ in string]?: string }} connection
+ * @returns {$CancellablePromise<plugin$0.TestConnectionResponse | null>}
+ */
+export function TestConnection(name, connection) {
+    return $Call.ByID(2822844201, name, connection).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType10($result);
+    }));
+}
+
 // Private type creation functions
 const $$createType0 = pluginpb$0.PluginV1_ExecResponse.createFrom;
 const $$createType1 = $Create.Nullable($$createType0);
@@ -149,3 +166,5 @@ const $$createType5 = $Create.Nullable($$createType4);
 const $$createType6 = $Create.Map($Create.Any, $$createType5);
 const $$createType7 = $models.PluginInfo.createFrom;
 const $$createType8 = $Create.Array($$createType7);
+const $$createType9 = pluginpb$0.PluginV1_TestConnectionResponse.createFrom;
+const $$createType10 = $Create.Nullable($$createType9);

@@ -1,7 +1,7 @@
 # QueryBox Basic Design
 
 **Version**: 0.0.1 (Draft)
-**Updated**: February 22, 2026
+**Updated**: February 23, 2026
 
 ## 1. Architecture
 
@@ -10,7 +10,7 @@
 - Plugins are on-demand executables discovered under `bin/plugins` that implement database-specific behavior.
 - Frontend initiates operations through Wails service bindings to Core and receives execution results.
 - **ConnectionService** embeds all persistence and credential-delegation logic (no separate `ConnectionManager` struct). Exposes `CreateConnection`, `ListConnections`, `GetConnection`, `GetCredential`, and `DeleteConnection` via Wails bindings.
-- **PluginManager** exposes `ListPlugins`, `Rescan`, `ExecPlugin`, `GetPluginAuthForms`, `GetConnectionTree`, and `ExecTreeAction` via Wails bindings. `pkg/plugin` provides a CLI helper (`ServeCLI`) and the canonical proto is at `contracts/plugin/v1/plugin.proto` (generated package `pluginpb`).
+- **PluginManager** exposes `ListPlugins`, `Rescan`, `ExecPlugin`, `GetPluginAuthForms`, `GetConnectionTree`, `ExecTreeAction`, and `TestConnection` via Wails bindings. `pkg/plugin` provides a CLI helper (`ServeCLI`) and the canonical proto is at `contracts/plugin/v1/plugin.proto` (generated package `pluginpb`).
 - **Event System**: QueryBox follows a **backend-emits / frontend-listens** contract. All domain events are emitted exclusively by Go services; the frontend only subscribes and reacts — it never calls `Events.Emit` for domain topics.
   - `app:log` → structured `LogEntry{Level, Message, Timestamp}` emitted by every service for observability.
   - `connection:created` → emitted by `ConnectionService` after a successful `CreateConnection`; payload is the full `Connection` object.
@@ -24,6 +24,7 @@
 - **Stateless Plugins**: spawned per request, receive connection parameters and query via JSON stdin/stdout, execute queries, and return results as JSON.
 - **On-Demand Execution**: plugins are CLI executables invoked when needed; no long-running processes or gRPC communication.
 - **Connection Tree**: plugins may implement `connection-tree` to expose a hierarchical browse structure (databases → tables → columns). The Core forwards tree-node actions back to the plugin via `ExecTreeAction`.
+- **Test Connection**: plugins implement `test-connection` to verify credentials are valid without persisting any state. The Core invokes this via `PluginManager.TestConnection(name, connection)` and returns an `ok` flag with a human-readable message to the frontend. The result is displayed inline in the New Connection form.
 - **Separation of Knowledge**: Core never implements database protocols; plugins never persist credentials or connection metadata.
 
 ## 2. Connection & Credential Management
@@ -55,6 +56,15 @@
 3. Plugin returns `{"nodes": [...]}` — a hierarchical tree with optional `actions` per node.
 4. Frontend renders the tree; when a node action is selected it calls `PluginManager.ExecTreeAction` which delegates to `ExecPlugin` with the action's query string.
 
+**Connection test:**
+1. User fills in the New Connection form and clicks **Test Connection** (does not save).
+2. Frontend calls `PluginManager.TestConnection(driver, connectionParams)` via Wails bindings.
+3. PluginManager spawns `plugin test-connection` with 15-second timeout, sends `{"connection": {...}}` via stdin.
+4. Plugin attempts to open and ping the data store (e.g. `db.Open` + `db.Ping()` for SQL drivers).
+5. Plugin writes `{"ok": true|false, "message": "..."}` to stdout and exits.
+6. PluginManager returns the `TestConnectionResponse` to the frontend.
+7. Frontend displays an inline ✓/✗ indicator with the plugin's message below the action bar.
+
 ### 2.3 Security Posture
 - **Current Implementation**:
   - Credentials stored in OS keyring via `go-keyring` (preferred).
@@ -75,17 +85,17 @@
 - **Storage**: SQLite via `modernc.org/sqlite` for connection metadata (`data/connections.db`) and credential fallback (`data/credentials.db`).
 - **Credentials**: 3-tier — `go-keyring` (OS keyring) → sqlite file → in-memory map.
 - **Plugins**: Standalone Go executables using CLI JSON interchange (stdin/stdout) with proto-derived types from `rpc/contracts/plugin/v1`.
-- **Reference Plugins**: MySQL (`go-sql-driver/mysql`), PostgreSQL (`github.com/lib/pq`), and SQLite (`modernc.org/sqlite`); MySQL and PostgreSQL support arbitrary connection parameters (tls/settings) with a built-in dialing timeout. All three implement `connection-tree`: MySQL/PostgreSQL return schemas → tables, SQLite returns the flat table list from `sqlite_master`.
+- **Reference Plugins**: MySQL (`go-sql-driver/mysql`), PostgreSQL (`github.com/lib/pq`), and SQLite (`modernc.org/sqlite`); MySQL and PostgreSQL support arbitrary connection parameters (tls/settings) with a built-in dialing timeout. All three implement `connection-tree` (MySQL/PostgreSQL return schemas → tables; SQLite returns the flat table list from `sqlite_master`) and `test-connection` (`db.Open` + `db.Ping()` checks for all three drivers).
 - **Frontend**: Vue 3 + Naive UI components, Tailwind CSS for styling, TypeScript bindings auto-generated from Go services.
 
 ### 3.2 Current Implementation Status
 - ConnectionService with SQLite persistence, credential_key references, and `GetCredential` method.
 - CredManager with 3-tier fallback: OS keyring → sqlite file (`data/credentials.db`) → in-memory map.
-- PluginManager with on-demand discovery, scanning, and CLI-based execution (`ExecPlugin`, `GetConnectionTree`, `ExecTreeAction`).
-- MySQL plugin implementing `info`, `exec`, `authforms`, and `connection-tree` commands (TLS/query-parameter support; built-in connection timeout).
-- PostgreSQL plugin implementing `info`, `exec`, `authforms`, and `connection-tree` commands.
-- SQLite plugin implementing `info`, `exec`, `authforms`, and `connection-tree` commands (file-path based connection via `credential_blob`; tables sourced from `sqlite_master`).
-- Plugin SDK (`pkg/plugin`) with ServeCLI helper, protobuf type aliases, and `FormatSQLValue` utility.
+- PluginManager with on-demand discovery, scanning, and CLI-based execution (`ExecPlugin`, `GetConnectionTree`, `ExecTreeAction`, `TestConnection`).
+- MySQL plugin implementing `info`, `exec`, `authforms`, `connection-tree`, and `test-connection` commands (TLS/query-parameter support; built-in connection timeout).
+- PostgreSQL plugin implementing `info`, `exec`, `authforms`, `connection-tree`, and `test-connection` commands.
+- SQLite plugin implementing `info`, `exec`, `authforms`, `connection-tree`, and `test-connection` commands (file-path based connection; tables sourced from `sqlite_master`).
+- Plugin SDK (`pkg/plugin`) with ServeCLI helper, protobuf type aliases (`TestConnectionRequest`, `TestConnectionResponse`), and `FormatSQLValue` utility.
 - Structured event system: all services emit `app:log` / `LogEntry`; `ConnectionService` emits `connection:created` and `connection:deleted` domain events. Event constants defined in `services/events.go`. Frontend only subscribes — never emits domain events.
 - Frontend Wails bindings for ConnectionService and PluginManager.
 - Automatic migration from old credential_blob schema to credential_key model.

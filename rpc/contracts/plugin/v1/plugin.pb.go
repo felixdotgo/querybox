@@ -1194,11 +1194,112 @@ func (x *PluginV1_ConnectionTreeAction) GetQuery() string {
 	return ""
 }
 
+// TestConnectionRequest carries the same credential map as ExecRequest so
+// plugins can reuse their existing connection-building logic.
+type PluginV1_TestConnectionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Connection    map[string]string      `protobuf:"bytes,1,rep,name=connection,proto3" json:"connection,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PluginV1_TestConnectionRequest) Reset() {
+	*x = PluginV1_TestConnectionRequest{}
+	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PluginV1_TestConnectionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PluginV1_TestConnectionRequest) ProtoMessage() {}
+
+func (x *PluginV1_TestConnectionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PluginV1_TestConnectionRequest.ProtoReflect.Descriptor instead.
+func (*PluginV1_TestConnectionRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_plugin_v1_plugin_proto_rawDescGZIP(), []int{0, 18}
+}
+
+func (x *PluginV1_TestConnectionRequest) GetConnection() map[string]string {
+	if x != nil {
+		return x.Connection
+	}
+	return nil
+}
+
+// TestConnectionResponse indicates whether the connection attempt succeeded.
+// ok=true means the plugin could open and ping the data store.
+// message carries a human-readable success or failure description.
+type PluginV1_TestConnectionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Ok            bool                   `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PluginV1_TestConnectionResponse) Reset() {
+	*x = PluginV1_TestConnectionResponse{}
+	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PluginV1_TestConnectionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PluginV1_TestConnectionResponse) ProtoMessage() {}
+
+func (x *PluginV1_TestConnectionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_plugin_v1_plugin_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PluginV1_TestConnectionResponse.ProtoReflect.Descriptor instead.
+func (*PluginV1_TestConnectionResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_plugin_v1_plugin_proto_rawDescGZIP(), []int{0, 19}
+}
+
+func (x *PluginV1_TestConnectionResponse) GetOk() bool {
+	if x != nil {
+		return x.Ok
+	}
+	return false
+}
+
+func (x *PluginV1_TestConnectionResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 var File_contracts_plugin_v1_plugin_proto protoreflect.FileDescriptor
 
 const file_contracts_plugin_v1_plugin_proto_rawDesc = "" +
 	"\n" +
-	" contracts/plugin/v1/plugin.proto\x12\tplugin.v1\x1a\x1cgoogle/protobuf/struct.proto\"\xf6\x11\n" +
+	" contracts/plugin/v1/plugin.proto\x12\tplugin.v1\x1a\x1cgoogle/protobuf/struct.proto\"\xee\x13\n" +
 	"\bPluginV1\x1a\r\n" +
 	"\vInfoRequest\x1a\x8c\x01\n" +
 	"\fInfoResponse\x12,\n" +
@@ -1284,16 +1385,27 @@ const file_contracts_plugin_v1_plugin_proto_rawDesc = "" +
 	"\x14ConnectionTreeAction\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x14\n" +
-	"\x05query\x18\x03 \x01(\tR\x05query\"\x1f\n" +
+	"\x05query\x18\x03 \x01(\tR\x05query\x1a\xb1\x01\n" +
+	"\x15TestConnectionRequest\x12Y\n" +
+	"\n" +
+	"connection\x18\x01 \x03(\v29.plugin.v1.PluginV1.TestConnectionRequest.ConnectionEntryR\n" +
+	"connection\x1a=\n" +
+	"\x0fConnectionEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1aB\n" +
+	"\x16TestConnectionResponse\x12\x0e\n" +
+	"\x02ok\x18\x01 \x01(\bR\x02ok\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\x1f\n" +
 	"\x04Type\x12\v\n" +
 	"\aUNKNOWN\x10\x00\x12\n" +
 	"\n" +
-	"\x06DRIVER\x10\x012\xe8\x02\n" +
+	"\x06DRIVER\x10\x012\xd1\x03\n" +
 	"\rPluginService\x12I\n" +
 	"\x04Info\x12\x1f.plugin.v1.PluginV1.InfoRequest\x1a .plugin.v1.PluginV1.InfoResponse\x12I\n" +
 	"\x04Exec\x12\x1f.plugin.v1.PluginV1.ExecRequest\x1a .plugin.v1.PluginV1.ExecResponse\x12X\n" +
 	"\tAuthForms\x12$.plugin.v1.PluginV1.AuthFormsRequest\x1a%.plugin.v1.PluginV1.AuthFormsResponse\x12g\n" +
-	"\x0eConnectionTree\x12).plugin.v1.PluginV1.ConnectionTreeRequest\x1a*.plugin.v1.PluginV1.ConnectionTreeResponseB\x14Z\x12plugin/v1;pluginpbb\x06proto3"
+	"\x0eConnectionTree\x12).plugin.v1.PluginV1.ConnectionTreeRequest\x1a*.plugin.v1.PluginV1.ConnectionTreeResponse\x12g\n" +
+	"\x0eTestConnection\x12).plugin.v1.PluginV1.TestConnectionRequest\x1a*.plugin.v1.PluginV1.TestConnectionResponseB\x14Z\x12plugin/v1;pluginpbb\x06proto3"
 
 var (
 	file_contracts_plugin_v1_plugin_proto_rawDescOnce sync.Once
@@ -1308,7 +1420,7 @@ func file_contracts_plugin_v1_plugin_proto_rawDescGZIP() []byte {
 }
 
 var file_contracts_plugin_v1_plugin_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_contracts_plugin_v1_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
+var file_contracts_plugin_v1_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
 var file_contracts_plugin_v1_plugin_proto_goTypes = []any{
 	(PluginV1_Type)(0),                      // 0: plugin.v1.PluginV1.Type
 	(PluginV1_AuthField_FieldType)(0),       // 1: plugin.v1.PluginV1.AuthField.FieldType
@@ -1331,44 +1443,50 @@ var file_contracts_plugin_v1_plugin_proto_goTypes = []any{
 	(*PluginV1_ConnectionTreeResponse)(nil), // 18: plugin.v1.PluginV1.ConnectionTreeResponse
 	(*PluginV1_ConnectionTreeNode)(nil),     // 19: plugin.v1.PluginV1.ConnectionTreeNode
 	(*PluginV1_ConnectionTreeAction)(nil),   // 20: plugin.v1.PluginV1.ConnectionTreeAction
-	nil,                                     // 21: plugin.v1.PluginV1.ExecRequest.ConnectionEntry
-	nil,                                     // 22: plugin.v1.PluginV1.KeyValueResult.DataEntry
-	nil,                                     // 23: plugin.v1.PluginV1.AuthFormsResponse.FormsEntry
-	nil,                                     // 24: plugin.v1.PluginV1.ConnectionTreeRequest.ConnectionEntry
-	(*structpb.Struct)(nil),                 // 25: google.protobuf.Struct
+	(*PluginV1_TestConnectionRequest)(nil),  // 21: plugin.v1.PluginV1.TestConnectionRequest
+	(*PluginV1_TestConnectionResponse)(nil), // 22: plugin.v1.PluginV1.TestConnectionResponse
+	nil,                                     // 23: plugin.v1.PluginV1.ExecRequest.ConnectionEntry
+	nil,                                     // 24: plugin.v1.PluginV1.KeyValueResult.DataEntry
+	nil,                                     // 25: plugin.v1.PluginV1.AuthFormsResponse.FormsEntry
+	nil,                                     // 26: plugin.v1.PluginV1.ConnectionTreeRequest.ConnectionEntry
+	nil,                                     // 27: plugin.v1.PluginV1.TestConnectionRequest.ConnectionEntry
+	(*structpb.Struct)(nil),                 // 28: google.protobuf.Struct
 }
 var file_contracts_plugin_v1_plugin_proto_depIdxs = []int32{
 	0,  // 0: plugin.v1.PluginV1.InfoResponse.type:type_name -> plugin.v1.PluginV1.Type
-	21, // 1: plugin.v1.PluginV1.ExecRequest.connection:type_name -> plugin.v1.PluginV1.ExecRequest.ConnectionEntry
+	23, // 1: plugin.v1.PluginV1.ExecRequest.connection:type_name -> plugin.v1.PluginV1.ExecRequest.ConnectionEntry
 	7,  // 2: plugin.v1.PluginV1.ExecResponse.result:type_name -> plugin.v1.PluginV1.ExecResult
 	9,  // 3: plugin.v1.PluginV1.ExecResult.sql:type_name -> plugin.v1.PluginV1.SqlResult
 	11, // 4: plugin.v1.PluginV1.ExecResult.document:type_name -> plugin.v1.PluginV1.DocumentResult
 	12, // 5: plugin.v1.PluginV1.ExecResult.kv:type_name -> plugin.v1.PluginV1.KeyValueResult
 	8,  // 6: plugin.v1.PluginV1.SqlResult.columns:type_name -> plugin.v1.PluginV1.Column
 	10, // 7: plugin.v1.PluginV1.SqlResult.rows:type_name -> plugin.v1.PluginV1.Row
-	25, // 8: plugin.v1.PluginV1.DocumentResult.documents:type_name -> google.protobuf.Struct
-	22, // 9: plugin.v1.PluginV1.KeyValueResult.data:type_name -> plugin.v1.PluginV1.KeyValueResult.DataEntry
+	28, // 8: plugin.v1.PluginV1.DocumentResult.documents:type_name -> google.protobuf.Struct
+	24, // 9: plugin.v1.PluginV1.KeyValueResult.data:type_name -> plugin.v1.PluginV1.KeyValueResult.DataEntry
 	1,  // 10: plugin.v1.PluginV1.AuthField.type:type_name -> plugin.v1.PluginV1.AuthField.FieldType
 	13, // 11: plugin.v1.PluginV1.AuthForm.fields:type_name -> plugin.v1.PluginV1.AuthField
-	23, // 12: plugin.v1.PluginV1.AuthFormsResponse.forms:type_name -> plugin.v1.PluginV1.AuthFormsResponse.FormsEntry
-	24, // 13: plugin.v1.PluginV1.ConnectionTreeRequest.connection:type_name -> plugin.v1.PluginV1.ConnectionTreeRequest.ConnectionEntry
+	25, // 12: plugin.v1.PluginV1.AuthFormsResponse.forms:type_name -> plugin.v1.PluginV1.AuthFormsResponse.FormsEntry
+	26, // 13: plugin.v1.PluginV1.ConnectionTreeRequest.connection:type_name -> plugin.v1.PluginV1.ConnectionTreeRequest.ConnectionEntry
 	19, // 14: plugin.v1.PluginV1.ConnectionTreeResponse.nodes:type_name -> plugin.v1.PluginV1.ConnectionTreeNode
 	19, // 15: plugin.v1.PluginV1.ConnectionTreeNode.children:type_name -> plugin.v1.PluginV1.ConnectionTreeNode
 	20, // 16: plugin.v1.PluginV1.ConnectionTreeNode.actions:type_name -> plugin.v1.PluginV1.ConnectionTreeAction
-	14, // 17: plugin.v1.PluginV1.AuthFormsResponse.FormsEntry.value:type_name -> plugin.v1.PluginV1.AuthForm
-	3,  // 18: plugin.v1.PluginService.Info:input_type -> plugin.v1.PluginV1.InfoRequest
-	5,  // 19: plugin.v1.PluginService.Exec:input_type -> plugin.v1.PluginV1.ExecRequest
-	15, // 20: plugin.v1.PluginService.AuthForms:input_type -> plugin.v1.PluginV1.AuthFormsRequest
-	17, // 21: plugin.v1.PluginService.ConnectionTree:input_type -> plugin.v1.PluginV1.ConnectionTreeRequest
-	4,  // 22: plugin.v1.PluginService.Info:output_type -> plugin.v1.PluginV1.InfoResponse
-	6,  // 23: plugin.v1.PluginService.Exec:output_type -> plugin.v1.PluginV1.ExecResponse
-	16, // 24: plugin.v1.PluginService.AuthForms:output_type -> plugin.v1.PluginV1.AuthFormsResponse
-	18, // 25: plugin.v1.PluginService.ConnectionTree:output_type -> plugin.v1.PluginV1.ConnectionTreeResponse
-	22, // [22:26] is the sub-list for method output_type
-	18, // [18:22] is the sub-list for method input_type
-	18, // [18:18] is the sub-list for extension type_name
-	18, // [18:18] is the sub-list for extension extendee
-	0,  // [0:18] is the sub-list for field type_name
+	27, // 17: plugin.v1.PluginV1.TestConnectionRequest.connection:type_name -> plugin.v1.PluginV1.TestConnectionRequest.ConnectionEntry
+	14, // 18: plugin.v1.PluginV1.AuthFormsResponse.FormsEntry.value:type_name -> plugin.v1.PluginV1.AuthForm
+	3,  // 19: plugin.v1.PluginService.Info:input_type -> plugin.v1.PluginV1.InfoRequest
+	5,  // 20: plugin.v1.PluginService.Exec:input_type -> plugin.v1.PluginV1.ExecRequest
+	15, // 21: plugin.v1.PluginService.AuthForms:input_type -> plugin.v1.PluginV1.AuthFormsRequest
+	17, // 22: plugin.v1.PluginService.ConnectionTree:input_type -> plugin.v1.PluginV1.ConnectionTreeRequest
+	21, // 23: plugin.v1.PluginService.TestConnection:input_type -> plugin.v1.PluginV1.TestConnectionRequest
+	4,  // 24: plugin.v1.PluginService.Info:output_type -> plugin.v1.PluginV1.InfoResponse
+	6,  // 25: plugin.v1.PluginService.Exec:output_type -> plugin.v1.PluginV1.ExecResponse
+	16, // 26: plugin.v1.PluginService.AuthForms:output_type -> plugin.v1.PluginV1.AuthFormsResponse
+	18, // 27: plugin.v1.PluginService.ConnectionTree:output_type -> plugin.v1.PluginV1.ConnectionTreeResponse
+	22, // 28: plugin.v1.PluginService.TestConnection:output_type -> plugin.v1.PluginV1.TestConnectionResponse
+	24, // [24:29] is the sub-list for method output_type
+	19, // [19:24] is the sub-list for method input_type
+	19, // [19:19] is the sub-list for extension type_name
+	19, // [19:19] is the sub-list for extension extendee
+	0,  // [0:19] is the sub-list for field type_name
 }
 
 func init() { file_contracts_plugin_v1_plugin_proto_init() }
@@ -1387,7 +1505,7 @@ func file_contracts_plugin_v1_plugin_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_contracts_plugin_v1_plugin_proto_rawDesc), len(file_contracts_plugin_v1_plugin_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   23,
+			NumMessages:   26,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

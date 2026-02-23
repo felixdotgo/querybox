@@ -393,6 +393,46 @@ export class PluginV1_ExecResult {
 }
 
 /**
+ * TestConnectionResponse indicates whether the connection attempt succeeded.
+ * ok=true means the plugin could open and ping the data store.
+ * message carries a human-readable success or failure description.
+ */
+export class PluginV1_TestConnectionResponse {
+    /**
+     * Creates a new PluginV1_TestConnectionResponse instance.
+     * @param {Partial<PluginV1_TestConnectionResponse>} [$$source = {}] - The source object to create the PluginV1_TestConnectionResponse.
+     */
+    constructor($$source = {}) {
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {boolean | undefined}
+             */
+            this["ok"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["message"] = undefined;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new PluginV1_TestConnectionResponse instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {PluginV1_TestConnectionResponse}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new PluginV1_TestConnectionResponse(/** @type {Partial<PluginV1_TestConnectionResponse>} */($$parsedSource));
+    }
+}
+
+/**
  * @typedef {any} isPluginV1_ExecResult_Payload
  */
 

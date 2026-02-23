@@ -5,5 +5,6 @@
 export {
     AuthForm,
     ConnectionTreeResponse,
-    ExecResponse
+    ExecResponse,
+    TestConnectionResponse
 } from "./models.js";

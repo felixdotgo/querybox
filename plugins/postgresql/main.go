@@ -268,6 +268,28 @@ ORDER BY table_name`, schemaName)
 	return &plugin.ConnectionTreeResponse{Nodes: nodes}, nil
 }
 
+// TestConnection opens a PostgreSQL connection and pings the server to verify
+// the supplied credentials are valid. Nothing is persisted.
+func (m *postgresqlPlugin) TestConnection(req *plugin.TestConnectionRequest) (*plugin.TestConnectionResponse, error) {
+	dsn, err := buildConnString(req.Connection)
+	if err != nil || dsn == "" {
+		msg := "invalid connection parameters"
+		if err != nil {
+			msg = err.Error()
+		}
+		return &plugin.TestConnectionResponse{Ok: false, Message: msg}, nil
+	}
+	db, err := sql.Open("postgres", dsn)
+	if err != nil {
+		return &plugin.TestConnectionResponse{Ok: false, Message: fmt.Sprintf("open error: %v", err)}, nil
+	}
+	defer db.Close()
+	if err := db.Ping(); err != nil {
+		return &plugin.TestConnectionResponse{Ok: false, Message: fmt.Sprintf("ping error: %v", err)}, nil
+	}
+	return &plugin.TestConnectionResponse{Ok: true, Message: "Connection successful"}, nil
+}
+
 func main() {
 	plugin.ServeCLI(&postgresqlPlugin{})
 }

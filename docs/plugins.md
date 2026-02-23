@@ -14,10 +14,12 @@ Contract (CLI)
 - `plugin info` → plugin prints JSON: `{ name, version, description, type }`.  The `type` field corresponds to the `PluginV1_Type` enum (DRIVER = 1, etc).  Older plugins emitted the numeric value while new ones produce the enum name (e.g. `"DRIVER"`); hosts post‑0.0.1 parse either form transparently.
 - `plugin exec` → plugin reads JSON `{ connection, query }` from stdin and writes JSON `{ result, error }` to stdout.  `connection` may be a simple DSN string or a credential blob JSON; arbitrary extra query parameters (including `tls` settings for SSL) are allowed and appended by the host. `result` is now a structured object containing one of `sql`, `document`, or `kv` payloads; older plugins may still return a raw string which will be wrapped in a `kv` map by the host.
 - `plugin connection-tree` (or simply `plugin tree`) → plugin reads JSON `{ connection }` and returns `{ nodes: [...]}` describing a hierarchical browse structure.  Each node may include an `actions` array describing what the core should do when the user activates that node.
+- `plugin test-connection` → plugin reads JSON `{ connection }` from stdin and writes JSON `{ ok: bool, message: string }` to stdout.  The plugin must attempt to open and verify connectivity (e.g. `db.Open` + `db.Ping()` for SQL drivers) without persisting any state.  Plugins that cannot meaningfully probe connectivity should return `{ ok: true, message: "..." }`.  The host uses a **15-second** timeout for this command.
 
 Contract (proto)
-- `contracts/plugin/v1/plugin.proto` defines `Info`, `Exec`, `AuthForms`, and `ConnectionTree` messages — the canonical proto for plugins (generated Go package: `rpc/contracts/plugin/v1`, `package pluginpb`).
-- `pkg/plugin` provides a small Go shim (`ServeCLI`), type aliases to `pluginpb`, and the `FormatSQLValue(v interface{}) string` utility for safely converting `database/sql` scan values to human-readable strings (handles `[]byte` → UTF-8 string or hex).
+- `contracts/plugin/v1/plugin.proto` defines `Info`, `Exec`, `AuthForms`, `ConnectionTree`, and `TestConnection` messages — the canonical proto for plugins (generated Go package: `rpc/contracts/plugin/v1`, `package pluginpb`).
+- `TestConnectionRequest` carries `map<string, string> connection` (same format as `ExecRequest.connection`).  `TestConnectionResponse` carries `bool ok` and `string message`.
+- `pkg/plugin` provides a small Go shim (`ServeCLI`), type aliases to `pluginpb` (including `TestConnectionRequest` / `TestConnectionResponse`), and the `FormatSQLValue(v interface{}) string` utility for safely converting `database/sql` scan values to human-readable strings (handles `[]byte` → UTF-8 string or hex).
 
 Auth forms
 - Plugins can now expose structured authentication forms via `authforms` (CLI) / `AuthForms` (proto).
@@ -29,9 +31,10 @@ Runtime contract
 
 Host-side
 - `services/pluginmgr` discovers available executables and invokes them on-demand using the CLI contract.
-- `ListPlugins`, `Rescan`, `ExecPlugin`, `GetConnectionTree`, `ExecTreeAction`, and `GetPluginAuthForms` are available from the manager for UI integration.
+- `ListPlugins`, `Rescan`, `ExecPlugin`, `GetConnectionTree`, `ExecTreeAction`, `GetPluginAuthForms`, and `TestConnection` are available from the manager for UI integration.
 - `GetConnectionTree(name, connection)` — spawns `plugin connection-tree`; returns `ConnectionTreeResponse` (list of nodes with optional actions).
-- `ExecTreeAction(name, connection, actionQuery)` — convenience wrapper; delegates to `ExecPlugin` with the action’s query string.
+- `ExecTreeAction(name, connection, actionQuery)` — convenience wrapper; delegates to `ExecPlugin` with the action's query string.
+- `TestConnection(name, connection)` — spawns `plugin test-connection` (15s timeout); returns `*TestConnectionResponse{Ok bool, Message string}`.  Does not persist any state.  Used by the New Connection form's **Test Connection** button.
 
 Notes
 - On-demand model = simpler lifecycle, easier hot-swap, and predictable resource usage.

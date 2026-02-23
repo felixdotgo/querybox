@@ -446,6 +446,77 @@ func (m *Manager) ExecTreeAction(name string, connection map[string]string, acti
 	return m.ExecPlugin(name, connection, actionQuery)
 }
 
+// TestConnection invokes the named plugin's `test-connection` command to verify
+// that the supplied connection parameters are valid. The plugin is expected to
+// open and ping the underlying data store without persisting anything.
+// Old plugins that do not implement the command will exit non-zero; in that
+// case TestConnection returns an error rather than a failed response so the
+// caller can distinguish "unsupported" from "tested and failed".
+func (m *Manager) TestConnection(name string, connection map[string]string) (*plugin.TestConnectionResponse, error) {
+	m.mu.Lock()
+	info, ok := m.plugins[name]
+	m.mu.Unlock()
+	if !ok {
+		return nil, fmt.Errorf("TestConnection: plugin %s not found", name)
+	}
+	full := info.Path
+	if !isExecutable(full) {
+		return nil, fmt.Errorf("TestConnection: plugin %s is not executable", name)
+	}
+	m.emitLog(services.LogLevelInfo, fmt.Sprintf("TestConnection: testing (driver: %s)", name))
+
+	req := plugin.TestConnectionRequest{Connection: connection}
+	b, _ := json.Marshal(&req)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, full, "test-connection")
+	cmd.Env = append(os.Environ(), "QUERYBOX_PLUGIN_NAME="+name)
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, fmt.Errorf("TestConnection: stdin pipe error: %w", err)
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, fmt.Errorf("TestConnection: stdout pipe error: %w", err)
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, fmt.Errorf("TestConnection: stderr pipe error: %w", err)
+	}
+
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("TestConnection: start error: %w", err)
+	}
+
+	_, _ = stdin.Write(b)
+	_ = stdin.Close()
+
+	outB, _ := io.ReadAll(stdout)
+	errB, _ := io.ReadAll(stderr)
+
+	if err := cmd.Wait(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			m.emitLog(services.LogLevelError, fmt.Sprintf("TestConnection: plugin '%s' timed out", name))
+			return nil, fmt.Errorf("TestConnection: plugin timed out")
+		}
+		m.emitLog(services.LogLevelError, fmt.Sprintf("TestConnection: plugin '%s' exited with error: %v", name, err))
+		return nil, fmt.Errorf("TestConnection: plugin exited: %w - stderr: %s", err, string(errB))
+	}
+
+	var resp plugin.TestConnectionResponse
+	if err := json.Unmarshal(outB, &resp); err != nil {
+		return nil, fmt.Errorf("TestConnection: invalid response json: %w", err)
+	}
+
+	if resp.Ok {
+		m.emitLog(services.LogLevelInfo, fmt.Sprintf("TestConnection: (driver: %s) success: %s", name, resp.Message))
+	} else {
+		m.emitLog(services.LogLevelWarn, fmt.Sprintf("TestConnection: (driver: %s) failed: %s", name, resp.Message))
+	}
+	return &resp, nil
+}
+
 // GetPluginAuthForms probes the plugin executable for supported authentication
 // forms by invoking `plugin authforms` and decoding the JSON response. If the
 // plugin doesn't implement the command or returns no forms an empty map is

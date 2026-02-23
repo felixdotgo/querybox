@@ -23,6 +23,7 @@ const (
 	PluginService_Exec_FullMethodName           = "/plugin.v1.PluginService/Exec"
 	PluginService_AuthForms_FullMethodName      = "/plugin.v1.PluginService/AuthForms"
 	PluginService_ConnectionTree_FullMethodName = "/plugin.v1.PluginService/ConnectionTree"
+	PluginService_TestConnection_FullMethodName = "/plugin.v1.PluginService/TestConnection"
 )
 
 // PluginServiceClient is the client API for PluginService service.
@@ -44,6 +45,10 @@ type PluginServiceClient interface {
 	// ConnectionTree returns a driver-defined hierarchy of nodes and actions for
 	// a given connection.  The frontend uses this to render a browsable tree.
 	ConnectionTree(ctx context.Context, in *PluginV1_ConnectionTreeRequest, opts ...grpc.CallOption) (*PluginV1_ConnectionTreeResponse, error)
+	// TestConnection verifies that the provided credentials can reach the data
+	// store. Plugins MUST NOT persist any state; the call is fire-and-forget.
+	// Plugins that cannot meaningfully test connectivity should return ok=true.
+	TestConnection(ctx context.Context, in *PluginV1_TestConnectionRequest, opts ...grpc.CallOption) (*PluginV1_TestConnectionResponse, error)
 }
 
 type pluginServiceClient struct {
@@ -94,6 +99,16 @@ func (c *pluginServiceClient) ConnectionTree(ctx context.Context, in *PluginV1_C
 	return out, nil
 }
 
+func (c *pluginServiceClient) TestConnection(ctx context.Context, in *PluginV1_TestConnectionRequest, opts ...grpc.CallOption) (*PluginV1_TestConnectionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PluginV1_TestConnectionResponse)
+	err := c.cc.Invoke(ctx, PluginService_TestConnection_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // PluginServiceServer is the server API for PluginService service.
 // All implementations must embed UnimplementedPluginServiceServer
 // for forward compatibility.
@@ -113,6 +128,10 @@ type PluginServiceServer interface {
 	// ConnectionTree returns a driver-defined hierarchy of nodes and actions for
 	// a given connection.  The frontend uses this to render a browsable tree.
 	ConnectionTree(context.Context, *PluginV1_ConnectionTreeRequest) (*PluginV1_ConnectionTreeResponse, error)
+	// TestConnection verifies that the provided credentials can reach the data
+	// store. Plugins MUST NOT persist any state; the call is fire-and-forget.
+	// Plugins that cannot meaningfully test connectivity should return ok=true.
+	TestConnection(context.Context, *PluginV1_TestConnectionRequest) (*PluginV1_TestConnectionResponse, error)
 	mustEmbedUnimplementedPluginServiceServer()
 }
 
@@ -134,6 +153,9 @@ func (UnimplementedPluginServiceServer) AuthForms(context.Context, *PluginV1_Aut
 }
 func (UnimplementedPluginServiceServer) ConnectionTree(context.Context, *PluginV1_ConnectionTreeRequest) (*PluginV1_ConnectionTreeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ConnectionTree not implemented")
+}
+func (UnimplementedPluginServiceServer) TestConnection(context.Context, *PluginV1_TestConnectionRequest) (*PluginV1_TestConnectionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method TestConnection not implemented")
 }
 func (UnimplementedPluginServiceServer) mustEmbedUnimplementedPluginServiceServer() {}
 func (UnimplementedPluginServiceServer) testEmbeddedByValue()                       {}
@@ -228,6 +250,24 @@ func _PluginService_ConnectionTree_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _PluginService_TestConnection_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PluginV1_TestConnectionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PluginServiceServer).TestConnection(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PluginService_TestConnection_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PluginServiceServer).TestConnection(ctx, req.(*PluginV1_TestConnectionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // PluginService_ServiceDesc is the grpc.ServiceDesc for PluginService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -250,6 +290,10 @@ var PluginService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ConnectionTree",
 			Handler:    _PluginService_ConnectionTree_Handler,
+		},
+		{
+			MethodName: "TestConnection",
+			Handler:    _PluginService_TestConnection_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

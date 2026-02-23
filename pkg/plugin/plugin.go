@@ -81,6 +81,14 @@ type ConnectionTreeResponse = pluginpb.PluginV1_ConnectionTreeResponse
 type ConnectionTreeNode = pluginpb.PluginV1_ConnectionTreeNode
 type ConnectionTreeAction = pluginpb.PluginV1_ConnectionTreeAction
 
+// TestConnectionRequest / TestConnectionResponse are type aliases for the
+// proto-package types defined in rpc/contracts/plugin/v1.  When protoc
+// regenerates plugin.pb.go these will resolve to the fully-registered proto
+// structs; until then they resolve to the hand-maintained plain structs in
+// plugin_test_connection.go in the same package.
+type TestConnectionRequest = pluginpb.PluginV1_TestConnectionRequest
+type TestConnectionResponse = pluginpb.PluginV1_TestConnectionResponse
+
 const (
 	TypeDriver DriverType = pluginpb.PluginV1_DRIVER
 
@@ -118,7 +126,10 @@ type Plugin interface {
  	// a given connection.  Drivers that do not support browsing can return an
  	// empty Response or an error; the core will treat that as “no tree”.
  	ConnectionTree(*ConnectionTreeRequest) (*ConnectionTreeResponse, error)
-}
+	// TestConnection verifies the provided connection parameters by attempting
+	// to open and ping the underlying data store. It must NOT persist any state.
+	// Plugins that cannot meaningfully test connectivity should return Ok=true.
+	TestConnection(*TestConnectionRequest) (*TestConnectionResponse, error)}
 
 // ServeCLI runs a Plugin implementation as a small CLI shim that supports
 // three commands used by the host: `info`, `exec` and `authforms`.
@@ -179,6 +190,23 @@ func ServeCLI(p Plugin) {
 		res, _ := p.ConnectionTree(&req)
 		b, _ := protojson.Marshal(res)
 		_, _ = os.Stdout.Write(b)
+	case "test-connection":
+		in, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "plugin: failed to read stdin: %v\n", err)
+			os.Exit(1)
+		}
+		var req TestConnectionRequest
+		if err := json.Unmarshal(in, &req); err != nil {
+			fmt.Fprintf(os.Stderr, "plugin: invalid test-connection request json: %v\n", err)
+			os.Exit(1)
+		}
+		res, err := p.TestConnection(&req)
+		if err != nil {
+			res = &TestConnectionResponse{Ok: false, Message: err.Error()}
+		}
+		b, _ := json.Marshal(res)
+		_, _ = os.Stdout.Write(b)
 	default:
 		usage()
 		os.Exit(2)
@@ -186,5 +214,5 @@ func ServeCLI(p Plugin) {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "Usage: <plugin> info | exec | authforms (request on stdin as JSON)")
+	fmt.Fprintln(os.Stderr, "Usage: <plugin> info | exec | authforms | connection-tree | test-connection (request on stdin as JSON)")
 }

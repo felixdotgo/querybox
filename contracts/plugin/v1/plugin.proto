@@ -23,6 +23,11 @@ service PluginService {
   // ConnectionTree returns a driver-defined hierarchy of nodes and actions for
   // a given connection.  The frontend uses this to render a browsable tree.
   rpc ConnectionTree(PluginV1.ConnectionTreeRequest) returns (PluginV1.ConnectionTreeResponse);
+
+  // TestConnection verifies that the provided credentials can reach the data
+  // store. Plugins MUST NOT persist any state; the call is fire-and-forget.
+  // Plugins that cannot meaningfully test connectivity should return ok=true.
+  rpc TestConnection(PluginV1.TestConnectionRequest) returns (PluginV1.TestConnectionResponse);
 }
 
 // PluginV1 defines the data structures for plugin information, execution, and authentication forms.
@@ -167,5 +172,19 @@ message PluginV1 {
     string type  = 1; // machine name (e.g. "select", "describe")
     string title = 2; // displayed in a context menu or double-click
     string query = 3; // plugin-interpreted payload (often SQL)
+  }
+
+  // TestConnectionRequest carries the same credential map as ExecRequest so
+  // plugins can reuse their existing connection-building logic.
+  message TestConnectionRequest {
+    map<string, string> connection = 1;
+  }
+
+  // TestConnectionResponse indicates whether the connection attempt succeeded.
+  // ok=true means the plugin could open and ping the data store.
+  // message carries a human-readable success or failure description.
+  message TestConnectionResponse {
+    bool   ok      = 1;
+    string message = 2;
   }
 }
