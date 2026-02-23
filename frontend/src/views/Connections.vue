@@ -1,7 +1,8 @@
 <template>
-  <div class="container-fluid p-0">
-    <n-layout has-sider>
-      <n-layout-sider>
+  <div class="flex flex-col h-screen">
+    <div class="flex flex-1 min-h-0">
+      <!-- Left: connection type list, fixed, no scroll -->
+      <div class="w-52 shrink-0 border-r border-gray-200 overflow-y-auto">
         <div class="p-4">
           <h3 class="mb-2 font-bold">Connection Type</h3>
           <ul class="list-none p-0 m-0 flex flex-col gap-1.5">
@@ -27,10 +28,11 @@
             </li>
           </ul>
         </div>
-      </n-layout-sider>
+      </div>
 
-      <n-layout-content>
-        <div class="p-4">
+      <!-- Right: connection detail form, scrolls independently -->
+      <div class="flex-1 overflow-y-auto">
+        <div class="p-4 pb-6">
           <div class="max-w-3xl">
             <div class="mb-4">
               <label class="block mb-1.5 text-gray-700 font-bold">Name</label>
@@ -59,12 +61,11 @@
             </div>
           </div>
         </div>
-      </n-layout-content>
-    </n-layout>
+      </div>
+    </div>
 
-    <div
-      class="fixed bottom-0 left-0 right-0 p-4 bg-white shadow-lg"
-    >
+    <!-- Bottom action bar, always visible -->
+    <div class="shrink-0 p-4 bg-white border-t border-gray-200 shadow-sm">
       <n-flex justify="space-between">
         <n-button class="w-32 ml-auto" quaternary @click="CloseConnectionsWindow">
           Cancel
