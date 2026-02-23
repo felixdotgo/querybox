@@ -30,13 +30,13 @@ func (m *postgresqlPlugin) AuthForms(*plugin.AuthFormsRequest) (*plugin.AuthForm
 		Key: "basic",
 		Name: "Basic",
 		Fields: []*plugin.AuthField{
-			{Type: plugin.AuthFieldText, Name: "host", Label: "Host", Required: true, Placeholder: "127.0.0.1"},
-			{Type: plugin.AuthFieldNumber, Name: "port", Label: "Port", Placeholder: "5432"},
-			{Type: plugin.AuthFieldText, Name: "user", Label: "User"},
+			{Type: plugin.AuthFieldText, Name: "host", Label: "Host", Required: true, Placeholder: "127.0.0.1", Value: "localhost"},
+			{Type: plugin.AuthFieldNumber, Name: "port", Label: "Port", Placeholder: "5432", Value: "5432"},
+			{Type: plugin.AuthFieldText, Name: "user", Label: "User", Value: "postgres"},
 			{Type: plugin.AuthFieldPassword, Name: "password", Label: "Password"},
 			{Type: plugin.AuthFieldText, Name: "database", Label: "Database name"},
 			// allow tls and extra params similar to mysql
-			{Type: plugin.AuthFieldText, Name: "tls", Label: "TLS mode (e.g. disable/require)"},
+			{Type: plugin.AuthFieldSelect, Name: "tls", Label: "TLS mode (e.g. disable/require)", Options: []string{"disable", "require", "verify-ca", "verify-full"}, Value: "disable"},
 			{Type: plugin.AuthFieldText, Name: "params", Label: "Extra params", Placeholder: "connect_timeout=5&application_name=myapp"},
 		},
 	}

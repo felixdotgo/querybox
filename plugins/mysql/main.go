@@ -37,7 +37,7 @@ func (m *mysqlPlugin) AuthForms(*plugin.AuthFormsRequest) (*plugin.AuthFormsResp
 			{Type: plugin.AuthFieldPassword, Name: "password", Label: "Password"},
 			{Type: plugin.AuthFieldText, Name: "database", Label: "Database name"},
 			// allow users to specify extra params such as tls=skip-verify
-			{Type: plugin.AuthFieldText, Name: "tls", Label: "TLS mode (e.g. skip-verify)"},
+			{Type: plugin.AuthFieldSelect, Name: "tls", Label: "TLS mode (e.g. skip-verify)", Options: []string{"skip-verify", "true", "false"}, Value: "skip-verify"},
 			{Type: plugin.AuthFieldText, Name: "params", Label: "Extra params", Placeholder: "charset=utf8&parseTime=true"},
 		},
 	}
