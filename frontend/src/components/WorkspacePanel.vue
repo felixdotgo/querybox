@@ -11,7 +11,7 @@
         v-for="tab in tabs"
         :key="tab.key"
         :name="tab.key"
-        :title="tab.title || 'Untitled'"
+        :tab="tab.title || 'Untitled'"
         closable
       >
 

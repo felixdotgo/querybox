@@ -47,7 +47,7 @@
                   v-for="(f, k) in authForms"
                   :key="k"
                   :name="k"
-                  :title="f.name"
+                  :tab="f.name"
                 >
                   <AuthFormRenderer :form="f" v-model="authValues" />
                 </n-tab-pane>
