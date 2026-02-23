@@ -294,6 +294,11 @@ async function runTreeAction(conn, action, node) {
   // request ordering regardless of return speed.
   const invocationVersion = Date.now()
 
+  // Hoist stable identifiers so they are available in the catch block too.
+  const tabKey = conn.id + ":" + (node && node.key ? node.key : action.query || invocationVersion)
+  let title = (node && node.key) || action.title || action.query || "Query"
+  title = title.split(":").pop()
+
   try {
     const cred = await GetCredential(conn.id)
     const params = {}
@@ -335,20 +340,6 @@ async function runTreeAction(conn, action, node) {
     }
     payload = normalizeKeys(payload)
 
-    // compute a stable identifier for this action so repeated clicks
-    // reuse the same tab rather than opening a new one. nodes from the
-    // connection tree include a `key` property (e.g. "dbname.table").
-    // prefix with connection id to avoid collisions across different
-    // servers.
-    // stable identifier used to dedupe tabs across clicks. we keep it
-    // separate from the human-readable title below.
-    const tabKey = conn.id + ":" + (node && node.key ? node.key : action.query || Date.now())
-    // prefer the node key (which for tables is a stable "db.table" string),
-    // fall back to any title provided by the plugin, then the raw query text.
-    let title = (node && node.key) || action.title || action.query || "Query"
-    // strip any accidental connection prefix from the title so users never
-    // see the hashed connection ID.
-    title = title.split(":").pop()
     // use the version we captured at the start; the response time may
     // not reflect request order, so this guarantees the later-initiated
     // query cannot be accidentally overwritten by an earlier one.
@@ -362,6 +353,10 @@ async function runTreeAction(conn, action, node) {
     }
   } catch (err) {
     console.error("ExecTreeAction", conn.id, err)
+    // Surface the error in the workspace tab so it is visible to the user.
+    // The backend already emits an app:log event for these failures;
+    // opening an error tab gives additional in-context feedback.
+    emit("query-result", title, null, err?.message || String(err), tabKey, invocationVersion)
   }
 }
 

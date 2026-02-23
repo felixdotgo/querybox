@@ -264,14 +264,17 @@ func (m *Manager) ExecPlugin(name string, connection map[string]string, query st
 	cmd.Env = append(os.Environ(), "QUERYBOX_PLUGIN_NAME="+name)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
+		m.emitLog("error", fmt.Sprintf("ExecPlugin: stdin pipe error for plugin '%s': %v", name, err))
 		return nil, fmt.Errorf("ExecPlugin: stdin pipe error: %w", err)
 	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
+		m.emitLog("error", fmt.Sprintf("ExecPlugin: stdout pipe error for plugin '%s': %v", name, err))
 		return nil, fmt.Errorf("ExecPlugin: stdout pipe error: %w", err)
 	}
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
+		m.emitLog("error", fmt.Sprintf("ExecPlugin: stderr pipe error for plugin '%s': %v", name, err))
 		return nil, fmt.Errorf("ExecPlugin: stderr pipe error: %w", err)
 	}
 
@@ -390,19 +393,23 @@ func (m *Manager) GetConnectionTree(name string, connection map[string]string) (
 	cmd.Env = append(os.Environ(), "QUERYBOX_PLUGIN_NAME="+name)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		return nil, err
+		m.emitLog("error", fmt.Sprintf("GetConnectionTree: stdin pipe error for plugin '%s': %v", name, err))
+		return nil, fmt.Errorf("GetConnectionTree: stdin pipe error: %w", err)
 	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, err
+		m.emitLog("error", fmt.Sprintf("GetConnectionTree: stdout pipe error for plugin '%s': %v", name, err))
+		return nil, fmt.Errorf("GetConnectionTree: stdout pipe error: %w", err)
 	}
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		return nil, err
+		m.emitLog("error", fmt.Sprintf("GetConnectionTree: stderr pipe error for plugin '%s': %v", name, err))
+		return nil, fmt.Errorf("GetConnectionTree: stderr pipe error: %w", err)
 	}
 
 	if err := cmd.Start(); err != nil {
-		return nil, err
+		m.emitLog("error", fmt.Sprintf("GetConnectionTree: failed to start plugin '%s': %v", name, err))
+		return nil, fmt.Errorf("GetConnectionTree: start error: %w", err)
 	}
 
 	_, _ = stdin.Write(b)
