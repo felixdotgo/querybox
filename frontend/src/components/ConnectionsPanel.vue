@@ -3,7 +3,7 @@
     <!-- small toolbar -->
     <div class="flex items-center justify-between gap-2">
       <div class="flex items-center gap-2">
-        <span class="text-lg font-semibold m-0">Databases</span>
+        <span class="text-lg font-semibold m-0">Connections</span>
       </div>
       <div class="flex items-center gap-2">
         <n-button
@@ -22,7 +22,7 @@
     <n-input
       v-model:value="filter"
       size="small"
-      placeholder="Filter connections"
+      placeholder="Filter"
     />
 
     <div class="flex-1 overflow-auto mt-2 px-1 min-h-0">
@@ -42,7 +42,7 @@
         v-if="connections.length === 0"
         class="py-6 text-center opacity-70"
       >
-        No connections configured
+        No connections yet
       </div>
     </div>
 
@@ -51,9 +51,9 @@
       v-model:show="deleteModal.visible"
       preset="dialog"
       type="error"
-      title="Delete connection"
-      :content="`Delete &quot;${deleteModal.conn?.name}&quot;? This cannot be undone.`"
-      positive-text="Delete"
+      title="Remove connection"
+      :content="`Remove &quot;${deleteModal.conn?.name}&quot;? This cannot be undone.`"
+      positive-text="Remove"
       negative-text="Cancel"
       @positive-click="confirmDelete"
       @negative-click="deleteModal.visible = false"

@@ -3,10 +3,10 @@
     <n-layout has-sider>
       <n-layout-sider>
         <div class="p-4">
-          <h3 class="mb-2 font-bold">Drivers</h3>
+          <h3 class="mb-2 font-bold">Connection Type</h3>
           <ul class="list-none p-0 m-0 flex flex-col gap-1.5">
             <li v-if="drivers.length === 0" class="opacity-70">
-              No driver plugins found
+              No drivers available
             </li>
             <li v-for="p in filteredDrivers" :key="p.name">
               <n-button
@@ -70,14 +70,14 @@
           Cancel
         </n-button>
         <n-flex>
-          <n-button class="w-32 ml-2" quaternary @click="clearForm">Clear</n-button>
+          <n-button class="w-32 ml-2" quaternary @click="clearForm">Reset</n-button>
           <n-button
             class="w-32 ml-2"
             type="primary"
             @click="saveConnection"
             :disabled="!canConnect"
           >
-            OK
+            Save &amp; Connect
           </n-button>
         </n-flex>
       </n-flex>

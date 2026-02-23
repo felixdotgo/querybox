@@ -1,6 +1,5 @@
 <template>
   <div class="flex flex-col h-full">
-    <span class="text-lg font-semibold mb-2">Workspace</span>
     <n-tabs
       type="card"
       v-model:value="activeTabKey"
@@ -21,7 +20,7 @@
 {{ tab.error }}
           </pre>
           <div v-else class="text-gray-500">
-            No data to display
+            No Results
           </div>
         </template>
       </n-tab-pane>

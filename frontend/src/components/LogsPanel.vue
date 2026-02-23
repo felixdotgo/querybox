@@ -47,7 +47,7 @@
       @scroll="onScroll"
     >
       <div v-if="filteredLogs.length === 0" class="flex items-center justify-center py-8">
-        <n-empty description="No log entries" size="small" />
+        <n-empty description="No activity" size="small" />
       </div>
       <table v-else class="w-full border-collapse">
         <tbody>

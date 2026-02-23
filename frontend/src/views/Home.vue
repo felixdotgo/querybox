@@ -62,7 +62,7 @@
           </n-icon>
           Logs
         </button>
-        <span class="text-[10px] text-gray-400">{{ logs.length }} events</span>
+        <span class="text-[10px] text-gray-400">{{ logs.length }} operations</span>
       </div>
 
       <div

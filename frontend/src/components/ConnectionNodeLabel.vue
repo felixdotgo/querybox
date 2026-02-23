@@ -25,7 +25,7 @@
              {{ hasTree ? "Reconnect" : "Connect" }}
           </n-button>
         </template>
-        {{ hasTree ? "Reconnect" : "Connect and load database tree" }}
+        {{ hasTree ? "Reconnect" : "Connect" }}
       </n-tooltip>
       &nbsp;
       <!-- Delete -->
@@ -42,7 +42,7 @@
             </template>
           </n-button>
         </template>
-        Delete connection
+        Remove connection
       </n-tooltip>
     </div>
   </div>

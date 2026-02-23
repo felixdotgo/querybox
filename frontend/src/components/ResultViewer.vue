@@ -28,7 +28,7 @@
       </n-descriptions>
     </template>
     <template v-else>
-      <div class="text-gray-500">No result available</div>
+      <div class="text-gray-500">No Results</div>
     </template>
   </div>
 </template>
