@@ -190,16 +190,14 @@ function handleSelect(keys, options, meta) {
     }
   }
 
-  // previously we executed the first node action on click, which
-  // caused queries to run automatically whenever a user selected a tree
-  // node.  the UI now requires an explicit button press (see renderLabel)
-  // so we no longer trigger the action here.  keeping the stub in case
-  // future behaviour needs to observe the selection, but we do *not*
-  // call runTreeAction.
-  // if (parentConn && node && node.actions && node.actions.length > 0) {
-  //   const act = node.actions[0]
-  //   runTreeAction(parentConn, act, node)
-  // }
+  // execute the first action for leaf nodes (nodes with no children).
+  // non-leaf nodes (databases, schemas, etc.) are only used for navigation
+  // so clicking them should not trigger a query.
+  const isLeaf = !node?.children || node.children.length === 0
+  if (parentConn && node && isLeaf && node.actions && node.actions.length > 0) {
+    const act = node.actions[0]
+    runTreeAction(parentConn, act, node)
+  }
 
 }
 
