@@ -75,7 +75,7 @@ export class Connection {
 }
 
 /**
- * LogEntry is the payload emitted on the "app:log" event to the frontend.
+ * LogEntry is the payload emitted on the EventAppLog event.
  */
 export class LogEntry {
     /**

@@ -20,7 +20,7 @@ graph LR
         KEYRING["OS Keyring<br/>(go-keyring)"]
         CREDDB[(SQLite<br/>data/credentials.db)]
         MEMORY["In-Memory Map<br/>(last-resort fallback)"]
-        EVENTS["app:log events<br/>(LogEntry)"]
+        EVENTS["Event Bus<br/>(app:log, connection:created, connection:deleted)"]
     end
 
     subgraph Frontend ["Frontend (Wails + Vue)"]
@@ -55,8 +55,12 @@ graph LR
     PLUGIN -->|exit after request| EXEC
 
     CONN -->|emitLog| EVENTS
+    CONN -->|emitConnectionCreated| EVENTS
+    CONN -->|emitConnectionDeleted| EVENTS
     PLUGMGR -->|emitLog| EVENTS
     EVENTS -->|app:log event| FE
+    EVENTS -->|connection:created event| FE
+    EVENTS -->|connection:deleted event| FE
 ```
 
 ---
@@ -69,6 +73,7 @@ graph LR
    - Credential JSON is stored via `CredManager.Store(credential_key, credential)`.
    - CredManager tries OS keyring first; falls back to sqlite file (`data/credentials.db`); final fallback is in-memory map.
    - Only connection metadata + `credential_key` reference persisted in `data/connections.db`.
+   - ConnectionService emits `connection:created` with the full `Connection` payload — the frontend updates its list reactively.
 
 2. **Credential Retrieval**:
    - Frontend calls `ConnectionService.GetCredential(id)` to obtain the stored credential for a connection.
@@ -102,6 +107,38 @@ graph LR
    - ConnectionService looks up `credential_key` from SQLite, then calls `CredManager.Delete(credential_key)`.
    - CredManager removes from keyring (best-effort), sqlite fallback, and in-memory map.
    - Connection metadata removed from `data/connections.db`.
+   - ConnectionService emits `connection:deleted` with the removed connection `id` — the frontend removes the entry from state reactively.
+
+---
+
+## Event-Driven Architecture Rules
+
+QueryBox follows a **backend-emits / frontend-listens** event contract.
+
+### Mandatory Rules
+
+1. **Backend is the sole event producer** for all domain events.
+   All events listed under *Event Catalogue* below MUST be emitted exclusively by Go services via `app.Event.Emit`. The frontend MUST NOT call `Events.Emit` for any domain event topic.
+
+2. **Frontend is a pure event consumer.**
+   Frontend components subscribe via `Events.On` and react to incoming data — they never initiate a domain event.
+
+3. **State mutations follow events.**
+   When a backend event carries sufficient payload (e.g. full `Connection` object), the frontend updates local state directly from the event data — no redundant re-fetch RPC call needed.
+
+4. **New mutations require new events.**
+   Every state-modifying backend operation (create, update, delete) that has visible side effects in the UI MUST emit a corresponding domain event upon success. The event is emitted *after* the DB write succeeds, never speculatively.
+
+5. **Event constants are defined in `services/events.go`.**
+   All event name strings are Go `const` values. TypeScript listeners must use the same string literals. Document each event in the *Event Catalogue* below.
+
+### Event Catalogue
+
+| Event name | Emitted by | Payload type | When |
+|---|---|---|---|
+| `app:log` | All services | `LogEntry{Level, Message, Timestamp}` | Every significant service action |
+| `connection:created` | `ConnectionService.CreateConnection` | `ConnectionCreatedEvent{Connection}` | After successful DB insert |
+| `connection:deleted` | `ConnectionService.DeleteConnection` | `ConnectionDeletedEvent{ID}` | After successful DB delete |
 
 ---
 

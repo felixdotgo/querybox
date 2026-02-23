@@ -93,7 +93,6 @@ import {
 } from "@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager"
 import { CloseConnectionsWindow } from "@/bindings/github.com/felixdotgo/querybox/services/app"
 import { CreateConnection } from "@/bindings/github.com/felixdotgo/querybox/services/connectionservice"
-import { Events } from "@wailsio/runtime"
 import AuthFormRenderer from "@/components/AuthFormRenderer.vue"
 
 const plugins = ref([])
@@ -240,8 +239,7 @@ async function saveConnection() {
       form.value.driver.trim(),
       form.value.cred.trim(),
     )
-    // Notify other windows (e.g. Home) that a connection was saved, then close.
-    Events.Emit("connection:saved")
+    // Backend emits connection:created — frontend only closes the window.
     await CloseConnectionsWindow()
   } catch (err) {
     console.error("connect:", err)

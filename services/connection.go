@@ -208,14 +208,16 @@ func (s *ConnectionService) CreateConnection(ctx context.Context, name, driverTy
 		return Connection{}, fmt.Errorf("insert database connection: %w", err)
 	}
 	emitLog(s.app, LogLevelInfo, fmt.Sprintf("CreateConnection: '%s' created successfully (id: %s)", name, id))
-	return Connection{
+	conn := Connection{
 		ID:            id,
 		Name:          name,
 		DriverType:    driverType,
 		CredentialKey: key,
 		CreatedAt:     now,
 		UpdatedAt:     now,
-	}, nil
+	}
+	emitConnectionCreated(s.app, conn)
+	return conn, nil
 }
 
 // GetCredential retrieves the raw credential blob associated with the
@@ -280,5 +282,6 @@ func (s *ConnectionService) DeleteConnection(ctx context.Context, id string) err
 		return fmt.Errorf("database connection not found")
 	}
 	emitLog(s.app, LogLevelInfo, fmt.Sprintf("DeleteConnection: connection %s deleted successfully", id))
+	emitConnectionDeleted(s.app, id)
 	return nil
 }

@@ -297,12 +297,8 @@ async function confirmDelete() {
   const conn = deleteModal.value.conn
   if (!conn) return
   try {
+    // Backend emits connection:deleted on success; the event handler cleans up state.
     await DeleteConnection(conn.id)
-    connections.value = connections.value.filter((c) => c.id !== conn.id)
-    delete connectionTrees.value[conn.id]
-    if (selectedConnection.value?.id === conn.id)
-      selectedConnection.value = null
-    expandedKeys.value = expandedKeys.value.filter((k) => k !== conn.id)
   } catch (err) {
     console.error("DeleteConnection", err)
   } finally {
@@ -427,12 +423,27 @@ watch(connections, () => {
 // initialize
 loadConnections()
 
-// reload on connection saved
-const offConnectionSaved = Events.On("connection:saved", () => {
-  loadConnections()
+// Backend domain events — frontend only listens, never emits these topics.
+
+// connection:created → prepend the new connection (avoids a full re-fetch).
+const offConnectionCreated = Events.On("connection:created", (event) => {
+  const conn = (event?.data ?? event)?.connection
+  if (!conn) return
+  connections.value = [conn, ...connections.value]
+})
+
+// connection:deleted → reactively remove from local state.
+const offConnectionDeleted = Events.On("connection:deleted", (event) => {
+  const id = (event?.data ?? event)?.id
+  if (!id) return
+  connections.value = connections.value.filter((c) => c.id !== id)
+  delete connectionTrees.value[id]
+  if (selectedConnection.value?.id === id) selectedConnection.value = null
+  expandedKeys.value = expandedKeys.value.filter((k) => k !== id)
 })
 
 onUnmounted(() => {
-  if (offConnectionSaved) offConnectionSaved()
+  if (offConnectionCreated) offConnectionCreated()
+  if (offConnectionDeleted) offConnectionDeleted()
 })
 </script>

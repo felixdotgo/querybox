@@ -11,7 +11,11 @@
 - Frontend initiates operations through Wails service bindings to Core and receives execution results.
 - **ConnectionService** embeds all persistence and credential-delegation logic (no separate `ConnectionManager` struct). Exposes `CreateConnection`, `ListConnections`, `GetConnection`, `GetCredential`, and `DeleteConnection` via Wails bindings.
 - **PluginManager** exposes `ListPlugins`, `Rescan`, `ExecPlugin`, `GetPluginAuthForms`, `GetConnectionTree`, and `ExecTreeAction` via Wails bindings. `pkg/plugin` provides a CLI helper (`ServeCLI`) and the canonical proto is at `contracts/plugin/v1/plugin.proto` (generated package `pluginpb`).
-- **Event System**: all services emit structured `app:log` events (`LogEntry{Level, Message, Timestamp}`) that the frontend receives as typed TypeScript bindings registered in `main.go`.
+- **Event System**: QueryBox follows a **backend-emits / frontend-listens** contract. All domain events are emitted exclusively by Go services; the frontend only subscribes and reacts — it never calls `Events.Emit` for domain topics.
+  - `app:log` → structured `LogEntry{Level, Message, Timestamp}` emitted by every service for observability.
+  - `connection:created` → emitted by `ConnectionService` after a successful `CreateConnection`; payload is the full `Connection` object.
+  - `connection:deleted` → emitted by `ConnectionService` after a successful `DeleteConnection`; payload carries the connection `id`.
+  - Event constants are declared in `services/events.go`. See `docs/detailed-design/architecture.md` § *Event-Driven Architecture Rules* for the full contract and event catalogue.
 
 ### 1.2 Core Concepts
 - **Connection Service**: stores connection metadata in SQLite (including a `credential_key` reference), delegates secret storage to CredManager, and exposes `GetCredential` to the frontend for building plugin requests.
@@ -79,7 +83,7 @@
 - PluginManager with on-demand discovery, scanning, and CLI-based execution (`ExecPlugin`, `GetConnectionTree`, `ExecTreeAction`).
 - MySQL plugin implementing `info`, `exec`, `authforms`, and `connection-tree` commands (TLS/query-parameter support; built-in connection timeout).
 - Plugin SDK (`pkg/plugin`) with ServeCLI helper, protobuf type aliases, and `FormatSQLValue` utility.
-- Structured event system: `app:log` / `LogEntry` emitted by all services; typed TypeScript bindings.
+- Structured event system: all services emit `app:log` / `LogEntry`; `ConnectionService` emits `connection:created` and `connection:deleted` domain events. Event constants defined in `services/events.go`. Frontend only subscribes — never emits domain events.
 - Frontend Wails bindings for ConnectionService and PluginManager.
 - Automatic migration from old credential_blob schema to credential_key model.
 
