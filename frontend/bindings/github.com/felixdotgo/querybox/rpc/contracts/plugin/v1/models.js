@@ -244,6 +244,15 @@ export class PluginV1_ConnectionTreeNode {
              */
             this["actions"] = undefined;
         }
+        if (/** @type {any} */(false)) {
+            /**
+             * node_type is an optional hint for the frontend icon renderer.
+             * Recognised values: "database", "table", "column".  Empty means generic.
+             * @member
+             * @type {string | undefined}
+             */
+            this["node_type"] = undefined;
+        }
 
         Object.assign(this, $$source);
     }

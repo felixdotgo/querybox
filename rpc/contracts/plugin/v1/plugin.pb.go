@@ -1057,11 +1057,14 @@ func (x *PluginV1_ConnectionTreeResponse) GetNodes() []*PluginV1_ConnectionTreeN
 }
 
 type PluginV1_ConnectionTreeNode struct {
-	state         protoimpl.MessageState           `protogen:"open.v1"`
-	Key           string                           `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`     // unique within the returned tree
-	Label         string                           `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"` // user-visible text
-	Children      []*PluginV1_ConnectionTreeNode   `protobuf:"bytes,3,rep,name=children,proto3" json:"children,omitempty"`
-	Actions       []*PluginV1_ConnectionTreeAction `protobuf:"bytes,4,rep,name=actions,proto3" json:"actions,omitempty"`
+	state    protoimpl.MessageState           `protogen:"open.v1"`
+	Key      string                           `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`     // unique within the returned tree
+	Label    string                           `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"` // user-visible text
+	Children []*PluginV1_ConnectionTreeNode   `protobuf:"bytes,3,rep,name=children,proto3" json:"children,omitempty"`
+	Actions  []*PluginV1_ConnectionTreeAction `protobuf:"bytes,4,rep,name=actions,proto3" json:"actions,omitempty"`
+	// node_type is an optional hint for the frontend icon renderer.
+	// Recognised values: "database", "table", "column".  Empty means generic.
+	NodeType      string `protobuf:"bytes,5,opt,name=node_type,json=nodeType,proto3" json:"node_type,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1122,6 +1125,13 @@ func (x *PluginV1_ConnectionTreeNode) GetActions() []*PluginV1_ConnectionTreeAct
 		return x.Actions
 	}
 	return nil
+}
+
+func (x *PluginV1_ConnectionTreeNode) GetNodeType() string {
+	if x != nil {
+		return x.NodeType
+	}
+	return ""
 }
 
 type PluginV1_ConnectionTreeAction struct {
@@ -1188,7 +1198,7 @@ var File_contracts_plugin_v1_plugin_proto protoreflect.FileDescriptor
 
 const file_contracts_plugin_v1_plugin_proto_rawDesc = "" +
 	"\n" +
-	" contracts/plugin/v1/plugin.proto\x12\tplugin.v1\x1a\x1cgoogle/protobuf/struct.proto\"\xd9\x11\n" +
+	" contracts/plugin/v1/plugin.proto\x12\tplugin.v1\x1a\x1cgoogle/protobuf/struct.proto\"\xf6\x11\n" +
 	"\bPluginV1\x1a\r\n" +
 	"\vInfoRequest\x1a\x8c\x01\n" +
 	"\fInfoResponse\x12,\n" +
@@ -1264,12 +1274,13 @@ const file_contracts_plugin_v1_plugin_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1aV\n" +
 	"\x16ConnectionTreeResponse\x12<\n" +
-	"\x05nodes\x18\x01 \x03(\v2&.plugin.v1.PluginV1.ConnectionTreeNodeR\x05nodes\x1a\xc4\x01\n" +
+	"\x05nodes\x18\x01 \x03(\v2&.plugin.v1.PluginV1.ConnectionTreeNodeR\x05nodes\x1a\xe1\x01\n" +
 	"\x12ConnectionTreeNode\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12B\n" +
 	"\bchildren\x18\x03 \x03(\v2&.plugin.v1.PluginV1.ConnectionTreeNodeR\bchildren\x12B\n" +
-	"\aactions\x18\x04 \x03(\v2(.plugin.v1.PluginV1.ConnectionTreeActionR\aactions\x1aV\n" +
+	"\aactions\x18\x04 \x03(\v2(.plugin.v1.PluginV1.ConnectionTreeActionR\aactions\x12\x1b\n" +
+	"\tnode_type\x18\x05 \x01(\tR\bnodeType\x1aV\n" +
 	"\x14ConnectionTreeAction\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x14\n" +

@@ -104,4 +104,65 @@
 - Inputs and forms should rely on `input-tw` (light background / dark text) and primary actions may use `btn-tw`.
 - Document any deliberate deviations from the default Tailwind palette in design docs and PR descriptions.
 
+### 3.5 Icon System
+
+**Library**: `@vicons/ionicons5` wrapped in Naive UI's `<n-icon>` component.
+
+**Golden rule**: Never import icon components directly from `@vicons/ionicons5` in Vue SFCs or render
+functions.  Always import from `frontend/src/lib/icons.js`.  Swapping the icon library only requires
+changing that one file.
+
+**Usage in templates:**
+
+```vue
+<script setup>
+import { TrashOutline } from "@/lib/icons"
+</script>
+
+<template>
+  <n-icon :size="16"><TrashOutline /></n-icon>
+</template>
+```
+
+**Usage in render functions** (e.g. `renderPrefix` / `renderLabel` in ConnectionsPanel):
+
+```js
+import { NIcon } from "naive-ui"
+import { LayersOutline } from "@/lib/icons"
+
+function renderPrefix({ option }) {
+  return h(NIcon, { size: 14 }, { default: () => h(LayersOutline) })
+}
+```
+
+**Icon sizes:**
+| Context | Size |
+|---|---|
+| Toolbar / action buttons | 16 |
+| Tree node prefix icons | 14 |
+| Inline / footer chevrons | 12 |
+
+**Icon registry** (`frontend/src/lib/icons.js`):
+
+| Export name | Use case |
+|---|---|
+| `LayersOutline` | Driver group node in connection tree |
+| `ServerOutline` | Connection node in connection tree |
+| `LibraryOutline` | Tree node with `node_type === "database"` |
+| `GridOutline` | Tree node with `node_type === "table"` |
+| `CodeSlashOutline` | Tree node with `node_type === "column"` |
+| `DocumentOutline` | Unknown / generic tree node fallback |
+| `ChevronDownOutline` | Footer collapse toggle (rotated −90° when collapsed) |
+| `ArrowDownOutline` | LogsPanel auto-scroll enable toggle |
+| `AddCircleOutline` | "New connection" toolbar button |
+| `FlashOutline` | "Connect" action on connection row |
+| `RefreshOutline` | "Refresh" action on connection row |
+| `TrashOutline` | "Delete" action (also in LogsPanel clear) |
+
+**Tree node type resolution** — plugin nodes carry an optional `node_type` string field (defined in
+`contracts/plugin/v1/plugin.proto`, field 5 on `ConnectionTreeNode`).  Recognised values and their
+icons are tracked in `nodeTypeIconMap` exported from `icons.js`.  Unknown or empty values fall back
+to `nodeTypeFallbackIcon` (`DocumentOutline`).  Plugins should set `NodeType` on every node they
+return so the frontend can render the correct icon without depth heuristics.
+
 ---

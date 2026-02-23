@@ -131,8 +131,9 @@ func (m *sqlitePlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugi
 			continue
 		}
 		nodes = append(nodes, &plugin.ConnectionTreeNode{
-			Key:   tbl,
-			Label: tbl,
+			Key:      tbl,
+			Label:    tbl,
+			NodeType: "table",
 			Actions: []*plugin.ConnectionTreeAction{
 				{Type: plugin.ConnectionTreeActionSelect, Title: tbl, Query: fmt.Sprintf(`SELECT * FROM "%s" LIMIT 100;`, tbl)},
 			},

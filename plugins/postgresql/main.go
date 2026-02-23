@@ -199,8 +199,9 @@ WHERE schemaname NOT IN ('pg_catalog','information_schema')
 				var tbl string
 				if tblRows.Scan(&tbl) == nil {
 					tables = append(tables, &plugin.ConnectionTreeNode{
-					Key:   dbname + "." + tbl,
-					Label: tbl,
+					Key:      dbname + "." + tbl,
+					Label:    tbl,
+					NodeType: "table",
 					Actions: []*plugin.ConnectionTreeAction{
 						{Type: plugin.ConnectionTreeActionSelect, Title: fmt.Sprintf("%s.%s", dbname, tbl), Query: fmt.Sprintf("SELECT * FROM \"%s\".%s LIMIT 100;", dbname, tbl)},
 					},
@@ -210,8 +211,9 @@ WHERE schemaname NOT IN ('pg_catalog','information_schema')
 			tblRows.Close()
 		}
 		nodes = append(nodes, &plugin.ConnectionTreeNode{
-			Key:   dbname,
-			Label: dbname,
+			Key:      dbname,
+			Label:    dbname,
+			NodeType: "database",
 			Children: tables,
 			Actions: []*plugin.ConnectionTreeAction{
 				{Type: plugin.ConnectionTreeActionSelect, Title: "Query", Query: "SELECT 1"},

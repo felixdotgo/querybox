@@ -18,11 +18,16 @@
             :type="hasTree ? 'default' : 'primary'"
             primary
             @click.stop="emit('connect')"
-          >{{ hasTree ? "Refresh" : "Connect" }}</n-button>
+          >
+            <template #icon>
+              <n-icon><component :is="hasTree ? RefreshOutline : FlashOutline" /></n-icon>
+            </template>
+             {{ hasTree ? "Reconnect" : "Connect" }}
+          </n-button>
         </template>
-        {{ hasTree ? "Reload database tree" : "Connect and load database tree" }}
+        {{ hasTree ? "Reconnect" : "Connect and load database tree" }}
       </n-tooltip>
-
+      &nbsp;
       <!-- Delete -->
       <n-tooltip :delay="600">
         <template #trigger>
@@ -31,7 +36,11 @@
             secondary
             type="error"
             @click.stop="emit('delete')"
-          >×</n-button>
+          >
+            <template #icon>
+              <n-icon><TrashOutline /></n-icon>
+            </template>
+          </n-button>
         </template>
         Delete connection
       </n-tooltip>
@@ -40,6 +49,8 @@
 </template>
 
 <script setup>
+import { FlashOutline, RefreshOutline, TrashOutline } from "@/lib/icons"
+
 defineProps({
   /** Display name of the connection */
   label: {

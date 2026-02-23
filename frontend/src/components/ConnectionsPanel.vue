@@ -11,8 +11,11 @@
           secondary
           title="New connection"
           @click="openConnections"
-          >+</n-button
         >
+          <template #icon>
+            <n-icon><AddCircleOutline /></n-icon>
+          </template>
+        </n-button>
       </div>
     </div>
 
@@ -32,6 +35,7 @@
         :show-selector="false"
         :node-props="getNodeProps"
         :render-label="renderLabel"
+        :render-prefix="renderPrefix"
         @update:selected-keys="handleSelect"
       />
       <div
@@ -59,9 +63,17 @@
 
 <script setup>
 import { ref, computed, h, watch, onUnmounted, defineEmits } from "vue"
+import { NIcon } from "naive-ui"
 import { Events } from "@wailsio/runtime"
 import { useRouter } from "vue-router"
 import ConnectionNodeLabel from "@/components/ConnectionNodeLabel.vue"
+import {
+  LayersOutline,
+  ServerOutline,
+  AddCircleOutline,
+  nodeTypeIconMap,
+  nodeTypeFallbackIcon,
+} from "@/lib/icons"
 import {
   ListConnections,
   GetCredential,
@@ -224,33 +236,6 @@ function getNodeProps(node) {
     }
   }
 
-  // actions on tree nodes are no longer triggered by clicking the node.
-  // the plugin tree may still provide actions metadata for each node but
-  // the user must explicitly invoke them (e.g. via buttons in the UI).  we
-  // therefore drop the old click handlers entirely.
-  // if (node.actions && node.actions.length > 0) {
-  //   const clickHandler = (e) => {
-  //     e.stopPropagation()
-  //     handleSelect([node.key], null, { node })
-  //   }
-  //   props.onClick = clickHandler
-  //   // always attach clickHandler to the dblclick event too. some tree
-  //   // implementations will only send the dblclick and not the intermediate
-  //   // click events, so relying on two browser click events proved
-  //   // unreliable; this ensures double‑clicking the same node always causes
-  //   // a refresh.
-  //   if (props.onDblclick) {
-  //     const originalDbl = props.onDblclick
-  //     props.onDblclick = (e) => {
-  //       originalDbl(e)
-  //       clickHandler(e)
-  //     }
-  //   } else {
-  //     props.onDblclick = clickHandler
-  //   }
-  // }
-
-
   return props
 }
 
@@ -277,6 +262,18 @@ function renderLabel({ option }) {
       handleConnectionDblclick(conn)
     },
   })
+}
+
+function renderPrefix({ option }) {
+  let icon
+  if (String(option.key).startsWith("driver:")) {
+    icon = LayersOutline
+  } else if (connections.value.find((c) => c.id === option.key)) {
+    icon = ServerOutline
+  } else {
+    icon = nodeTypeIconMap[option.node_type] ?? nodeTypeFallbackIcon
+  }
+  return h(NIcon, { size: 14 }, { default: () => h(icon) })
 }
 
 async function confirmDelete() {

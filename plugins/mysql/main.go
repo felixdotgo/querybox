@@ -220,8 +220,9 @@ func (m *mysqlPlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugin
 				var tbl string
 				if tblRows.Scan(&tbl) == nil {
 					tables = append(tables, &plugin.ConnectionTreeNode{
-						Key:   dbname + "." + tbl,
-						Label: tbl,
+						Key:      dbname + "." + tbl,
+						Label:    tbl,
+						NodeType: "table",
 						Actions: []*plugin.ConnectionTreeAction{
 							// use fully qualified name for clarity
 							{Type: plugin.ConnectionTreeActionSelect, Title: fmt.Sprintf("%s.%s", dbname, tbl), Query: fmt.Sprintf("SELECT * FROM `%s`.`%s` LIMIT 100;", dbname, tbl)},
@@ -232,8 +233,9 @@ func (m *mysqlPlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugin
 			tblRows.Close()
 		}
 		nodes = append(nodes, &plugin.ConnectionTreeNode{
-			Key:   dbname,
-			Label: dbname,
+			Key:      dbname,
+			Label:    dbname,
+			NodeType: "database",
 			Children: tables,
 			Actions: []*plugin.ConnectionTreeAction{
 				{Type: plugin.ConnectionTreeActionSelect, Title: "Use", Query: fmt.Sprintf("USE `%s`;", dbname)},

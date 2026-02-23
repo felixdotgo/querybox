@@ -54,12 +54,12 @@
           class="flex items-center gap-1.5 text-[11px] text-gray-500 hover:text-gray-800 transition-colors font-mono"
           @click="toggleFooter"
         >
-          <svg
-            :class="['w-3 h-3 transition-transform', footerCollapsed ? '-rotate-90' : '']"
-            viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          <n-icon
+            :size="12"
+            :class="['transition-transform', footerCollapsed ? '-rotate-90' : '']"
           >
-            <path d="M4 6l4 4 4-4"/>
-          </svg>
+            <ChevronDownOutline />
+          </n-icon>
           Logs
         </button>
         <span class="text-[10px] text-gray-400">{{ logs.length }} events</span>
@@ -83,6 +83,7 @@ import ConnectionsPanel from "@/components/ConnectionsPanel.vue"
 import WorkspacePanel from "@/components/WorkspacePanel.vue"
 import LogsPanel from "@/components/LogsPanel.vue"
 import { Events } from "@wailsio/runtime"
+import { ChevronDownOutline } from "@/lib/icons"
 // components required by footer etc (panels import their own viewers)
 import {
   MinimiseMainWindow,

@@ -158,6 +158,9 @@ message PluginV1 {
     string label     = 2;              // user-visible text
     repeated ConnectionTreeNode children = 3;
     repeated ConnectionTreeAction actions = 4;
+    // node_type is an optional hint for the frontend icon renderer.
+    // Recognised values: "database", "table", "column".  Empty means generic.
+    string node_type = 5;
   }
 
   message ConnectionTreeAction {

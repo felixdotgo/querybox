@@ -90,7 +90,7 @@
 
 <script setup>
 import { ref, computed, watch, nextTick } from "vue"
-import { ArrowDownOutline, TrashOutline } from "@vicons/ionicons5"
+import { ArrowDownOutline, TrashOutline } from "@/lib/icons"
 
 const props = defineProps({
   logs: { type: Array, default: () => [] },
