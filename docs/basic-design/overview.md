@@ -16,6 +16,7 @@
   - `connection:created` → emitted by `ConnectionService` after a successful `CreateConnection`; payload is the full `Connection` object.
   - `connection:deleted` → emitted by `ConnectionService` after a successful `DeleteConnection`; payload carries the connection `id`.
   - Event constants are declared in `services/events.go`. See `docs/detailed-design/architecture.md` § *Event-Driven Architecture Rules* for the full contract and event catalogue.
+  - Log message format, backend event naming, and Vue component emit naming are governed by the **Naming & Messaging Conventions** in `docs/detailed-design/architecture.md`.
 
 ### 1.2 Core Concepts
 - **Connection Service**: stores connection metadata in SQLite (including a `credential_key` reference), delegates secret storage to CredManager, and exposes `GetCredential` to the frontend for building plugin requests.

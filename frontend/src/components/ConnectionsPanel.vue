@@ -93,7 +93,7 @@ import {
 const emit = defineEmits([
   "connection-selected",
   "query-result",
-  "connection-dblclick",
+  "connection-opened",
 ])
 
 const router = useRouter()
@@ -219,7 +219,7 @@ function handleConnectionDblclick(conn) {
   checkConnection(conn)
   // tree load remains tied to the explicit connect button so we don't
   // auto-fetch here
-  emit("connection-dblclick", conn)
+  emit("connection-opened", conn)
 }
 
 function getNodeProps(node) {

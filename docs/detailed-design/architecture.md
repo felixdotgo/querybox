@@ -142,6 +142,141 @@ QueryBox follows a **backend-emits / frontend-listens** event contract.
 
 ---
 
+## Naming & Messaging Conventions
+
+All contributors must follow these conventions for every new log message, backend event, and Vue component emit. Consistency here makes logs grep-able and events self-documenting.
+
+---
+
+### 1. Log Messages (`app:log` payloads)
+
+`LogEntry.Message` strings MUST follow the pattern:
+
+```
+"<MethodName>: <lowercase description>"
+```
+
+**Rules:**
+
+| Rule | Correct | Wrong |
+|------|---------|-------|
+| `<MethodName>` is the exact Go method name (PascalCase) | `"CreateConnection: ..."` | `"create_connection: ..."` |
+| Description always starts lowercase after the colon | `"CreateConnection: creating 'db1'"` | `"CreateConnection: Creating 'db1'"` |
+| No trailing period | `"DeleteConnection: connection deleted"` | `"DeleteConnection: connection deleted."` |
+| Single-quoted identifiers (names, keys) | `"creating 'my-db' (driver: mysql)"` | `"creating my-db (driver: mysql)"` |
+| Key-value context in parentheses | `"(driver: mysql, id: abc123)"` | `"[driver=mysql][id=abc123]"` |
+
+**Lifecycle phrase templates:**
+
+```
+// Operation start (info)
+"<MethodName>: <verb>-ing '<target>' (key: value, ...)"
+
+// Operation success (info)
+"<MethodName>: '<target>' <past-tense> successfully (id: uuid)"
+"<MethodName>: found N item(s)"
+
+// Operation error (error)
+"<MethodName>: failed to <verb> '<target>': <error>"
+"<MethodName>: <noun> not found: <error>"
+```
+
+**Concrete examples:**
+
+```go
+// info — start
+emitLog(app, LogLevelInfo, fmt.Sprintf("CreateConnection: creating '%s' (driver: %s)", name, driver))
+
+// info — success
+emitLog(app, LogLevelInfo, fmt.Sprintf("CreateConnection: '%s' created successfully (id: %s)", name, id))
+emitLog(app, LogLevelInfo, fmt.Sprintf("ListConnections: found %d connection(s)", count))
+
+// error
+emitLog(app, LogLevelError, fmt.Sprintf("CreateConnection: failed to store credential for '%s': %v", name, err))
+emitLog(app, LogLevelError, fmt.Sprintf("GetCredential: connection '%s' not found: %v", id, err))
+```
+
+**Log level semantics:**
+
+| Level | When to use |
+|-------|-------------|
+| `info` | Normal lifecycle events: start of operation, successful completion, counts |
+| `warn` | Recoverable issues: fallback triggered, optional resource missing |
+| `error` | Non-recoverable failures: DB error, credential loss, plugin crash |
+
+---
+
+### 2. Backend Domain Event Names (Wails events)
+
+All domain events are backend-emitted strings that travel over the Wails event bus.
+
+**Format:** `<domain>:<past-tense-verb>`
+
+**Rules:**
+
+| Rule | Correct | Wrong |
+|------|---------|-------|
+| Lowercase only | `"connection:created"` | `"Connection:Created"` |
+| Colon `:` as separator (no dots, slashes, hyphens) | `"plugin:scanned"` | `"plugin.scanned"`, `"plugin-scanned"` |
+| Domain is a **singular noun** (`app`, `connection`, `plugin`, `query`) | `"connection:deleted"` | `"connections:deleted"` |
+| Verb is **past tense** for state-change events | `"connection:created"` | `"connection:create"`, `"connection:creating"` |
+| Declared as a Go `const` in `services/events.go` | ✓ | Inline string literals |
+| Unique across the entire event catalogue | ✓ | — |
+
+**Special case:** `app:log` is a **stream channel**, not a state-change event. It does not follow the past-tense-verb rule and must not be replicated by any domain-specific event.
+
+**Adding a new event — checklist:**
+1. Add a `const EventXxx = "domain:verb"` in `services/events.go` with a doc comment.
+2. Add the payload struct (if new) next to the constant.
+3. Add an `emitXxx` helper following the nil-safe pattern in `services/events.go`.
+4. Call the helper *after* the DB write succeeds — never speculatively.
+5. Update the Event Catalogue table in this doc.
+6. Never emit from the frontend — subscribe only.
+
+**Event Catalogue:**
+
+| Event name | Emitted by | Payload type | When |
+|---|---|---|---|
+| `app:log` | All services | `LogEntry{Level, Message, Timestamp}` | Every significant service action |
+| `connection:created` | `ConnectionService.CreateConnection` | `ConnectionCreatedEvent{Connection}` | After successful DB insert |
+| `connection:deleted` | `ConnectionService.DeleteConnection` | `ConnectionDeletedEvent{ID}` | After successful DB delete |
+
+---
+
+### 3. Vue Component Emit Names
+
+Vue component emits are **frontend-internal** communication between parent and child components. They are completely separate from Wails backend events.
+
+**Format:** `kebab-case`
+
+**Rules:**
+
+| Rule | Correct | Wrong |
+|------|---------|-------|
+| Always kebab-case | `"query-result"` | `"queryResult"`, `"QueryResult"` |
+| **Past tense** for notifications (something already happened) | `"tab-closed"`, `"connection-selected"` | `"close-tab"`, `"select-connection"` |
+| **Noun or noun-phrase** for data-delivery events | `"query-result"` | `"send-query-result"` |
+| **Imperative verb** only for requests to the parent (pure UI) | `"toggle-logs"` | `"logs-toggled"` (if it's a request, not a fact) |
+| DOM re-emit names keep the DOM convention | `"dragstart"`, `"dblclick"` | `"drag-started"` |
+| v-model uses Vue convention, no change | `"update:modelValue"` | — |
+| **Never use backend domain event names** as component emits | ✓ | `emit("connection:created")` |
+
+**Lifecycle guidance:**
+
+```
+// Something happened → past tense
+emit("connection-selected", conn)
+emit("tab-closed", key)
+
+// Delivering data upward → noun phrase
+emit("query-result", title, payload, error)
+
+// Asking parent to act → imperative (use sparingly)
+emit("toggle-logs")
+```
+
+---
+
 ## Notes & Security Callouts
 
 - **Credential Storage**: `CredManager` uses a 3-tier fallback — OS keyring (`go-keyring`) → persistent sqlite file (`data/credentials.db`) → in-memory map. Only the last tier is ephemeral (cleared on restart).

@@ -204,7 +204,7 @@ func (s *ConnectionService) CreateConnection(ctx context.Context, name, driverTy
 		return Connection{}, fmt.Errorf("store credential: %w", err)
 	}
 	if _, err := s.db.ExecContext(ctx, `INSERT INTO connections (id, name, driver_type, credential_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`, id, name, driverType, key, now, now); err != nil {
-		emitLog(s.app, LogLevelError, fmt.Sprintf("CreateConnection: DB insert failed for '%s': %v", name, err))
+		emitLog(s.app, LogLevelError, fmt.Sprintf("CreateConnection: failed to insert connection '%s': %v", name, err))
 		return Connection{}, fmt.Errorf("insert database connection: %w", err)
 	}
 	emitLog(s.app, LogLevelInfo, fmt.Sprintf("CreateConnection: '%s' created successfully (id: %s)", name, id))
@@ -235,10 +235,10 @@ func (s *ConnectionService) GetCredential(ctx context.Context, id string) (strin
 	if !s.closeable() {
 		return "", errors.New("connections database not initialized")
 	}
-	emitLog(s.app, LogLevelInfo, fmt.Sprintf("GetCredential: fetching credential for connection %s", id))
+	emitLog(s.app, LogLevelInfo, fmt.Sprintf("GetCredential: fetching credential for connection '%s'", id))
 	conn, err := s.GetConnection(ctx, id)
 	if err != nil {
-		emitLog(s.app, LogLevelError, fmt.Sprintf("GetCredential: connection %s not found: %v", id, err))
+		emitLog(s.app, LogLevelError, fmt.Sprintf("GetCredential: connection '%s' not found: %v", id, err))
 		return "", err
 	}
 	if conn.CredentialKey == "" {
@@ -246,7 +246,7 @@ func (s *ConnectionService) GetCredential(ctx context.Context, id string) (strin
 	}
 	cred, err := s.cred.Get(conn.CredentialKey)
 	if err != nil {
-		emitLog(s.app, LogLevelError, fmt.Sprintf("GetCredential: keyring lookup failed for %s: %v", id, err))
+		emitLog(s.app, LogLevelError, fmt.Sprintf("GetCredential: keyring lookup failed for '%s': %v", id, err))
 		return "", fmt.Errorf("fetch credential: %w", err)
 	}
 	return cred, nil
@@ -261,7 +261,7 @@ func (s *ConnectionService) DeleteConnection(ctx context.Context, id string) err
 	if !s.closeable() {
 		return errors.New("connections database not initialized")
 	}
-	emitLog(s.app, LogLevelInfo, fmt.Sprintf("DeleteConnection: deleting connection %s", id))
+	emitLog(s.app, LogLevelInfo, fmt.Sprintf("DeleteConnection: deleting connection '%s'", id))
 	// fetch credential_key (if any) so we can delete the secret from the keyring
 	var credKey sql.NullString
 	row := s.db.QueryRowContext(ctx, `SELECT credential_key FROM connections WHERE id = ?`, id)
@@ -273,15 +273,15 @@ func (s *ConnectionService) DeleteConnection(ctx context.Context, id string) err
 	}
 	res, err := s.db.ExecContext(ctx, `DELETE FROM connections WHERE id = ?`, id)
 	if err != nil {
-		emitLog(s.app, LogLevelError, fmt.Sprintf("DeleteConnection: DB delete failed for %s: %v", id, err))
+		emitLog(s.app, LogLevelError, fmt.Sprintf("DeleteConnection: failed to delete connection '%s': %v", id, err))
 		return fmt.Errorf("delete database connection: %w", err)
 	}
 	n, _ := res.RowsAffected()
 	if n == 0 {
-		emitLog(s.app, LogLevelWarn, fmt.Sprintf("DeleteConnection: connection %s not found", id))
+		emitLog(s.app, LogLevelWarn, fmt.Sprintf("DeleteConnection: connection '%s' not found", id))
 		return fmt.Errorf("database connection not found")
 	}
-	emitLog(s.app, LogLevelInfo, fmt.Sprintf("DeleteConnection: connection %s deleted successfully", id))
+	emitLog(s.app, LogLevelInfo, fmt.Sprintf("DeleteConnection: connection '%s' deleted successfully", id))
 	emitConnectionDeleted(s.app, id)
 	return nil
 }
