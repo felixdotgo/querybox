@@ -74,7 +74,7 @@
 - **Storage**: SQLite via `modernc.org/sqlite` for connection metadata (`data/connections.db`) and credential fallback (`data/credentials.db`).
 - **Credentials**: 3-tier — `go-keyring` (OS keyring) → sqlite file → in-memory map.
 - **Plugins**: Standalone Go executables using CLI JSON interchange (stdin/stdout) with proto-derived types from `rpc/contracts/plugin/v1`.
-- **Reference Plugins**: MySQL (`go-sql-driver/mysql`) and PostgreSQL (`github.com/lib/pq`); both drivers support arbitrary connection parameters (tls/settings) with a built-in dialing timeout. MySQL also implements `connection-tree` returning schemas → tables → columns.
+- **Reference Plugins**: MySQL (`go-sql-driver/mysql`), PostgreSQL (`github.com/lib/pq`), and SQLite (`modernc.org/sqlite`); MySQL and PostgreSQL support arbitrary connection parameters (tls/settings) with a built-in dialing timeout. All three implement `connection-tree`: MySQL/PostgreSQL return schemas → tables, SQLite returns the flat table list from `sqlite_master`.
 - **Frontend**: Vue 3 + Naive UI components, Tailwind CSS for styling, TypeScript bindings auto-generated from Go services.
 
 ### 3.2 Current Implementation Status
@@ -82,6 +82,8 @@
 - CredManager with 3-tier fallback: OS keyring → sqlite file (`data/credentials.db`) → in-memory map.
 - PluginManager with on-demand discovery, scanning, and CLI-based execution (`ExecPlugin`, `GetConnectionTree`, `ExecTreeAction`).
 - MySQL plugin implementing `info`, `exec`, `authforms`, and `connection-tree` commands (TLS/query-parameter support; built-in connection timeout).
+- PostgreSQL plugin implementing `info`, `exec`, `authforms`, and `connection-tree` commands.
+- SQLite plugin implementing `info`, `exec`, `authforms`, and `connection-tree` commands (file-path based connection via `credential_blob`; tables sourced from `sqlite_master`).
 - Plugin SDK (`pkg/plugin`) with ServeCLI helper, protobuf type aliases, and `FormatSQLValue` utility.
 - Structured event system: all services emit `app:log` / `LogEntry`; `ConnectionService` emits `connection:created` and `connection:deleted` domain events. Event constants defined in `services/events.go`. Frontend only subscribes — never emits domain events.
 - Frontend Wails bindings for ConnectionService and PluginManager.
