@@ -42,41 +42,26 @@
       </div>
     </div>
 
-    <!-- delete confirmation overlay -->
-    <div
-      v-if="deleteModal.visible"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      @click.self="deleteModal.visible = false"
-    >
-      <div class="bg-white rounded-lg shadow-xl p-6 w-80">
-        <div class="text-base font-semibold mb-2">Delete connection</div>
-        <div class="text-sm text-gray-600 mb-5">
-          Delete <strong>{{ deleteModal.conn?.name }}</strong
-          >? This cannot be undone.
-        </div>
-        <div class="flex justify-end gap-2">
-          <button
-            class="px-4 py-1.5 text-sm rounded border border-gray-300 hover:bg-gray-50"
-            @click="deleteModal.visible = false"
-          >
-            Cancel
-          </button>
-          <button
-            class="px-4 py-1.5 text-sm rounded bg-red-600 text-white hover:bg-red-700"
-            @click="confirmDelete"
-          >
-            Delete
-          </button>
-        </div>
-      </div>
-    </div>
+    <!-- delete confirmation dialog -->
+    <n-modal
+      v-model:show="deleteModal.visible"
+      preset="dialog"
+      type="error"
+      title="Delete connection"
+      :content="`Delete &quot;${deleteModal.conn?.name}&quot;? This cannot be undone.`"
+      positive-text="Delete"
+      negative-text="Cancel"
+      @positive-click="confirmDelete"
+      @negative-click="deleteModal.visible = false"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, h, watch, onMounted, onUnmounted, defineEmits } from "vue"
+import { ref, computed, h, watch, onUnmounted, defineEmits } from "vue"
 import { Events } from "@wailsio/runtime"
 import { useRouter } from "vue-router"
+import ConnectionNodeLabel from "@/components/ConnectionNodeLabel.vue"
 import {
   ListConnections,
   GetCredential,
@@ -173,7 +158,9 @@ function handleSelect(keys, options, meta) {
   const conn = connections.value.find((c) => c.id === key)
   if (conn) {
     selectedConnection.value = conn
-    fetchTreeFor(conn)
+    // do not automatically load the tree; user must hit the 'Connect'
+    // button now. this keeps connection selection lightweight and avoids
+    // surprise network calls on click.
     emit("connection-selected", conn)
     return
   }
@@ -203,10 +190,17 @@ function handleSelect(keys, options, meta) {
     }
   }
 
-  if (parentConn && node && node.actions && node.actions.length > 0) {
-    const act = node.actions[0]
-    runTreeAction(parentConn, act, node)
-  }
+  // previously we executed the first node action on click, which
+  // caused queries to run automatically whenever a user selected a tree
+  // node.  the UI now requires an explicit button press (see renderLabel)
+  // so we no longer trigger the action here.  keeping the stub in case
+  // future behaviour needs to observe the selection, but we do *not*
+  // call runTreeAction.
+  // if (parentConn && node && node.actions && node.actions.length > 0) {
+  //   const act = node.actions[0]
+  //   runTreeAction(parentConn, act, node)
+  // }
+
 }
 
 function handleConnectionDblclick(conn) {
@@ -216,7 +210,8 @@ function handleConnectionDblclick(conn) {
   delete copy[conn.id]
   connectionTrees.value = copy
   checkConnection(conn)
-  fetchTreeFor(conn)
+  // tree load remains tied to the explicit connect button so we don't
+  // auto-fetch here
   emit("connection-dblclick", conn)
 }
 
@@ -231,66 +226,59 @@ function getNodeProps(node) {
     }
   }
 
-  // any node with actions should execute the first action when clicked or
-  // double‑clicked.  n-tree will not fire `update:selected-keys` if the
-  // user selects an already‑selected node, so we attach explicit listeners
-  // so the user can reload the same table by clicking again.
-  if (node.actions && node.actions.length > 0) {
-    const clickHandler = (e) => {
-      e.stopPropagation()
-      handleSelect([node.key], null, { node })
-    }
-    props.onClick = clickHandler
-    // always attach clickHandler to the dblclick event too. some tree
-    // implementations will only send the dblclick and not the intermediate
-    // click events, so relying on two browser click events proved
-    // unreliable; this ensures double‑clicking the same node always causes
-    // a refresh.
-    if (props.onDblclick) {
-      const originalDbl = props.onDblclick
-      props.onDblclick = (e) => {
-        originalDbl(e)
-        clickHandler(e)
-      }
-    } else {
-      props.onDblclick = clickHandler
-    }
-  }
+  // actions on tree nodes are no longer triggered by clicking the node.
+  // the plugin tree may still provide actions metadata for each node but
+  // the user must explicitly invoke them (e.g. via buttons in the UI).  we
+  // therefore drop the old click handlers entirely.
+  // if (node.actions && node.actions.length > 0) {
+  //   const clickHandler = (e) => {
+  //     e.stopPropagation()
+  //     handleSelect([node.key], null, { node })
+  //   }
+  //   props.onClick = clickHandler
+  //   // always attach clickHandler to the dblclick event too. some tree
+  //   // implementations will only send the dblclick and not the intermediate
+  //   // click events, so relying on two browser click events proved
+  //   // unreliable; this ensures double‑clicking the same node always causes
+  //   // a refresh.
+  //   if (props.onDblclick) {
+  //     const originalDbl = props.onDblclick
+  //     props.onDblclick = (e) => {
+  //       originalDbl(e)
+  //       clickHandler(e)
+  //     }
+  //   } else {
+  //     props.onDblclick = clickHandler
+  //   }
+  // }
+
 
   return props
 }
 
 function renderLabel({ option }) {
   const conn = connections.value.find((c) => c.id === option.key)
-  if (!conn) {
-    return option.label
-  }
-  return h(
-    "div",
-    {
-      class: "flex items-center justify-between w-full group/conn pr-1",
-      onDblclick: (e) => {
-        e.stopPropagation()
-        handleConnectionDblclick(conn)
-      },
+  // non-connection nodes (driver group headers, database/table nodes) just show the label
+  if (!conn) return option.label
+
+  return h(ConnectionNodeLabel, {
+    label: option.label,
+    hasTree: !!connectionTrees.value[conn.id],
+    onConnect() {
+      if (connectionTrees.value[conn.id]) {
+        const copy = { ...connectionTrees.value }
+        delete copy[conn.id]
+        connectionTrees.value = copy
+      }
+      fetchTreeFor(conn)
     },
-    [
-      h("span", { class: "truncate" }, option.label),
-      h(
-        "button",
-        {
-          class:
-            "opacity-0 group-hover/conn:opacity-100 ml-2 flex-shrink-0 text-gray-400 hover:text-red-500 transition-opacity leading-none",
-          title: "Delete connection",
-          onClick(e) {
-            e.stopPropagation()
-            deleteModal.value = { visible: true, conn }
-          },
-        },
-        "×",
-      ),
-    ],
-  )
+    onDelete() {
+      deleteModal.value = { visible: true, conn }
+    },
+    onDblclick() {
+      handleConnectionDblclick(conn)
+    },
+  })
 }
 
 async function confirmDelete() {
