@@ -57,7 +57,7 @@ Credentials are NOT stored in the connections SQLite. Instead, CredManager handl
 
 ### From credential_blob to credential_key + Keyring
 
-On startup, ConnectionManager automatically migrates old schemas:
+On startup, `ConnectionService` automatically migrates old schemas:
 
 1. Check if `credential_blob` column exists
 2. If yes, add `credential_key` column (if not present)
