@@ -177,29 +177,33 @@ function handleSelect(keys, options, meta) {
     return
   }
 
-  // determine which connection the clicked tree node belongs to.  normally
-  // `selectedConnection` will already be set (user clicked the connection
-  // parent first), but if not we attempt to infer it by walking the cached
-  // tree data. this makes the behaviour a little more forgiving.
-  let parentConn = selectedConnection.value
+  // determine which connection the clicked tree node belongs to by walking
+  // the cached tree data first.  relying solely on selectedConnection can
+  // cause the wrong plugin to be invoked when the user switches between
+  // connections without clicking the parent connection node first (e.g.
+  // connect postgres → connect mysql → click mysql table without re-selecting
+  // the mysql connection header, which would leave selectedConnection pointing
+  // at the postgres entry and trigger pq errors from the mysql plugin).
   const node = meta?.node
-  if (!parentConn) {
-    for (const c of connections.value) {
-      const nodes = connectionTrees.value[c.id] || []
-      const finder = (list) => {
-        for (const n of list) {
-          if (n.key === key) return true
-          if (n.children && finder(n.children)) return true
-        }
-        return false
+  let parentConn = null
+  for (const c of connections.value) {
+    const nodes = connectionTrees.value[c.id] || []
+    const finder = (list) => {
+      for (const n of list) {
+        if (n.key === key) return true
+        if (n.children && finder(n.children)) return true
       }
-      if (finder(nodes)) {
-        parentConn = c
-        // ensure we have a tree available so runTreeAction has metadata
-        fetchTreeFor(c)
-        break
-      }
+      return false
     }
+    if (finder(nodes)) {
+      parentConn = c
+      break
+    }
+  }
+  // fall back to selectedConnection when the node is not found in any cached
+  // tree (e.g. tree not yet loaded, or key belongs to the connection itself).
+  if (!parentConn) {
+    parentConn = selectedConnection.value
   }
 
   // execute the first action for leaf nodes (nodes with no children).

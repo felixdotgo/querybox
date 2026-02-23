@@ -4,7 +4,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"net/url"
+	"os"
+	"strings"
 
 	"github.com/felixdotgo/querybox/pkg/plugin"
 	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
@@ -44,9 +45,10 @@ func (m *postgresqlPlugin) AuthForms(*plugin.AuthFormsRequest) (*plugin.AuthForm
 	return &plugin.AuthFormsResponse{Forms: map[string]*plugin.AuthForm{"basic": &basic}}, nil
 }
 
-// buildConnString constructs a postgres connection string from the provided
-// connection map.  Reuses the same rules used by Exec and the connection tree
-// logic.
+// buildConnString constructs a postgres keyword=value connection string from
+// the provided connection map.  Extra DSN parameters are appended as
+// space-separated key=value pairs as required by lib/pq; URL-encoded (&)
+// format is NOT used because it is invalid for the postgres DSN format.
 func buildConnString(connection map[string]string) (string, error) {
 	dsn, ok := connection["dsn"]
 	if !ok || dsn == "" {
@@ -64,30 +66,60 @@ func buildConnString(connection map[string]string) (string, error) {
 					pass := payload.Values["password"]
 					port := payload.Values["port"]
 					dbname := payload.Values["database"]
+					// The "tls" form field carries a postgres sslmode value
+					// (disable / require / verify-ca / verify-full).
+					sslmode := payload.Values["tls"]
 					if port == "" {
 						port = "5432"
 					}
+					if sslmode == "" {
+						sslmode = "disable"
+					}
 					if host != "" {
-						dsn = fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", host, port, user, pass, dbname)
+						dsn = fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+							host, port, user, pass, dbname, sslmode)
 					}
 				}
-				// append extra params analogous to mysql buildDSN
+				// Append extra postgres DSN params as space-separated key=value
+				// pairs.  The "tls", "params", and core credential fields are
+				// excluded here because they are handled above or parsed below.
 				if dsn != "" {
-					params := url.Values{}
+					skip := map[string]bool{
+						"host": true, "user": true, "password": true,
+						"port": true, "database": true, "dsn": true,
+						"tls": true, "params": true,
+					}
+					var extra []string
 					for k, v := range payload.Values {
-						switch k {
-						case "host", "user", "password", "port", "database", "dsn":
+						if skip[k] || v == "" {
 							continue
 						}
-						if v != "" {
-							params.Add(k, v)
+						extra = append(extra, fmt.Sprintf("%s=%s", k, v))
+					}
+					// The "params" field lets users supply additional DSN
+					// key=value pairs separated by spaces or "&".
+					if raw := payload.Values["params"]; raw != "" {
+						for _, part := range strings.FieldsFunc(raw, func(r rune) bool {
+							return r == '&' || r == ' '
+						}) {
+							if kv := strings.SplitN(part, "=", 2); len(kv) == 2 && kv[1] != "" {
+								extra = append(extra, fmt.Sprintf("%s=%s", kv[0], kv[1]))
+							}
 						}
 					}
-					if params.Get("connect_timeout") == "" {
-						params.Set("connect_timeout", "5")
+					// Ensure a sensible default connect timeout when the caller
+					// has not specified one explicitly.
+					hasTimeout := strings.Contains(dsn, "connect_timeout")
+					for _, e := range extra {
+						if strings.HasPrefix(e, "connect_timeout=") {
+							hasTimeout = true
+						}
 					}
-					if len(params) > 0 {
-						dsn = dsn + " " + params.Encode()
+					if !hasTimeout {
+						extra = append(extra, "connect_timeout=5")
+					}
+					if len(extra) > 0 {
+						dsn = dsn + " " + strings.Join(extra, " ")
 					}
 				}
 			}
@@ -157,67 +189,79 @@ func (m *postgresqlPlugin) Exec(req *plugin.ExecRequest) (*plugin.ExecResponse, 
 	}, nil
 }
 
-// ConnectionTree returns a simple list of non-template databases.  The host
-// can display the names and optionally invoke the provided action if the
-// user requests it.  Errors or missing connection details result in an empty
-// response so the core treats the plugin as having no tree support.
+// ConnectionTree returns a schema → table hierarchy for the connected database.
+// A PostgreSQL connection is scoped to a single database, so we list schemas
+// (excluding system schemas) and their tables instead of trying to enumerate
+// all server databases.  Errors or missing connection details result in an
+// empty response so the core treats the plugin as having no tree support.
 func (m *postgresqlPlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugin.ConnectionTreeResponse, error) {
 	dsn, err := buildConnString(req.Connection)
 	if err != nil || dsn == "" {
+		fmt.Fprintf(os.Stderr, "postgresql: ConnectionTree: DSN error: %v dsn=%q\n", err, dsn)
 		return &plugin.ConnectionTreeResponse{}, nil
 	}
 
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "postgresql: ConnectionTree: open error: %v\n", err)
 		return &plugin.ConnectionTreeResponse{}, nil
 	}
 	defer db.Close()
 
-	rows, err := db.Query("SELECT datname FROM pg_database WHERE datistemplate = false")
+	// List all non-system schemas in the connected database.
+	schemaRows, err := db.Query(`
+SELECT schema_name
+FROM information_schema.schemata
+WHERE schema_name NOT IN ('pg_catalog','information_schema','pg_toast')
+  AND schema_name NOT LIKE 'pg_%'
+ORDER BY schema_name`)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "postgresql: ConnectionTree: query schemas error: %v\n", err)
 		return &plugin.ConnectionTreeResponse{}, nil
 	}
-	defer rows.Close()
+	defer schemaRows.Close()
 
 	var nodes []*plugin.ConnectionTreeNode
-	for rows.Next() {
-		var dbname string
-		if err := rows.Scan(&dbname); err != nil {
+	for schemaRows.Next() {
+		var schemaName string
+		if err := schemaRows.Scan(&schemaName); err != nil {
 			continue
 		}
-		// fetch tables for this db; note the DSN may already target a specific
-		// database so querying across databases may not work, but this is
-		// illustrative.
+
+		// List base tables within this schema.
 		tables := []*plugin.ConnectionTreeNode{}
 		tblRows, err := db.Query(`
-SELECT tablename
-FROM pg_catalog.pg_tables
-WHERE schemaname NOT IN ('pg_catalog','information_schema')
-`)
+SELECT table_name
+FROM information_schema.tables
+WHERE table_schema = $1
+  AND table_type = 'BASE TABLE'
+ORDER BY table_name`, schemaName)
 		if err == nil {
 			for tblRows.Next() {
 				var tbl string
 				if tblRows.Scan(&tbl) == nil {
 					tables = append(tables, &plugin.ConnectionTreeNode{
-					Key:      dbname + "." + tbl,
-					Label:    tbl,
-					NodeType: "table",
-					Actions: []*plugin.ConnectionTreeAction{
-						{Type: plugin.ConnectionTreeActionSelect, Title: fmt.Sprintf("%s.%s", dbname, tbl), Query: fmt.Sprintf("SELECT * FROM \"%s\".%s LIMIT 100;", dbname, tbl)},
-					},
-				})
+						Key:      schemaName + "." + tbl,
+						Label:    tbl,
+						NodeType: "table",
+						Actions: []*plugin.ConnectionTreeAction{
+							{
+								Type:  plugin.ConnectionTreeActionSelect,
+								Title: fmt.Sprintf("%s.%s", schemaName, tbl),
+								Query: fmt.Sprintf(`SELECT * FROM "%s"."%s" LIMIT 100;`, schemaName, tbl),
+							},
+						},
+					})
 				}
 			}
 			tblRows.Close()
 		}
+
 		nodes = append(nodes, &plugin.ConnectionTreeNode{
-			Key:      dbname,
-			Label:    dbname,
-			NodeType: "database",
+			Key:      schemaName,
+			Label:    schemaName,
+			NodeType: "schema",
 			Children: tables,
-			Actions: []*plugin.ConnectionTreeAction{
-				{Type: plugin.ConnectionTreeActionSelect, Title: "Query", Query: "SELECT 1"},
-			},
 		})
 	}
 
