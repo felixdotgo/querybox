@@ -1,115 +1,98 @@
 # QueryBox (Current under development - Not released)
 
-**QueryBox** is a lightweight database management tool for executing and managing queries across multiple database systems through a plugin-based architecture.
+**QueryBox** is a database management tool for executing and managing queries across multiple database systems through a plugin-based architecture.
 
-## Features
+## Prerequisites
 
-- **Multi-database support** via plugin system (MySQL, PostgreSQL)
-- **Secure credential storage** using system keychain
-- **Connection management** with SQLite-backed persistence
-- **Cross-platform** support (Windows, macOS, Linux)
-- **Plugin-based architecture** for extensibility
+| Tool | Version | Purpose |
+|------|---------|---------|
+| [Go](https://go.dev/dl/) | 1.24+ | Backend |
+| [Wails v3](https://v3alpha.wails.io/getting-started/installation/) | v3 alpha | Desktop framework |
+| [Task](https://taskfile.dev/installation/) | latest | Build automation |
+| [Node.js](https://nodejs.org/) | 18+ | Frontend tooling |
+| [protoc](https://grpc.io/docs/protoc-installation/) + [protoc-gen-go](https://pkg.go.dev/google.golang.org/protobuf/cmd/protoc-gen-go) | libprotoc 29.6 / protoc-gen-go v1.36.10 | gRPC code generation (only if modifying `.proto` files) |
 
 ## Getting Started
 
-### Prerequisites
-
-- Go 1.26 or higher
-- [Wails v3](https://v3alpha.wails.io/) framework
-- [Taskfile](https://taskfile.dev/) for build automation
-- protoc and protoc-gen-go for gRPC code generation
-
-### Development
-
-Navigate to the project directory and run:
+### Clone the repository
 
 ```bash
+git clone https://github.com/your-username/querybox.git
+cd querybox
+```
+
+### Run in Development Mode
+
+```bash
+# Start the app with hot-reload
 wails3 dev
 ```
 
-This starts the application in development mode with hot-reloading for both frontend and backend changes.
+Both frontend and backend changes are hot-reloaded automatically.
 
-### Building
-
-Build the application for production:
+### Build the Application
 
 ```bash
 wails3 build
 ```
 
-This creates a production-ready executable.
+The production executable is placed in `bin/`.
 
-Build plugins separately:
+### Build Plugins
+
+Plugins are standalone executables that live in `bin/plugins/`. The app discovers them automatically at runtime.
 
 ```bash
+# Build all plugins at once
 task build:plugins
-# or directly:
-bash scripts/build-plugins.sh
 ```
 
-Plugin executables are placed in `bin/plugins/` and automatically discovered at runtime on a 2-second scan interval.
+Binaries are placed in `bin/plugins/` and picked up by the app within 2 seconds.
+
+### Create a New Plugin
+
+1. Copy the template:
+   ```bash
+   cp -r plugins/template plugins/<your-plugin-name>
+   ```
+
+2. Edit `plugins/<your-plugin-name>/main.go` — implement the four commands:
+   - `info` — return plugin metadata (name, version, type)
+   - `authforms` — return auth form definitions for the UI
+   - `exec` — execute a query and return results
+   - `connection-tree` — return a browsable object hierarchy
+
+3. Build and drop the binary:
+   ```bash
+   task build:plugins
+   ```
+
+4. The running app will discover the new plugin automatically (no restart needed).
+
+See [docs/plugins.md](docs/plugins.md) for the full plugin contract and examples.
 
 ## Project Structure
 
 ```
 ├── main.go                     # Application entry point
-├── services/                   # Core services
-│   ├── app.go                  # Window management (App service)
-│   ├── connection.go           # ConnectionService (CRUD + SQLite + keyring)
-│   ├── events.go               # LogEntry / emitLog shared helpers
-│   ├── credmanager/            # CredManager (OS keyring + sqlite + in-memory)
-│   └── pluginmgr/              # PluginManager (discovery + execution)
-├── pkg/plugin/                 # Plugin SDK — type aliases, ServeCLI helper
-├── plugins/                    # Database driver plugins
-│   ├── mysql/                  # MySQL driver plugin
-│   ├── postgresql/             # PostgreSQL driver plugin
-│   └── template/               # Plugin template / starter
-├── contracts/plugin/v1/        # Protobuf source definitions
-├── rpc/contracts/plugin/v1/    # Generated Go (pluginpb) code
-├── frontend/                   # Vue.js frontend (Wails)
-│   ├── src/
-│   │   ├── views/              # UI views (Home, Connections)
-│   │   └── components/         # Reusable components
-│   └── bindings/               # Auto-generated TypeScript bindings
-├── docs/                       # Architecture and design docs
+├── services/                   # Core services (connection, credential, plugin manager)
+├── pkg/plugin/                 # Plugin SDK — ServeCLI helper and type aliases
+├── plugins/                    # Plugin source code
+│   ├── mysql/
+│   ├── postgresql/
+│   ├── sqlite/
+│   └── template/               # Starting point for new plugins
+├── contracts/plugin/v1/        # Protobuf definitions
+├── rpc/contracts/plugin/v1/    # Generated Go code (pluginpb)
+├── frontend/                   # Vue 3 frontend
+├── docs/                       # Design and architecture documentation
 ├── scripts/                    # Build helper scripts
-└── build/                      # Build configuration and platform assets
+└── build/                      # Platform-specific build configuration
 ```
 
-## Architecture
+## Documentation
 
-### Services
-
-QueryBox follows a service-oriented architecture:
-
-- **App Service**: Window lifecycle management (maximize, minimize, fullscreen, connections window)
-- **ConnectionService**: CRUD operations for database connections, plus SQLite persistence and credential retrieval. Exposes `CreateConnection`, `ListConnections`, `GetConnection`, `GetCredential`, `DeleteConnection`.
-- **PluginManager**: On-demand plugin discovery and execution. Exposes `ListPlugins`, `Rescan`, `ExecPlugin`, `GetPluginAuthForms`, `GetConnectionTree`, `ExecTreeAction`.
-- **CredentialManager**: Secure credential storage with 3-tier fallback — OS keyring (`go-keyring`) → persistent sqlite file (`data/credentials.db`) → in-memory map.
-- **Event System**: `app:log` Wails event carries `LogEntry{Level, Message, Timestamp}` from all services to the frontend.  Registered in `main.go` for typed TypeScript bindings.
-
-### Plugin System
-
-Plugins are standalone executables implementing a simple CLI interface:
-
-- `plugin info` — Returns metadata (name, version, description, type)
-- `plugin exec` — Reads `{connection, query}` JSON from stdin; writes a typed `ExecResponse` (sql / document / kv payload) to stdout
-- `plugin authforms` — Returns structured authentication form definitions
-- `plugin connection-tree` — Reads `{connection}` JSON from stdin; returns `{nodes:[…]}` describing a hierarchical tree of database objects with optional `actions` arrays
-
-Plugins communicate via JSON stdin/stdout using proto-derived types from `rpc/contracts/plugin/v1`. See [pkg/plugin/plugin.go](pkg/plugin/plugin.go) for the full contract and type aliases.
-
-## Development Workflow
-
-1. **Modify frontend**: Edit files in [frontend/src/](frontend/src/)
-2. **Add backend logic**: Update services in [services/](services/)
-3. **Create plugins**: Use [plugins/template/](plugins/template/) as a starting point
-4. **See changes**: `wails3 dev` for hot-reload
-5. **Build**: `wails3 build` for production executable
-
-## References
-
-- [Wails v3 Documentation](https://v3alpha.wails.io/)
 - [Plugin Development Guide](docs/plugins.md)
-- [Architecture Overview](docs/detailed-design/architecture.md)
-- [go-keyring](https://github.com/zalando/go-keyring) for credential management
+- [Basic Design Overview](docs/basic-design/overview.md)
+- [Architecture](docs/detailed-design/architecture.md)
+- [Data Model](docs/detailed-design/data-model.md)
