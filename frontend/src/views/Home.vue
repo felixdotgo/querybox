@@ -40,67 +40,48 @@
 
     <!-- Footer resizer -->
     <div
-      class="relative z-10 h-1 cursor-row-resize bg-gray-200 hover:bg-sky-500"
+      class="relative z-10 h-1 cursor-row-resize bg-gray-200 hover:bg-blue-400 transition-colors"
       @pointerdown="startFooterDrag"
     >
       <div class="w-10 h-0.5 bg-transparent mx-auto"></div>
     </div>
 
     <!-- Footer: collapsible log / debug area -->
-    <footer class="w-full bg-white">
-      <div class="flex items-center justify-between px-4 py-2">
-        <div class="flex items-center gap-3">
-          <button class="text-sm text-gray-600" @click="toggleFooter">
-            <span v-if="footerCollapsed">Show logs</span>
-            <span v-else>Hide logs</span>
-          </button>
-          <div class="text-xs opacity-60">Console / logs</div>
-        </div>
-        <div class="text-xs opacity-60">Status: ready</div>
+    <footer class="w-full border-t border-gray-200">
+      <!-- Collapse toggle bar -->
+      <div class="flex items-center justify-between px-3 py-1 border-b border-gray-200 bg-gray-50">
+        <button
+          class="flex items-center gap-1.5 text-[11px] text-gray-500 hover:text-gray-800 transition-colors font-mono"
+          @click="toggleFooter"
+        >
+          <svg
+            :class="['w-3 h-3 transition-transform', footerCollapsed ? '-rotate-90' : '']"
+            viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          >
+            <path d="M4 6l4 4 4-4"/>
+          </svg>
+          Logs
+        </button>
+        <span class="text-[10px] text-gray-400">{{ logs.length }} events</span>
       </div>
 
       <div
         v-show="!footerCollapsed"
-        class="bg-gray-50 overflow-auto font-mono text-xs"
         :style="{ height: footerHeight + 'px' }"
+        class="overflow-hidden"
       >
-        <div v-if="logs.length === 0" class="p-3 text-gray-400 italic">
-          Waiting for log output…
-        </div>
-        <div v-else class="p-2 space-y-0.5">
-          <div
-            v-for="(entry, i) in logs"
-            :key="i"
-            class="flex items-start gap-2 leading-5"
-          >
-            <span class="flex-shrink-0 text-gray-400">{{
-              formatTime(entry.timestamp)
-            }}</span>
-            <span
-              :class="[
-                'flex-shrink-0 uppercase font-semibold w-10 text-center rounded px-1',
-                entry.level === 'error'
-                  ? 'bg-red-100 text-red-700'
-                  : entry.level === 'warn'
-                    ? 'bg-yellow-100 text-yellow-700'
-                    : 'bg-green-100 text-green-700',
-              ]"
-              >{{ entry.level }}</span
-            >
-            <span class="text-gray-700 break-all">{{ entry.message }}</span>
-          </div>
-        </div>
-        <div ref="logsEndRef" />
+        <LogsPanel :logs="logs" @clear="clearLogs" />
       </div>
     </footer>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick } from "vue"
+import { ref, computed, onMounted, onUnmounted } from "vue"
 import TwoColumnLayout from "@/components/TwoColumnLayout.vue"
 import ConnectionsPanel from "@/components/ConnectionsPanel.vue"
 import WorkspacePanel from "@/components/WorkspacePanel.vue"
+import LogsPanel from "@/components/LogsPanel.vue"
 import { Events } from "@wailsio/runtime"
 // components required by footer etc (panels import their own viewers)
 import {
@@ -130,8 +111,11 @@ const footerHeight = ref(176)
 
 // log entries streamed from the Go backend via the app:log event
 const logs = ref([])
-const logsEndRef = ref(null)
 let offAppLog = null
+
+function clearLogs() {
+  logs.value = []
+}
 
 // reusable resizers (horizontal + vertical)
 const horizontalResizer = createHorizontalResizer({
@@ -184,24 +168,6 @@ function toggleFooter() {
   }
 }
 
-// Format an RFC3339 timestamp to a short HH:MM:SS.mmm string.
-// Go's RFC3339Nano uses 9-digit nanoseconds; JS Date only parses up to 3,
-// so we truncate fractional seconds to 3 digits before constructing the Date.
-function formatTime(ts) {
-  try {
-    const normalized = ts.replace(/(\.\d{3})\d+/, "$1")
-    const d = new Date(normalized)
-    if (isNaN(d.getTime())) return ts
-    const hh = String(d.getHours()).padStart(2, "0")
-    const mm = String(d.getMinutes()).padStart(2, "0")
-    const ss = String(d.getSeconds()).padStart(2, "0")
-    const ms = String(d.getMilliseconds()).padStart(3, "0")
-    return `${hh}:${mm}:${ss}.${ms}`
-  } catch {
-    return ts
-  }
-}
-
 const resizeHandler = () => {
   horizontalResizer.clamp()
   verticalResizer.clamp()
@@ -222,9 +188,6 @@ onMounted(() => {
     const entry = event?.data ?? event
     if (!entry) return
     logs.value.push(entry)
-    if (!footerCollapsed.value) {
-      nextTick(() => logsEndRef.value?.scrollIntoView({ behavior: "smooth" }))
-    }
   })
 
   // ensure initial sizes are within computed bounds

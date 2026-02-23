@@ -12,6 +12,7 @@
   "dependencies": {
     "@tailwindcss/postcss": "^4.2.0",
     "@tailwindcss/vite": "^4.2.0",
+    "@vicons/ionicons5": "^0.13.0",
     "@wailsio/runtime": "latest",
     "postcss": "^8.5.6",
     "vue": "^3.3.4",
