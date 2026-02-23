@@ -1,18 +1,6 @@
 <template>
   <div class="container-fluid p-0 flex flex-col h-screen bg-white">
-    <!-- Header (application menu placeholder) -->
-    <header
-      ref="headerRef"
-      :class="[
-        'w-full border-b border-gray-200 pr-2 flex items-center flex-shrink-0',
-        isMac ? 'pl-30 py-4 gap-2' : 'pl-2 gap-4 py-2',
-      ]"
-    >
-      <n-button size="tiny" quaternary>File</n-button>
-      <n-button size="tiny" quaternary>Edit</n-button>
-      <n-button size="tiny" quaternary>View</n-button>
-      <n-button size="tiny" quaternary>Help</n-button>
-    </header>
+    <AppMenuBar ref="menuBarRef" @toggle-logs="toggleFooter" />
 
     <!-- Content: two-column resizable layout -->
     <main class="flex-1 min-h-0">
@@ -82,23 +70,15 @@ import TwoColumnLayout from "@/components/TwoColumnLayout.vue"
 import ConnectionsPanel from "@/components/ConnectionsPanel.vue"
 import WorkspacePanel from "@/components/WorkspacePanel.vue"
 import LogsPanel from "@/components/LogsPanel.vue"
+import AppMenuBar from "@/components/AppMenuBar.vue"
 import { Events } from "@wailsio/runtime"
 import { ChevronDownOutline } from "@/lib/icons"
-// components required by footer etc (panels import their own viewers)
-import {
-  MinimiseMainWindow,
-  ToggleFullScreenMainWindow,
-  CloseMainWindow,
-} from "@/bindings/github.com/felixdotgo/querybox/services/app"
 import {
   createHorizontalResizer,
   createVerticalResizer,
 } from "@/composables/useResize"
 
-const isMac = navigator.userAgent.includes("Mac")
-
-
-const headerRef = ref(null)
+const menuBarRef = ref(null)
 // reference to TwoColumnLayout component instance; exposes inner containerRef
 const layoutRef = ref(null)
 const leftWidth = ref(0)
@@ -130,7 +110,7 @@ const verticalResizer = createVerticalResizer({
   sizeRef: footerHeight,
   min: 80,
   getMax: () => {
-    const headerH = headerRef.value?.getBoundingClientRect().height ?? 0
+    const headerH = menuBarRef.value?.el?.getBoundingClientRect().height ?? 0
     const minMainHeight = 120
     return Math.max(80, window.innerHeight - headerH - minMainHeight)
   },
