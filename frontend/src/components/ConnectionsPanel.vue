@@ -1,5 +1,5 @@
 <template>
-  <div class="p-3 h-full flex flex-col gap-3">
+  <div class="p-3 h-full flex flex-col gap-3 bg-slate-50">
     <!-- small toolbar -->
     <div class="flex items-center justify-between gap-2">
       <div class="flex items-center gap-2">
