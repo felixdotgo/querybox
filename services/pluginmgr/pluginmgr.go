@@ -184,16 +184,37 @@ func probeInfo(fullpath string) (PluginInfo, error) {
 	if err != nil {
 		return PluginInfo{}, fmt.Errorf("probe info failed: %w", err)
 	}
+	// decode in two steps because newer plugin binaries emit the enum
+	// as a string (protojson) while older ones used a numeric value.  Doing
+	// a straight unmarshal into an `int` would fail on the string case.
+	var raw map[string]interface{}
+	if err := json.Unmarshal(out, &raw); err != nil {
+		return PluginInfo{}, fmt.Errorf("invalid info json: %w", err)
+	}
+
+	// interpret the type field from float64 or string enum
+	typ := 0
+	if v, ok := raw["type"]; ok {
+		switch vv := v.(type) {
+		case float64:
+			typ = int(vv)
+		case string:
+			if val, ok := pluginpb.PluginV1_Type_value[vv]; ok {
+				typ = int(val)
+			}
+		}
+	}
+
 	var resp struct {
-		Type        int    `json:"type,omitempty"`
 		Name        string `json:"name"`
 		Version     string `json:"version"`
 		Description string `json:"description"`
 	}
-	if err := json.Unmarshal(out, &resp); err != nil {
-		return PluginInfo{}, fmt.Errorf("invalid info json: %w", err)
+	if b2, err2 := json.Marshal(raw); err2 == nil {
+		_ = json.Unmarshal(b2, &resp)
 	}
-	return PluginInfo{Name: resp.Name, Type: resp.Type, Version: resp.Version, Description: resp.Description}, nil
+
+	return PluginInfo{Name: resp.Name, Type: typ, Version: resp.Version, Description: resp.Description}, nil
 }
 
 // ListPlugins returns the discovered plugins (does not start them).
