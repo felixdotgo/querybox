@@ -413,17 +413,21 @@ async function runTreeAction(conn, action, node) {
     const version = invocationVersion
     console.debug("runTreeAction result", action, queryToRun, res, payload, tabKey, version)
 
+    // Store context to support Refresh functionality.
+    const context = { conn, action, node }
+
     if (res.error) {
-      emit("query-result", title, null, res.error, tabKey, version)
+      emit("query-result", title, null, res.error, tabKey, version, context)
     } else {
-      emit("query-result", title, payload, null, tabKey, version)
+      emit("query-result", title, payload, null, tabKey, version, context)
     }
   } catch (err) {
     console.error("ExecTreeAction", conn.id, err)
     // Surface the error in the workspace tab so it is visible to the user.
     // The backend already emits an app:log event for these failures;
     // opening an error tab gives additional in-context feedback.
-    emit("query-result", title, null, err?.message || String(err), tabKey, invocationVersion)
+    const context = { conn, action, node }
+    emit("query-result", title, null, err?.message || String(err), tabKey, invocationVersion, context)
   }
 }
 
@@ -490,5 +494,10 @@ const offConnectionDeleted = Events.On("connection:deleted", (event) => {
 onUnmounted(() => {
   if (offConnectionCreated) offConnectionCreated()
   if (offConnectionDeleted) offConnectionDeleted()
+})
+
+// Expose runTreeAction to support Refresh from the Workspace panel.
+defineExpose({
+  runTreeAction,
 })
 </script>

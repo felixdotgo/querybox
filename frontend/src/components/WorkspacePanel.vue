@@ -17,11 +17,46 @@
       >
 
         <template #default>
-          <ResultViewer v-if="tab.result" :result="tab.result" />
-          <pre v-else-if="tab.error" class="whitespace-pre-wrap">
+          <div v-if="tab.result || tab.error" class="flex flex-col h-full overflow-hidden">
+            <!-- Query Editor Area -->
+            <div
+              v-if="tab.context"
+              class="p-2 border-b border-gray-100 flex flex-col gap-2 bg-slate-50 shrink-0"
+            >
+              <n-input
+                v-model:value="tab.query"
+                type="textarea"
+                :autosize="{ minRows: 2, maxRows: 10 }"
+                placeholder="Type query..."
+                size="small"
+                class="font-mono text-[11px]"
+                @keypress.enter.prevent.ctrl="handleRefresh(tab)"
+              />
+              <div class="flex">
+                <n-button
+                  size="small"
+                  type="primary"
+                  :loading="tab.loading"
+                  @click="handleRefresh(tab)"
+                  title="Execute (Ctrl+Enter)"
+                >
+                  <template #icon>
+                    <n-icon :size="12"><RefreshOutline /></n-icon>
+                  </template>
+                  Execute
+                </n-button>
+              </div>
+            </div>
+
+            <ResultViewer v-if="tab.result" :result="tab.result" class="flex-1" />
+            <pre
+              v-else-if="tab.error"
+              class="whitespace-pre-wrap p-4 text-red-600 bg-red-50 flex-1 overflow-auto font-mono text-sm"
+            >
 {{ tab.error }}
-          </pre>
-          <div v-else class="text-gray-500">
+            </pre>
+          </div>
+          <div v-else class="text-gray-500 p-4">
             No Results
           </div>
         </template>
@@ -32,12 +67,14 @@
 
 <script setup>
 import { ref, watch } from "vue"
+import { NButton, NIcon, NInput } from "naive-ui"
+import { RefreshOutline } from "@/lib/icons"
 import ResultViewer from "@/components/ResultViewer.vue"
 
 const props = defineProps({
   selectedConnection: { type: Object, default: null },
 })
-const emit = defineEmits(["tab-closed", "active-connection-changed"])
+const emit = defineEmits(["tab-closed", "active-connection-changed", "refresh-tab"])
 
 const tabs = ref([])
 const activeTabKey = ref("")
@@ -48,7 +85,7 @@ watch(activeTabKey, (key) => {
   emit("active-connection-changed", connId || null)
 })
 
-function openTab(title, result, error, tabKey, version) {
+function openTab(title, result, error, tabKey, version, context) {
   // sanitize human title just in case it still contains a prefix
   const sanitize = (t) => (t ? t.split(":").pop() : t)
   title = sanitize(title)
@@ -93,7 +130,16 @@ function openTab(title, result, error, tabKey, version) {
     return
   }
 
-  const newTab = { key, title, result, error, version: version || Date.now() }
+  const newTab = {
+    key,
+    title,
+    result,
+    error,
+    version: version || Date.now(),
+    context,
+    loading: false,
+    query: context?.action?.query || "",
+  }
 
   if (existing) {
     const idx = tabs.value.findIndex((t) => t.key === key)
@@ -114,6 +160,20 @@ function handleTabClose(closedKey) {
     activeTabKey.value = tabs.value.length ? tabs.value[0].key : ""
   }
   emit("tab-closed", closedKey)
+}
+
+function handleRefresh(tab) {
+  if (!tab.context) return
+  tab.loading = true
+  // Re-execute with the potentially modified query from the textbox
+  const refreshContext = {
+    ...tab.context,
+    action: {
+      ...tab.context.action,
+      query: tab.query
+    }
+  }
+  emit("refresh-tab", refreshContext)
 }
 
 defineExpose({ openTab })

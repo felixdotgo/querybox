@@ -13,6 +13,7 @@
           <div class="bg-slate-50 h-full">
             <SafeZone />
             <ConnectionsPanel
+              ref="connectionsRef"
               :activeConnectionId="activeConnectionId"
               @connection-selected="selectedConnection = $event"
               @query-result="openTab"
@@ -25,6 +26,7 @@
             ref="workspaceRef"
             :selectedConnection="selectedConnection"
             @active-connection-changed="activeConnectionId = $event"
+            @refresh-tab="handleRefreshTab"
           />
         </template>
       </TwoColumnLayout>
@@ -127,10 +129,16 @@ const verticalResizer = createVerticalResizer({
 
 // workspace reference used to add tabs via exposed method
 const workspaceRef = ref(null)
+const connectionsRef = ref(null)
 
-function openTab(title, result, error, tabKey, version) {
+function openTab(title, result, error, tabKey, version, context) {
   // pass the optional version through so workspace can ignore stale data
-  workspaceRef.value?.openTab(title, result, error, tabKey, version)
+  workspaceRef.value?.openTab(title, result, error, tabKey, version, context)
+}
+
+function handleRefreshTab(context) {
+  if (!context || !context.conn || !context.action) return
+  connectionsRef.value?.runTreeAction(context.conn, context.action, context.node)
 }
 
 
