@@ -232,22 +232,34 @@ ORDER BY schema_name`)
 			continue
 		}
 
-		// List base tables within this schema.
+		// List base tables and views within this schema.
 		tables := []*plugin.ConnectionTreeNode{}
 		tblRows, err := db.Query(`
-SELECT table_name
-FROM information_schema.tables
-WHERE table_schema = $1
-  AND table_type = 'BASE TABLE'
-ORDER BY table_name`, schemaName)
+SELECT
+    c.relname,
+    CASE c.relkind
+        WHEN 'r' THEN 'table'
+        WHEN 'v' THEN 'view'
+        WHEN 'm' THEN 'view'
+        WHEN 'f' THEN 'foreign-table'
+        WHEN 'p' THEN 'table'
+        ELSE 'other'
+    END as type
+FROM pg_catalog.pg_class c
+JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = $1
+  AND c.relkind IN ('r', 'v', 'm', 'f', 'p')
+ORDER BY c.relname`, schemaName)
 		if err == nil {
 			for tblRows.Next() {
 				var tbl string
-				if tblRows.Scan(&tbl) == nil {
+				var tblType string
+				if err := tblRows.Scan(&tbl, &tblType); err == nil {
+					key := schemaName + "." + tbl
 					tables = append(tables, &plugin.ConnectionTreeNode{
-						Key:      schemaName + "." + tbl,
+						Key:      key,
 						Label:    tbl,
-						NodeType: "table",
+						NodeType: "table", // keep 'table' for now so it gets the grid icon
 						Actions: []*plugin.ConnectionTreeAction{
 							{
 								Type:  plugin.ConnectionTreeActionSelect,
@@ -266,7 +278,7 @@ ORDER BY table_name`, schemaName)
 			tblRows.Close()
 		}
 
-		schemaNodes = append(schemaNodes, &plugin.ConnectionTreeNode{
+		schemaNode := &plugin.ConnectionTreeNode{
 			Key:      schemaName,
 			Label:    schemaName,
 			NodeType: "schema",
@@ -278,7 +290,10 @@ ORDER BY table_name`, schemaName)
 					Query: fmt.Sprintf("CREATE TABLE \"%s\".\"new_table\" (\n    id SERIAL PRIMARY KEY\n);", schemaName),
 				},
 			},
-		})
+		}
+
+		// Pre-expand public schema if it exists and has tables
+		schemaNodes = append(schemaNodes, schemaNode)
 	}
 
 	// Wrap schemas under the current database node.
@@ -291,29 +306,29 @@ ORDER BY table_name`, schemaName)
 			{
 				Type:  plugin.ConnectionTreeActionDropDatabase,
 				Title: "Drop database",
-				// NOTE: you cannot drop the database you are currently connected to.
-				// Connect to 'postgres' or another database first.
 				Query: fmt.Sprintf(`DROP DATABASE "%s";`, currentDB),
 			},
 		},
 	}
 
-	// Server root node carries the create-database action.
-	serverNode := &plugin.ConnectionTreeNode{
-		Key:      "__server__",
-		Label:    "Server",
-		NodeType: "server",
-		Children: []*plugin.ConnectionTreeNode{dbNode},
-		Actions: []*plugin.ConnectionTreeAction{
+	// Root node for Databases (similar to MySQL plugin)
+	return &plugin.ConnectionTreeResponse{
+		Nodes: []*plugin.ConnectionTreeNode{
 			{
-				Type:  plugin.ConnectionTreeActionCreateDatabase,
-				Title: "Create database",
-				Query: `CREATE DATABASE "new_database";`,
+				Key:      "__server__",
+				Label:    "Databases",
+				NodeType: "server",
+				Children: []*plugin.ConnectionTreeNode{dbNode},
+				Actions: []*plugin.ConnectionTreeAction{
+					{
+						Type:  plugin.ConnectionTreeActionCreateDatabase,
+						Title: "Create database",
+						Query: `CREATE DATABASE "new_database";`,
+					},
+				},
 			},
 		},
-	}
-
-	return &plugin.ConnectionTreeResponse{Nodes: []*plugin.ConnectionTreeNode{serverNode}}, nil
+	}, nil
 }
 
 // TestConnection opens a PostgreSQL connection and pings the server to verify

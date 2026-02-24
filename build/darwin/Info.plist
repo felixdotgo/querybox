@@ -4,15 +4,15 @@
         <key>CFBundlePackageType</key>
             <string>APPL</string>
         <key>CFBundleName</key>
-            <string>My Product</string>
+            <string>QueryBox</string>
         <key>CFBundleExecutable</key>
             <string>querybox</string>
         <key>CFBundleIdentifier</key>
-            <string>com.example.querybox</string>
+            <string>com.querybox.querybox</string>
         <key>CFBundleVersion</key>
             <string>0.1.0</string>
         <key>CFBundleGetInfoString</key>
-            <string>This is a comment</string>
+            <string>QueryBox is a powerful tool for performing queries on various databases.</string>
         <key>CFBundleShortVersionString</key>
             <string>0.1.0</string>
         <key>CFBundleIconFile</key>
@@ -24,6 +24,6 @@
         <key>NSHighResolutionCapable</key>
             <string>true</string>
         <key>NSHumanReadableCopyright</key>
-            <string>© 2026, My Company</string>
+            <string>© 2026, QueryBox Inc.</string>
     </dict>
 </plist>

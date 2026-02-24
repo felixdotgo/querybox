@@ -21,6 +21,7 @@ import (
 
 // PluginInfo holds metadata that the UI can display for each plugin.
 type PluginInfo struct {
+	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Path        string `json:"path"`
 	Running     bool   `json:"running"`        // always false in on-demand model
@@ -130,13 +131,15 @@ func (m *Manager) scanOnce() {
 		m.mu.Lock()
 		if _, ok := m.plugins[name]; !ok {
 			// probe metadata
-			info := PluginInfo{Name: name, Path: full, Running: false}
+			info := PluginInfo{ID: name, Name: name, Path: full, Running: false}
 			meta, err := probeInfo(full)
 			if err != nil {
 				info.LastError = err.Error()
 			} else {
-				// Preserve filename as the displayed name/key but copy important
-				// metadata (type/version/description) returned by the plugin.
+				// Use descriptive name if available, otherwise fallback to filename.
+				if meta.Name != "" {
+					info.Name = meta.Name
+				}
 				info.Type = meta.Type
 				info.Version = meta.Version
 				info.Description = meta.Description

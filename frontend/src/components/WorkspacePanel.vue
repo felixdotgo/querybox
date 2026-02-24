@@ -17,11 +17,43 @@
       >
 
         <template #default>
-          <ResultViewer v-if="tab.result" :result="tab.result" />
-          <pre v-else-if="tab.error" class="whitespace-pre-wrap">
+          <div v-if="tab.result || tab.error" class="flex flex-col h-full overflow-hidden">
+            <!-- Query Editor Area -->
+            <div
+              v-if="tab.context"
+              class="border-b border-gray-200 flex flex-col bg-white shrink-0 relative h-48 pb-10"
+            >
+              <QueryEditor
+                v-model="tab.query"
+                :language="tab.language || 'sql'"
+                @execute="handleRefresh(tab)"
+              />
+              <div class="absolute bottom-2 left-2 flex gap-2 z-10 pointer-events-none">
+                <n-button
+                  size="small"
+                  type="primary"
+                  :loading="tab.loading"
+                  @click="handleRefresh(tab)"
+                  title="Execute (Ctrl+Enter)"
+                  class="pointer-events-auto shadow-md"
+                >
+                  <template #icon>
+                    <n-icon :size="12"><RefreshOutline /></n-icon>
+                  </template>
+                  Execute
+                </n-button>
+              </div>
+            </div>
+
+            <ResultViewer v-if="tab.result" :result="tab.result" class="flex-1" />
+            <pre
+              v-else-if="tab.error"
+              class="whitespace-pre-wrap p-4 text-red-600 bg-red-50 flex-1 overflow-auto font-mono text-sm"
+            >
 {{ tab.error }}
-          </pre>
-          <div v-else class="text-gray-500">
+            </pre>
+          </div>
+          <div v-else class="text-gray-500 p-4">
             No Results
           </div>
         </template>
@@ -32,15 +64,29 @@
 
 <script setup>
 import { ref, watch } from "vue"
+import { NButton, NIcon } from "naive-ui"
+import { RefreshOutline } from "@/lib/icons"
 import ResultViewer from "@/components/ResultViewer.vue"
+import QueryEditor from "@/components/QueryEditor.vue"
 
 const props = defineProps({
   selectedConnection: { type: Object, default: null },
 })
-const emit = defineEmits(["tab-closed", "active-connection-changed"])
+const emit = defineEmits(["tab-closed", "active-connection-changed", "refresh-tab"])
 
 const tabs = ref([])
 const activeTabKey = ref("")
+
+function getMonacoLanguage(driver) {
+  if (!driver) return "sql"
+  const d = driver.toLowerCase()
+  if (d.includes("postgres") || d.includes("psql")) return "pgsql"
+  if (d.includes("mysql")) return "mysql"
+  if (d.includes("sqlite")) return "sql"
+  if (d.includes("redis")) return "redis"
+  if (d.includes("arangodb")) return "javascript" // AQL is not supported, javascript is close enough or use sql
+  return "sql"
+}
 
 watch(activeTabKey, (key) => {
   // tabKey format: conn.id + ":" + node.key — extract the connection ID
@@ -48,7 +94,7 @@ watch(activeTabKey, (key) => {
   emit("active-connection-changed", connId || null)
 })
 
-function openTab(title, result, error, tabKey, version) {
+function openTab(title, result, error, tabKey, version, context) {
   // sanitize human title just in case it still contains a prefix
   const sanitize = (t) => (t ? t.split(":").pop() : t)
   title = sanitize(title)
@@ -93,7 +139,17 @@ function openTab(title, result, error, tabKey, version) {
     return
   }
 
-  const newTab = { key, title, result, error, version: version || Date.now() }
+  const newTab = {
+    key,
+    title,
+    result,
+    error,
+    version: version || Date.now(),
+    context,
+    loading: false,
+    query: context?.action?.query || "",
+    language: getMonacoLanguage(context?.conn?.driver_type),
+  }
 
   if (existing) {
     const idx = tabs.value.findIndex((t) => t.key === key)
@@ -114,6 +170,20 @@ function handleTabClose(closedKey) {
     activeTabKey.value = tabs.value.length ? tabs.value[0].key : ""
   }
   emit("tab-closed", closedKey)
+}
+
+function handleRefresh(tab) {
+  if (!tab.context) return
+  tab.loading = true
+  // Re-execute with the potentially modified query from the textbox
+  const refreshContext = {
+    ...tab.context,
+    action: {
+      ...tab.context.action,
+      query: tab.query
+    }
+  }
+  emit("refresh-tab", refreshContext)
 }
 
 defineExpose({ openTab })

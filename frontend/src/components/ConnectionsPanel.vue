@@ -5,7 +5,7 @@
       <div class="flex items-center gap-2">
         <span class="text-lg font-semibold m-0">Connections</span>
       </div>
-      <div class="flex items-center gap-2">
+      <div class="flex">
         <n-button
           size="small"
           secondary
@@ -151,6 +151,7 @@ const defaultExpandedKeys = computed(() => {
 function tagWithConnId(nodes, connId) {
   return nodes.map((n) => ({
     ...n,
+    key: connId + ":" + n.key,
     _connectionId: connId,
     children: n.children ? tagWithConnId(n.children, connId) : n.children,
   }))
@@ -358,7 +359,10 @@ async function runTreeAction(conn, action, node) {
   const invocationVersion = Date.now()
 
   // Hoist stable identifiers so they are available in the catch block too.
-  const tabKey = conn.id + ":" + (node && node.key ? node.key : action.query || invocationVersion)
+  const nodeKey = node && node.key ? node.key : (action.query || String(invocationVersion))
+  const tabKey = (typeof nodeKey === "string" && nodeKey.startsWith(conn.id + ":"))
+    ? nodeKey
+    : conn.id + ":" + nodeKey
   let title = (node && node.key) || action.title || action.query || "Query"
   title = title.split(":").pop()
 
@@ -409,17 +413,21 @@ async function runTreeAction(conn, action, node) {
     const version = invocationVersion
     console.debug("runTreeAction result", action, queryToRun, res, payload, tabKey, version)
 
+    // Store context to support Refresh functionality.
+    const context = { conn, action, node }
+
     if (res.error) {
-      emit("query-result", title, null, res.error, tabKey, version)
+      emit("query-result", title, null, res.error, tabKey, version, context)
     } else {
-      emit("query-result", title, payload, null, tabKey, version)
+      emit("query-result", title, payload, null, tabKey, version, context)
     }
   } catch (err) {
     console.error("ExecTreeAction", conn.id, err)
     // Surface the error in the workspace tab so it is visible to the user.
     // The backend already emits an app:log event for these failures;
     // opening an error tab gives additional in-context feedback.
-    emit("query-result", title, null, err?.message || String(err), tabKey, invocationVersion)
+    const context = { conn, action, node }
+    emit("query-result", title, null, err?.message || String(err), tabKey, invocationVersion, context)
   }
 }
 
@@ -486,5 +494,10 @@ const offConnectionDeleted = Events.On("connection:deleted", (event) => {
 onUnmounted(() => {
   if (offConnectionCreated) offConnectionCreated()
   if (offConnectionDeleted) offConnectionDeleted()
+})
+
+// Expose runTreeAction to support Refresh from the Workspace panel.
+defineExpose({
+  runTreeAction,
 })
 </script>

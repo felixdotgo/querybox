@@ -15,6 +15,13 @@ export class PluginInfo {
      * @param {Partial<PluginInfo>} [$$source = {}] - The source object to create the PluginInfo.
      */
     constructor($$source = {}) {
+        if (!("id" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["id"] = "";
+        }
         if (!("name" in $$source)) {
             /**
              * @member

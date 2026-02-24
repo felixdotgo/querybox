@@ -140,5 +140,19 @@ func (a *App) CloseConnectionsWindow() {
 		// Hide the window instead of closing it. Closing destroys the underlying webview
 		// which can cause "WEBKIT_IS_WEB_VIEW" assertion failures when reopened.
 		a.ConnectionsWindow.Hide()
+		a.App.Event.Emit(EventConnectionsWindowClosed, true)
 	}
+}
+
+// OpenURL opens the specified URL in the system's default browser.
+func (a *App) OpenURL(url string) {
+	a.App.Browser.OpenURL(url)
+}
+
+// ShowAboutDialog displays a native About dialog for the application.
+func (a *App) ShowAboutDialog() {
+	a.App.Dialog.Info().
+		SetTitle("About QueryBox").
+		SetMessage("QueryBox\nVersion 0.1.0\n\n© 2024 Felixdotgo").
+		Show()
 }

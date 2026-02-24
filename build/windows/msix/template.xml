@@ -10,27 +10,27 @@
     <Installer
         Path="querybox"
         Arguments=""
-        InstallLocation="C:\Program Files\My Company\My Product">
+        InstallLocation="C:\Program Files\QueryBox Inc.\QueryBox">
     </Installer>
     <PackageInformation
-        PackageName="My Product"
-        PackageDisplayName="My Product"
-        PublisherName="CN=My Company"
-        PublisherDisplayName="My Company"
+        PackageName="QueryBox"
+        PackageDisplayName="QueryBox"
+        PublisherName="CN=QueryBox Inc."
+        PublisherDisplayName="QueryBox Inc."
         Version="0.1.0.0"
-        PackageDescription="A querybox application">
+        PackageDescription="QueryBox is a powerful tool for performing queries on various databases.">
         <Capabilities>
             <Capability Name="runFullTrust" />
-            
+
         </Capabilities>
         <Applications>
             <Application
-                Id="com.example.querybox"
-                Description="A querybox application"
-                DisplayName="My Product"
+                Id="com.querybox.querybox"
+                Description="QueryBox is a powerful tool for performing queries on various databases."
+                DisplayName="QueryBox"
                 ExecutableName="querybox"
                 EntryPoint="Windows.FullTrustApplication">
-                
+
             </Application>
         </Applications>
         <Resources>
@@ -41,9 +41,9 @@
         </Dependencies>
         <Properties>
             <Framework>false</Framework>
-            <DisplayName>My Product</DisplayName>
-            <PublisherDisplayName>My Company</PublisherDisplayName>
-            <Description>A querybox application</Description>
+            <DisplayName>QueryBox</DisplayName>
+            <PublisherDisplayName>QueryBox Inc.</PublisherDisplayName>
+            <Description>QueryBox is a powerful tool for performing queries on various databases.</Description>
             <Logo>Assets\AppIcon.png</Logo>
         </Properties>
     </PackageInformation>

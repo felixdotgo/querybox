@@ -50,7 +50,9 @@ export {
  * @type {Record<string, object>}
  */
 export const nodeTypeIconMap = {
+  server:   ServerOutline,
   database: LibraryOutline,
+  schema:   LayersOutline,
   table:    GridOutline,
   column:   CodeSlashOutline,
 }

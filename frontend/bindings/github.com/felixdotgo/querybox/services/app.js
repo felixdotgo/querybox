@@ -83,6 +83,23 @@ export function OpenFileDialog() {
 }
 
 /**
+ * OpenURL opens the specified URL in the system's default browser.
+ * @param {string} url
+ * @returns {$CancellablePromise<void>}
+ */
+export function OpenURL(url) {
+    return $Call.ByID(2167090686, url);
+}
+
+/**
+ * ShowAboutDialog displays a native About dialog for the application.
+ * @returns {$CancellablePromise<void>}
+ */
+export function ShowAboutDialog() {
+    return $Call.ByID(2408607369);
+}
+
+/**
  * ShowConnectionsWindow shows the connections window and brings it to the front.
  * @returns {$CancellablePromise<void>}
  */

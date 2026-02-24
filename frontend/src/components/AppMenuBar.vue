@@ -12,6 +12,9 @@
     <n-dropdown trigger="click" :options="viewMenu" @select="handleSelect">
       <n-button size="tiny" quaternary class="rounded-none px-3">View</n-button>
     </n-dropdown>
+    <n-dropdown trigger="click" :options="helpMenu" @select="handleSelect">
+      <n-button size="tiny" quaternary class="rounded-none px-3">Help</n-button>
+    </n-dropdown>
 
     <!-- Slot for window-specific quick actions -->
     <template v-if="$slots.actions">
@@ -27,6 +30,8 @@ import {
   ShowConnectionsWindow,
   CloseMainWindow,
   ToggleFullScreenMainWindow,
+  OpenURL,
+  ShowAboutDialog,
 } from "@/bindings/github.com/felixdotgo/querybox/services/app"
 
 const emit = defineEmits(["toggle-logs"])
@@ -48,12 +53,23 @@ const viewMenu = [
   { label: "Toggle Logs", key: "toggle-logs" },
 ]
 
+const helpMenu = [
+  { label: "Github Repo", key: "github-repo" },
+  { label: "Website", key: "website" },
+  { type: "divider", key: "d1" },
+  { label: "About QueryBox", key: "about" },
+]
+
 function handleSelect(key) {
   switch (key) {
     case "new-connection":    ShowConnectionsWindow(); break
     case "quit":              CloseMainWindow(); break
     case "toggle-fullscreen": ToggleFullScreenMainWindow(); break
     case "toggle-logs":       emit("toggle-logs"); break
+
+    case "github-repo":       OpenURL("https://github.com/felixdotgo/querybox"); break
+    case "website":           OpenURL("https://querybox.app"); break
+    case "about":             ShowAboutDialog(); break
   }
 }
 </script>
