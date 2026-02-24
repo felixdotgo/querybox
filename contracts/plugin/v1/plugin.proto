@@ -121,6 +121,7 @@ message PluginV1 {
       PASSWORD = 3;
       CHECKBOX = 4;
       SELECT = 5;
+      FILE_PATH = 6;
     }
 
     FieldType type = 1; // input type

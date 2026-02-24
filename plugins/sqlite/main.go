@@ -29,7 +29,7 @@ func (m *sqlitePlugin) AuthForms(*plugin.AuthFormsRequest) (*plugin.AuthFormsRes
 		Key:  "basic",
 		Name: "Basic",
 		Fields: []*plugin.AuthField{
-			{Type: plugin.AuthFieldText, Name: "file", Label: "Database file path", Required: true, Placeholder: "/path/to/database.db"},
+			{Type: plugin.AuthFieldFilePath, Name: "file", Label: "Database file path", Required: true, Placeholder: "/path/to/database.db"},
 		},
 	}
 	return &plugin.AuthFormsResponse{Forms: map[string]*plugin.AuthForm{"basic": &basic}}, nil

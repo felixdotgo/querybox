@@ -108,6 +108,7 @@ export const PluginV1_AuthField_FieldType = {
     PluginV1_AuthField_PASSWORD: 3,
     PluginV1_AuthField_CHECKBOX: 4,
     PluginV1_AuthField_SELECT: 5,
+    PluginV1_AuthField_FILE_PATH: 6,
 };
 
 /**
