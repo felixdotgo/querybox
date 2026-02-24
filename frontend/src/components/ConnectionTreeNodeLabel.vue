@@ -17,8 +17,8 @@
         <template #trigger>
           <n-button
             size="tiny"
-            :type="isDestructive(action) ? 'error' : 'default'"
-            :secondary="!isDestructive(action)"
+            :type="isDestructive(action) ? 'error' : 'primary'"
+            :secondary="isDestructive(action)"
             @click.stop="emit('action', action)"
           >
             <template #icon>

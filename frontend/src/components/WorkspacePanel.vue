@@ -26,6 +26,8 @@
               <QueryEditor
                 v-model="tab.query"
                 :language="tab.language || 'sql'"
+                :context="tab.context"
+                :connection="props.selectedConnection"
                 @execute="handleRefresh(tab)"
               />
               <div class="absolute bottom-2 left-2 flex gap-2 z-10 pointer-events-none">
