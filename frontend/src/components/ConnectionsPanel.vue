@@ -46,6 +46,13 @@
       </div>
     </div>
 
+    <!-- action input form (create-database, create-table, …) -->
+    <ActionFormModal
+      v-model:visible="actionModal.visible"
+      :action="actionModal.action"
+      @submit="onActionModalSubmit"
+    />
+
     <!-- delete confirmation dialog -->
     <n-modal
       v-model:show="deleteModal.visible"
@@ -63,10 +70,12 @@
 
 <script setup>
 import { ref, computed, h, watch, onUnmounted, defineEmits } from "vue"
-import { NIcon } from "naive-ui"
+import { NIcon, useDialog } from "naive-ui"
 import { Events } from "@wailsio/runtime"
 import { useRouter } from "vue-router"
+import ActionFormModal from "@/components/ActionFormModal.vue"
 import ConnectionNodeLabel from "@/components/ConnectionNodeLabel.vue"
+import ConnectionTreeNodeLabel from "@/components/ConnectionTreeNodeLabel.vue"
 import {
   LayersOutline,
   ServerOutline,
@@ -94,6 +103,8 @@ const props = defineProps({
   activeConnectionId: { type: String, default: null },
 })
 
+const dialog = useDialog()
+
 // declare events emitted by this component
 const emit = defineEmits([
   "connection-selected",
@@ -118,13 +129,26 @@ const connectionTrees = ref({})
 const selectedConnection = ref(null)
 const expandedKeys = ref([])
 const deleteModal = ref({ visible: false, conn: null })
-// Keys recently actioned by handleSelect; used to prevent getNodeProps.onClick
-// from double-firing the same action when handleSelect already handled the click.
-const recentlyHandledLeafKeys = new Set()
+const actionModal = ref({ visible: false, action: null, conn: null, node: null })
 
 const defaultExpandedKeys = computed(() => {
   return treeData.value.map((g) => g.key)
 })
+
+/**
+ * Recursively stamps every node (and its descendants) with the owning
+ * connection id.  This lets the three parentConn-finder loops below resolve
+ * the correct connection in O(1) instead of scanning every loaded tree,
+ * which previously picked the wrong driver when two connections shared a
+ * node key such as "__server__".
+ */
+function tagWithConnId(nodes, connId) {
+  return nodes.map((n) => ({
+    ...n,
+    _connectionId: connId,
+    children: n.children ? tagWithConnId(n.children, connId) : n.children,
+  }))
+}
 
 const treeData = computed(() => {
   const groups = {}
@@ -137,7 +161,7 @@ const treeData = computed(() => {
     key: `driver:${driver}`,
     label: `${driver} (${conns.length})`,
     children: conns.map((cc) => {
-      const extra = connectionTrees.value[cc.id] || []
+      const extra = tagWithConnId(connectionTrees.value[cc.id] || [], cc.id)
       return { key: cc.id, label: cc.name, children: extra }
     }),
   }))
@@ -185,35 +209,8 @@ function handleSelect(keys, options, meta) {
     return
   }
 
-  // determine which connection owns the clicked tree node
-  const node = meta?.node
-  let parentConn = null
-  for (const c of connections.value) {
-    const nodes = connectionTrees.value[c.id] || []
-    const finder = (list) => {
-      for (const n of list) {
-        if (n.key === key) return true
-        if (n.children && finder(n.children)) return true
-      }
-      return false
-    }
-    if (finder(nodes)) {
-      parentConn = c
-      break
-    }
-  }
-  if (!parentConn) parentConn = selectedConnection.value
-
-  // Execute the first action for leaf nodes on first click.
-  // Re-clicks are handled by getNodeProps.onClick (n-tree won't re-emit for
-  // an already-selected key). A short-lived Set prevents double-firing.
-  const isLeaf = !node?.children || node.children.length === 0
-  if (parentConn && node && isLeaf && node.actions && node.actions.length > 0) {
-    recentlyHandledLeafKeys.add(key)
-    setTimeout(() => recentlyHandledLeafKeys.delete(key), 100)
-    runTreeAction(parentConn, node.actions[0], node)
-  }
 }
+
 
 function handleConnectionDblclick(conn) {
   if (!conn) return
@@ -238,40 +235,27 @@ function getNodeProps(node) {
     }
   }
 
-  // onClick handles re-clicks on an already-selected leaf node — n-tree won't
-  // re-emit update:selected-keys in that case, so handleSelect never fires.
-  // recentlyHandledLeafKeys guards against double-firing when handleSelect
-  // already actioned this click (first-click scenario).
-  const isLeaf = !node?.children || node.children.length === 0
-  if (isLeaf && node.actions && node.actions.length > 0) {
-    props.onClick = () => {
-      if (recentlyHandledLeafKeys.has(node.key)) return
-      let parentConn = null
-      for (const c of connections.value) {
-        const nodes = connectionTrees.value[c.id] || []
-        const finder = (list) => {
-          for (const n of list) {
-            if (n.key === node.key) return true
-            if (n.children && finder(n.children)) return true
-          }
-          return false
-        }
-        if (finder(nodes)) {
-          parentConn = c
-          break
-        }
-      }
-      if (!parentConn) parentConn = selectedConnection.value
-      if (parentConn) runTreeAction(parentConn, node.actions[0], node)
-    }
-  }
-
   return props
 }
 
 function renderLabel({ option }) {
   const conn = connections.value.find((c) => c.id === option.key)
-  // non-connection nodes (driver group headers, database/table nodes) just show the label
+
+  // non-connection nodes with plugin-defined actions: render action buttons on hover
+  if (!conn && option.actions && option.actions.length > 0) {
+    return h(ConnectionTreeNodeLabel, {
+      label: option.label,
+      actions: option.actions,
+      onAction(action) {
+        const parentConn = option._connectionId
+          ? connections.value.find((c) => c.id === option._connectionId)
+          : selectedConnection.value
+        if (parentConn) handleAction(parentConn, action, option)
+      },
+    })
+  }
+
+  // driver group headers and connection-less plain nodes just show the label
   if (!conn) return option.label
 
   return h(ConnectionNodeLabel, {
@@ -340,6 +324,45 @@ async function confirmDelete() {
   } finally {
     deleteModal.value = { visible: false, conn: null }
   }
+}
+
+/** Action types that require the user to fill in a form before execution. */
+const PROMPT_ACTION_TYPES = new Set(["create-database", "create-table"])
+
+/** Action types that require an explicit destructive confirmation dialog. */
+const DESTRUCTIVE_ACTION_TYPES = new Set(["drop-database", "drop-table", "drop-collection"])
+
+/**
+ * Central dispatcher for node actions.
+ * Routes create actions to the input form modal, destructive actions to a
+ * confirmation dialog, and everything else straight to runTreeAction.
+ */
+function handleAction(conn, action, node) {
+  if (PROMPT_ACTION_TYPES.has(action.type)) {
+    actionModal.value = { visible: true, action, conn, node }
+    return
+  }
+
+  if (DESTRUCTIVE_ACTION_TYPES.has(action.type)) {
+    dialog.error({
+      title: action.title ?? "Confirm action",
+      content: `The following query will be executed — this cannot be undone:\n\n${action.query}`,
+      positiveText: "Execute",
+      negativeText: "Cancel",
+      onPositiveClick() {
+        runTreeAction(conn, action, node)
+      },
+    })
+    return
+  }
+
+  runTreeAction(conn, action, node)
+}
+
+function onActionModalSubmit(modifiedQuery) {
+  const { conn, action, node } = actionModal.value
+  if (!conn || !action) return
+  runTreeAction(conn, { ...action, query: modifiedQuery }, node)
 }
 
 async function runTreeAction(conn, action, node) {

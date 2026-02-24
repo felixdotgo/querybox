@@ -374,6 +374,9 @@ func (r *redisPlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugin
 			Children: keyNodes,
 			Actions: []*plugin.ConnectionTreeAction{
 				{Type: plugin.ConnectionTreeActionSelect, Title: "Select DB", Query: fmt.Sprintf("SELECT %d", dbIdx)},
+				// Redis logical databases cannot be created or dropped; FLUSHDB
+				// removes all keys from the selected database (use with care).
+				{Type: plugin.ConnectionTreeActionDropDatabase, Title: "Flush DB (delete all keys)", Query: "FLUSHDB"},
 			},
 		})
 	}

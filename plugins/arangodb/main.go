@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 
 	driver "github.com/arangodb/go-driver"
@@ -161,6 +162,100 @@ func valueToStruct(v interface{}) (*structpb.Struct, error) {
 	return structpb.NewStruct(map[string]interface{}{"value": decoded})
 }
 
+// ddlPattern matches simple DDL meta-commands that ArangoDB AQL does not
+// natively support.  Exec intercepts these before sending to the AQL engine.
+//
+//	CREATE DATABASE <name>
+//	DROP   DATABASE <name>
+//	CREATE COLLECTION <db>.<name>
+//	DROP   COLLECTION <db>.<name>
+//
+// For COLLECTION operations the name field uses a <db>.<collection> format so
+// the target database is unambiguous regardless of the connection default.
+var ddlPattern = regexp.MustCompile(`(?i)^\s*(CREATE|DROP)\s+(DATABASE|COLLECTION)\s+(\S+)\s*;?\s*$`)
+
+// execDDL handles the four recognised DDL meta-commands.  It returns (result,
+// handled, error).  Callers should only use result when handled is true.
+func (a *arangoPlugin) execDDL(ctx context.Context, client driver.Client, p connParams, query string) (*plugin.ExecResponse, bool) {
+	m := ddlPattern.FindStringSubmatch(query)
+	if m == nil {
+		return nil, false
+	}
+	op, kind, name := strings.ToUpper(m[1]), strings.ToUpper(m[2]), m[3]
+
+	kvResult := func(msg string) *plugin.ExecResponse {
+		return &plugin.ExecResponse{
+			Result: &plugin.ExecResult{
+				Payload: &pluginpb.PluginV1_ExecResult_Kv{
+					Kv: &plugin.KeyValueResult{Data: map[string]string{"result": msg}},
+				},
+			},
+		}
+	}
+	errResult := func(msg string) *plugin.ExecResponse {
+		return &plugin.ExecResponse{Error: msg}
+	}
+
+	switch {
+	case op == "CREATE" && kind == "DATABASE":
+		if _, err := client.CreateDatabase(ctx, name, nil); err != nil {
+			return errResult(fmt.Sprintf("create database %q: %v", name, err)), true
+		}
+		return kvResult(fmt.Sprintf("Database %q created.", name)), true
+
+	case op == "DROP" && kind == "DATABASE":
+		db, err := client.Database(ctx, name)
+		if err != nil {
+			return errResult(fmt.Sprintf("open database %q: %v", name, err)), true
+		}
+		if err := db.Remove(ctx); err != nil {
+			return errResult(fmt.Sprintf("drop database %q: %v", name, err)), true
+		}
+		return kvResult(fmt.Sprintf("Database %q dropped.", name)), true
+
+	case op == "CREATE" && kind == "COLLECTION":
+		// name is encoded as "<db>.<collection>" so the target database is
+		// explicit.  Fall back to the connection default when the dot is absent.
+		dbName, collName := splitDBColl(name, p.database)
+		db, err := client.Database(ctx, dbName)
+		if err != nil {
+			return errResult(fmt.Sprintf("open database %q: %v", dbName, err)), true
+		}
+		if _, err := db.CreateCollection(ctx, collName, nil); err != nil {
+			return errResult(fmt.Sprintf("create collection %q: %v", collName, err)), true
+		}
+		return kvResult(fmt.Sprintf("Collection %q created in database %q.", collName, dbName)), true
+
+	case op == "DROP" && kind == "COLLECTION":
+		// name is encoded as "<db>.<collection>" so the target database is
+		// explicit.  Fall back to the connection default when the dot is absent.
+		dbName, collName := splitDBColl(name, p.database)
+		db, err := client.Database(ctx, dbName)
+		if err != nil {
+			return errResult(fmt.Sprintf("open database %q: %v", dbName, err)), true
+		}
+		coll, err := db.Collection(ctx, collName)
+		if err != nil {
+			return errResult(fmt.Sprintf("open collection %q: %v", collName, err)), true
+		}
+		if err := coll.Remove(ctx); err != nil {
+			return errResult(fmt.Sprintf("drop collection %q: %v", collName, err)), true
+		}
+		return kvResult(fmt.Sprintf("Collection %q dropped from database %q.", collName, dbName)), true
+	}
+
+	return nil, false
+}
+
+// splitDBColl splits a "<db>.<collection>" token into (db, collection).
+// When there is no dot, the caller-supplied default db is returned.
+func splitDBColl(name, defaultDB string) (string, string) {
+	if idx := strings.IndexByte(name, '.'); idx > 0 && idx < len(name)-1 {
+		return name[:idx], name[idx+1:]
+	}
+	return defaultDB, name
+}
+
 func (a *arangoPlugin) Exec(req *plugin.ExecRequest) (*plugin.ExecResponse, error) {
 	p, err := parseConnParams(req.Connection)
 	if err != nil {
@@ -173,6 +268,13 @@ func (a *arangoPlugin) Exec(req *plugin.ExecRequest) (*plugin.ExecResponse, erro
 	}
 
 	ctx := context.Background()
+
+	// Intercept DDL meta-commands (CREATE/DROP DATABASE|COLLECTION) before
+	// passing the query to the AQL engine, which does not support DDL.
+	if res, handled := a.execDDL(ctx, client, p, req.Query); handled {
+		return res, nil
+	}
+
 	db, err := client.Database(ctx, p.database)
 	if err != nil {
 		return &plugin.ExecResponse{Error: fmt.Sprintf("open database %q: %v", p.database, err)}, nil
@@ -209,7 +311,10 @@ func (a *arangoPlugin) Exec(req *plugin.ExecRequest) (*plugin.ExecResponse, erro
 	}, nil
 }
 
-// ConnectionTree returns a two-level hierarchy: databases → collections.
+// ConnectionTree returns a server → database → collection hierarchy.
+// DDL actions are exposed at the server (create database), database (drop
+// database, create collection) and collection (drop collection) levels.
+// The query templates use the DDL meta-commands intercepted by Exec.
 func (a *arangoPlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugin.ConnectionTreeResponse, error) {
 	p, err := parseConnParams(req.Connection)
 	if err != nil {
@@ -230,19 +335,33 @@ func (a *arangoPlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugi
 		return a.singleDatabaseTree(ctx, client, p.database), nil
 	}
 
-	var nodes []*plugin.ConnectionTreeNode
+	var dbNodes []*plugin.ConnectionTreeNode
 	for _, db := range databases {
 		dbName := db.Name()
 		collNodes := a.collectionNodes(ctx, db, dbName)
-		nodes = append(nodes, &plugin.ConnectionTreeNode{
+		dbNodes = append(dbNodes, &plugin.ConnectionTreeNode{
 			Key:      dbName,
 			Label:    dbName,
 			NodeType: "database",
 			Children: collNodes,
+			Actions: []*plugin.ConnectionTreeAction{
+				{Type: plugin.ConnectionTreeActionCreateTable, Title: "Create collection", Query: fmt.Sprintf("CREATE COLLECTION %s.new_collection", dbName)},
+				{Type: plugin.ConnectionTreeActionDropDatabase, Title: "Drop database", Query: fmt.Sprintf("DROP DATABASE %s", dbName)},
+			},
 		})
 	}
 
-	return &plugin.ConnectionTreeResponse{Nodes: nodes}, nil
+	serverNode := &plugin.ConnectionTreeNode{
+		Key:      "__server__",
+		Label:    "Databases",
+		NodeType: "server",
+		Children: dbNodes,
+		Actions: []*plugin.ConnectionTreeAction{
+			{Type: plugin.ConnectionTreeActionCreateDatabase, Title: "Create database", Query: "CREATE DATABASE new_database"},
+		},
+	}
+
+	return &plugin.ConnectionTreeResponse{Nodes: []*plugin.ConnectionTreeNode{serverNode}}, nil
 }
 
 // singleDatabaseTree builds a tree for a single named database when the user
@@ -252,16 +371,26 @@ func (a *arangoPlugin) singleDatabaseTree(ctx context.Context, client driver.Cli
 	if err != nil {
 		return &plugin.ConnectionTreeResponse{}
 	}
-	return &plugin.ConnectionTreeResponse{
-		Nodes: []*plugin.ConnectionTreeNode{
-			{
-				Key:      dbName,
-				Label:    dbName,
-				NodeType: "database",
-				Children: a.collectionNodes(ctx, db, dbName),
-			},
+	dbNode := &plugin.ConnectionTreeNode{
+		Key:      dbName,
+		Label:    dbName,
+		NodeType: "database",
+		Children: a.collectionNodes(ctx, db, dbName),
+		Actions: []*plugin.ConnectionTreeAction{
+			{Type: plugin.ConnectionTreeActionCreateTable, Title: "Create collection", Query: "CREATE COLLECTION new_collection"},
+			{Type: plugin.ConnectionTreeActionDropDatabase, Title: "Drop database", Query: fmt.Sprintf("DROP DATABASE %s", dbName)},
 		},
 	}
+	serverNode := &plugin.ConnectionTreeNode{
+		Key:      "__server__",
+		Label:    "Databases",
+		NodeType: "server",
+		Children: []*plugin.ConnectionTreeNode{dbNode},
+		Actions: []*plugin.ConnectionTreeAction{
+			{Type: plugin.ConnectionTreeActionCreateDatabase, Title: "Create database", Query: "CREATE DATABASE new_database"},
+		},
+	}
+	return &plugin.ConnectionTreeResponse{Nodes: []*plugin.ConnectionTreeNode{serverNode}}
 }
 
 // collectionNodes returns tree nodes for user collections inside db.
@@ -285,8 +414,13 @@ func (a *arangoPlugin) collectionNodes(ctx context.Context, db driver.Database, 
 			Actions: []*plugin.ConnectionTreeAction{
 				{
 					Type:  plugin.ConnectionTreeActionSelect,
-					Title: name,
+					Title: "Select documents",
 					Query: fmt.Sprintf("FOR doc IN %s LIMIT 100 RETURN doc", name),
+				},
+				{
+					Type:  plugin.ConnectionTreeActionDropTable,
+					Title: "Drop collection",
+					Query: fmt.Sprintf("DROP COLLECTION %s.%s", dbName, name),
 				},
 			},
 		})
