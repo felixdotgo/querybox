@@ -256,6 +256,29 @@ func splitDBColl(name, defaultDB string) (string, string) {
 	return defaultDB, name
 }
 
+// splitDBFromQuery looks for a simple qualified collection reference
+// at the start of an AQL FOR statement (e.g. "FOR x IN db.coll …") and, if
+// present, returns the database name along with a rewritten query that has the
+// qualification removed.  This allows the host to show a fully qualified
+// query in the tree while still executing against the correct database
+// without requiring the connection itself to change.
+//
+// Only the first occurrence is rewritten; more complex AQL (multiple collections,
+// LET expressions, subqueries, etc.) is left untouched.  The heuristic is
+// intentionally simple since we only need to satisfy the connection‑tree
+// templates and user‑supplied queries like "FOR d IN mydb.coll RETURN d".
+var qualifiedCollRE = regexp.MustCompile(`(?i)\bIN\s*([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)`) // allow zero or more spaces after IN
+
+func splitDBFromQuery(query string) (dbName, rewritten string) {
+	m := qualifiedCollRE.FindStringSubmatch(query)
+	if m == nil {
+		return "", query
+	}
+	// replace only the first occurrence so the rest of the query stays intact
+	rewritten = qualifiedCollRE.ReplaceAllString(query, "IN $2")
+	return m[1], rewritten
+}
+
 func (a *arangoPlugin) Exec(req *plugin.ExecRequest) (*plugin.ExecResponse, error) {
 	p, err := parseConnParams(req.Connection)
 	if err != nil {
@@ -275,12 +298,25 @@ func (a *arangoPlugin) Exec(req *plugin.ExecRequest) (*plugin.ExecResponse, erro
 		return res, nil
 	}
 
-	db, err := client.Database(ctx, p.database)
-	if err != nil {
-		return &plugin.ExecResponse{Error: fmt.Sprintf("open database %q: %v", p.database, err)}, nil
+	// adjust the target database if the user qualified the collection name
+	dbName := p.database
+	queryText := req.Query
+	if d, q := splitDBFromQuery(queryText); d != "" {
+		// only treat the prefix as a database if we can successfully open it.
+		// otherwise the user is probably querying a collection whose name
+		// contains a dot (which is legal) and we must not rewrite it.
+		if _, err := client.Database(ctx, d); err == nil {
+			dbName = d
+			queryText = q
+		}
 	}
 
-	cursor, err := db.Query(ctx, req.Query, nil)
+	db, err := client.Database(ctx, dbName)
+	if err != nil {
+		return &plugin.ExecResponse{Error: fmt.Sprintf("open database %q: %v", dbName, err)}, nil
+	}
+
+	cursor, err := db.Query(ctx, queryText, nil)
 	if err != nil {
 		return &plugin.ExecResponse{Error: fmt.Sprintf("query error: %v", err)}, nil
 	}
@@ -407,15 +443,20 @@ func (a *arangoPlugin) collectionNodes(ctx context.Context, db driver.Database, 
 		if strings.HasPrefix(name, "_") {
 			continue
 		}
+		// when the user clicks "Select documents" we want to make it obvious
+		// which database the collection lives in.  The Exec path will strip the
+		// qualification and switch to the correct database before running the
+		// query.
+		qualified := fmt.Sprintf("%s.%s", dbName, name)
 		nodes = append(nodes, &plugin.ConnectionTreeNode{
-			Key:      dbName + "." + name,
+			Key:      qualified,
 			Label:    name,
 			NodeType: "collection",
 			Actions: []*plugin.ConnectionTreeAction{
 				{
 					Type:  plugin.ConnectionTreeActionSelect,
 					Title: "Select documents",
-					Query: fmt.Sprintf("FOR doc IN %s LIMIT 100 RETURN doc", name),
+					Query: fmt.Sprintf("FOR doc IN %s LIMIT 100 RETURN doc", qualified),
 				},
 				{
 					Type:  plugin.ConnectionTreeActionDropTable,

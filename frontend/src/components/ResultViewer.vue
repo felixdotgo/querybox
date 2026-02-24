@@ -66,7 +66,10 @@ const viewType = computed(() => {
   const p = payload.value
   if (!p) return null
   if (p.columns) return "rdbms"
-  if (p.document !== undefined) return "document"
+  // proto defines DocumentResult as repeated Struct documents, not a
+  // single "document" field.  previous code wrongly checked p.document and
+  // therefore never activated when plugins returned multiple rows.
+  if (p.documents !== undefined) return "document"
   if (p.data !== undefined) return "kv"
   return null
 })

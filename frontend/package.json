@@ -16,7 +16,8 @@
     "@wailsio/runtime": "latest",
     "postcss": "^8.5.6",
     "vue": "^3.3.4",
-    "vue-router": "^4.2.2"
+    "vue-router": "^4.2.2",
+    "highlight.js": "^11.8.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.2.3",
