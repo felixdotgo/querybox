@@ -378,7 +378,7 @@ func (a *arangoPlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugi
 		dbNodes = append(dbNodes, &plugin.ConnectionTreeNode{
 			Key:      dbName,
 			Label:    dbName,
-			NodeType: "database",
+			NodeType: plugin.ConnectionTreeNodeTypeDatabase,
 			Children: collNodes,
 			Actions: []*plugin.ConnectionTreeAction{
 				{Type: plugin.ConnectionTreeActionCreateTable, Title: "Create collection", Query: fmt.Sprintf("CREATE COLLECTION %s.new_collection", dbName)},
@@ -387,17 +387,18 @@ func (a *arangoPlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugi
 		})
 	}
 
-	serverNode := &plugin.ConnectionTreeNode{
-		Key:      "__server__",
-		Label:    "Databases",
-		NodeType: "server",
-		Children: dbNodes,
+	// Prepend a leaf node for the create-database action so the user can
+	// create a new database without a redundant wrapper server node.
+	createNode := &plugin.ConnectionTreeNode{
+		Key:      "__create_database__",
+		Label:    "New database",
+		NodeType: plugin.ConnectionTreeNodeTypeAction,
 		Actions: []*plugin.ConnectionTreeAction{
-			{Type: plugin.ConnectionTreeActionCreateDatabase, Title: "Create database", Query: "CREATE DATABASE new_database"},
+			{Type: plugin.ConnectionTreeActionCreateDatabase, Title: "Create database", Query: "CREATE DATABASE new_database", Hidden: true},
 		},
 	}
 
-	return &plugin.ConnectionTreeResponse{Nodes: []*plugin.ConnectionTreeNode{serverNode}}, nil
+	return &plugin.ConnectionTreeResponse{Nodes: append([]*plugin.ConnectionTreeNode{createNode}, dbNodes...)}, nil
 }
 
 // singleDatabaseTree builds a tree for a single named database when the user
@@ -410,23 +411,22 @@ func (a *arangoPlugin) singleDatabaseTree(ctx context.Context, client driver.Cli
 	dbNode := &plugin.ConnectionTreeNode{
 		Key:      dbName,
 		Label:    dbName,
-		NodeType: "database",
+		NodeType: plugin.ConnectionTreeNodeTypeDatabase,
 		Children: a.collectionNodes(ctx, db, dbName),
 		Actions: []*plugin.ConnectionTreeAction{
 			{Type: plugin.ConnectionTreeActionCreateTable, Title: "Create collection", Query: "CREATE COLLECTION new_collection"},
 			{Type: plugin.ConnectionTreeActionDropDatabase, Title: "Drop database", Query: fmt.Sprintf("DROP DATABASE %s", dbName)},
 		},
 	}
-	serverNode := &plugin.ConnectionTreeNode{
-		Key:      "__server__",
-		Label:    "Databases",
-		NodeType: "server",
-		Children: []*plugin.ConnectionTreeNode{dbNode},
+	createNode := &plugin.ConnectionTreeNode{
+		Key:      "__create_database__",
+		Label:    "New database",
+		NodeType: plugin.ConnectionTreeNodeTypeAction,
 		Actions: []*plugin.ConnectionTreeAction{
-			{Type: plugin.ConnectionTreeActionCreateDatabase, Title: "Create database", Query: "CREATE DATABASE new_database"},
+			{Type: plugin.ConnectionTreeActionCreateDatabase, Title: "Create database", Query: "CREATE DATABASE new_database", Hidden: true},
 		},
 	}
-	return &plugin.ConnectionTreeResponse{Nodes: []*plugin.ConnectionTreeNode{serverNode}}
+	return &plugin.ConnectionTreeResponse{Nodes: []*plugin.ConnectionTreeNode{createNode, dbNode}}
 }
 
 // collectionNodes returns tree nodes for user collections inside db.
@@ -451,12 +451,14 @@ func (a *arangoPlugin) collectionNodes(ctx context.Context, db driver.Database, 
 		nodes = append(nodes, &plugin.ConnectionTreeNode{
 			Key:      qualified,
 			Label:    name,
-			NodeType: "collection",
+			NodeType: plugin.ConnectionTreeNodeTypeCollection,
 			Actions: []*plugin.ConnectionTreeAction{
 				{
-					Type:  plugin.ConnectionTreeActionSelect,
-					Title: "Select documents",
-					Query: fmt.Sprintf("FOR doc IN %s LIMIT 100 RETURN doc", qualified),
+					Type:   plugin.ConnectionTreeActionSelect,
+					Title:  "Select documents",
+					Query:  fmt.Sprintf("FOR doc IN %s LIMIT 100 RETURN doc", qualified),
+					Hidden: true,
+					NewTab: true,
 				},
 				{
 					Type:  plugin.ConnectionTreeActionDropTable,

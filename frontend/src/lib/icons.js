@@ -55,6 +55,7 @@ export const nodeTypeIconMap = {
   schema:   LayersOutline,
   table:    GridOutline,
   column:   CodeSlashOutline,
+  action:   AddCircleOutline,
 }
 
 /** Used when a plugin node has no recognised node_type value. */
