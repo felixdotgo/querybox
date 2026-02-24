@@ -74,6 +74,15 @@ export function NewMainWindow() {
 }
 
 /**
+ * OpenFileDialog opens a native file picker and returns the selected file path.
+ * Returns an empty string if the user cancels.
+ * @returns {$CancellablePromise<string>}
+ */
+export function OpenFileDialog() {
+    return $Call.ByID(309694127);
+}
+
+/**
  * ShowConnectionsWindow shows the connections window and brings it to the front.
  * @returns {$CancellablePromise<void>}
  */

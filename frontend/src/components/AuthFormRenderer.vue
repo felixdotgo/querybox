@@ -17,6 +17,16 @@
       <div v-else-if="field.type === FieldType.CHECKBOX">
         <n-checkbox v-model:value="values[field.name]">{{ field.label || field.name }}</n-checkbox>
       </div>
+      <div v-else-if="field.type === FieldType.FILE_PATH" class="flex gap-2">
+        <n-input v-model:value="values[field.name]" :placeholder="field.placeholder || ''" class="flex-1" />
+        <n-button @click="pickFile(field.name)" :title="'Browse for file'">
+          <template #icon>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            </svg>
+          </template>
+        </n-button>
+      </div>
       <div v-else>
         <n-input v-model:value="values[field.name]" :placeholder="field.placeholder || ''" class="w-full" />
       </div>
@@ -26,9 +36,10 @@
 
 <script setup>
 import { toRefs, watch } from 'vue'
+import { OpenFileDialog } from '../../bindings/github.com/felixdotgo/querybox/services/app.js'
 
 // FieldType mirrors PluginV1_AuthField_FieldType enum (proto int values)
-const FieldType = { TEXT: 1, NUMBER: 2, PASSWORD: 3, CHECKBOX: 4, SELECT: 5 }
+const FieldType = { TEXT: 1, NUMBER: 2, PASSWORD: 3, CHECKBOX: 4, SELECT: 5, FILE_PATH: 6 }
 
 const props = defineProps({
   form: { type: Object, required: true },
@@ -39,4 +50,11 @@ const emit = defineEmits(['update:modelValue'])
 const { modelValue: values } = toRefs(props)
 
 watch(values, (v) => emit('update:modelValue', v), { deep: true })
+
+async function pickFile(fieldName) {
+  const path = await OpenFileDialog()
+  if (path) {
+    values.value[fieldName] = path
+  }
+}
 </script>

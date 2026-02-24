@@ -122,6 +122,17 @@ func (a *App) ShowConnectionsWindow() {
 	a.ConnectionsWindow.Focus()
 }
 
+// OpenFileDialog opens a native file picker and returns the selected file path.
+// Returns an empty string if the user cancels.
+func (a *App) OpenFileDialog() (string, error) {
+	return a.App.Dialog.OpenFile().
+		SetTitle("Select SQLite Database File").
+		CanChooseFiles(true).
+		AddFilter("SQLite Database", "*.db;*.sqlite;*.sqlite3").
+		AddFilter("All Files", "*").
+		PromptForSingleSelection()
+}
+
 // CloseConnectionsWindow hides the connections window and sends it to the back.
 func (a *App) CloseConnectionsWindow() {
 	if a.ConnectionsWindow != nil {

@@ -97,6 +97,7 @@ const (
 	AuthFieldPassword = pluginpb.PluginV1_AuthField_PASSWORD
 	AuthFieldSelect   = pluginpb.PluginV1_AuthField_SELECT
 	AuthFieldCheckbox = pluginpb.PluginV1_AuthField_CHECKBOX
+	AuthFieldFilePath = pluginpb.PluginV1_AuthField_FILE_PATH
 
 	// common action types for ConnectionTree nodes.  Plugins should use
 	// these constants rather than hardcoding strings to avoid typos and to
