@@ -95,7 +95,7 @@ const containerRef = computed(() => layoutRef.value?.containerRef)
 const selectedConnection = ref(null)
 const activeConnectionId = ref(null)
 
-const footerCollapsed = ref(false)
+const footerCollapsed = ref(true)
 const footerHeight = ref(176)
 
 // log entries streamed from the Go backend via the app:log event
