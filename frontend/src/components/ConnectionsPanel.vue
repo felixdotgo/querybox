@@ -8,7 +8,7 @@
       <div class="flex">
         <n-button
           size="small"
-          secondary
+          type="primary"
           title="New connection"
           @click="openConnections"
         >
@@ -141,7 +141,13 @@ const deleteModal = ref({ visible: false, conn: null })
 const actionModal = ref({ visible: false, action: null, conn: null, node: null })
 
 const defaultExpandedKeys = computed(() => {
-  return Object.keys(connectionTrees)
+  // include every connection id so that roots are always visible when
+  // expansion state is reset.  `connectionTrees` only contains entries for
+  // connections whose tree has been loaded, so combining both ensures the
+  // first connection never vanishes after a search.
+  const ids = new Set(Object.keys(connectionTrees))
+  connections.value.forEach((c) => ids.add(c.id))
+  return Array.from(ids)
 })
 
 /**
@@ -192,12 +198,31 @@ const treeData = computed(() => {
   })
 })
 
+// recursively filter a hierarchy of nodes.  If a node's label matches
+// the query it is kept verbatim.  Otherwise we recurse into its children and
+// keep the node only if any child survives, replacing `children` with the
+// pruned list.
+function filterNodes(nodes, q) {
+  return nodes
+    .map((node) => {
+      const matches = (node.label || "").toLowerCase().includes(q)
+      let children = []
+      if (Array.isArray(node.children)) {
+        children = filterNodes(node.children, q)
+      }
+      if (matches || children.length > 0) {
+        // shallow clone to avoid mutating original treeData
+        return { ...node, children: children.length ? children : undefined }
+      }
+      return null
+    })
+    .filter((n) => n !== null)
+}
+
 const filteredTreeData = computed(() => {
   const q = (filter.value || "").toLowerCase().trim()
   if (!q) return treeData.value
-  return treeData.value.filter((node) =>
-    (node.label || "").toLowerCase().includes(q),
-  )
+  return filterNodes(treeData.value, q)
 })
 
 async function loadConnections() {
@@ -554,6 +579,31 @@ async function fetchTreeFor(conn) {
 // keep expandedKeys in sync when connection list or cache changes
 watch([connections, () => Object.keys(connectionTrees)], () => {
   expandedKeys.value = defaultExpandedKeys.value
+})
+
+// when a search query is entered we want to expand all nodes that would
+// appear so the match is visible.  Clearing the filter restores the normal
+// default expansion state.
+watch(filter, (q) => {
+  const query = (q || "").toLowerCase().trim()
+  if (!query) {
+    expandedKeys.value = defaultExpandedKeys.value
+    // scroll back to top so the first connection isn’t hidden offscreen
+    if (treeScrollRef.value && treeScrollRef.value.scrollTop !== undefined) {
+      treeScrollRef.value.scrollTop = 0
+    }
+    return
+  }
+
+  const keys = new Set()
+  function collect(nlist) {
+    nlist.forEach((n) => {
+      keys.add(n.key)
+      if (Array.isArray(n.children)) collect(n.children)
+    })
+  }
+  collect(filteredTreeData.value)
+  expandedKeys.value = Array.from(keys)
 })
 
 // initialize
