@@ -62,6 +62,11 @@ defineProps({
     type: Boolean,
     default: false,
   },
+  /** True when this connection's result is currently active in the workspace */
+  isActive: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const emit = defineEmits(["connect", "delete", "dblclick"])

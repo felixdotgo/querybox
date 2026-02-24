@@ -1,15 +1,15 @@
 <template>
-  <div class="w-full overflow-auto">
+  <div class="w-full overflow-auto overflow-x-auto">
     <template v-if="payload?.columns">
       <n-data-table
         :columns="tableColumns"
         :data="tableData"
         :row-key="rowKeyFunction"
+        :scroll-x="scrollX"
         size="small"
         bordered
         striped
         scrollable
-        class="w-full"
       />
     </template>
     <template v-else-if="payload?.document">
@@ -94,6 +94,9 @@ const tableColumns = computed(() => {
     key: `col${idx}`,
     align: "left",
     ellipsis: true,
+    resizable: true,
+    minWidth: 80,
+    width: 150,
   }))
 })
 
@@ -118,6 +121,10 @@ const tableData = computed(() => {
     return obj
   })
 })
+
+const scrollX = computed(() =>
+  tableColumns.value.reduce((sum, col) => sum + (col.width || 150), 0)
+)
 
 // helper for row-key prop
 const rowKeyFunction = (row) => row && row.key

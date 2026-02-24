@@ -1,10 +1,12 @@
 <template>
-  <div class="flex flex-col h-full">
+  <div class="flex flex-col h-full overflow-hidden">
     <n-tabs
       type="card"
       v-model:value="activeTabKey"
       @close="handleTabClose"
-      class="mb-4"
+      class="flex flex-col h-full"
+      :tab-bar-style="{ position: 'sticky', top: 0, zIndex: 10, flexShrink: 0 }"
+      :pane-style="{ overflow: 'auto', flex: '1 1 0', minHeight: 0 }"
     >
       <n-tab-pane
         v-for="tab in tabs"
@@ -29,16 +31,22 @@
 </template>
 
 <script setup>
-import { ref } from "vue"
+import { ref, watch } from "vue"
 import ResultViewer from "@/components/ResultViewer.vue"
 
 const props = defineProps({
   selectedConnection: { type: Object, default: null },
 })
-const emit = defineEmits(["tab-closed"])
+const emit = defineEmits(["tab-closed", "active-connection-changed"])
 
 const tabs = ref([])
 const activeTabKey = ref("")
+
+watch(activeTabKey, (key) => {
+  // tabKey format: conn.id + ":" + node.key — extract the connection ID
+  const connId = key ? key.split(":")[0] : null
+  emit("active-connection-changed", connId || null)
+})
 
 function openTab(title, result, error, tabKey, version) {
   // sanitize human title just in case it still contains a prefix
