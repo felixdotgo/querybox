@@ -1,40 +1,17 @@
 <template>
-  <div class="w-full overflow-auto overflow-x-auto">
-    <template v-if="payload?.columns">
-      <n-data-table
-        :columns="tableColumns"
-        :data="tableData"
-        :row-key="rowKeyFunction"
-        :scroll-x="scrollX"
-        size="small"
-        bordered
-        striped
-        scrollable
-      />
-    </template>
-    <template v-else-if="payload?.document">
-      <pre class="whitespace-pre-wrap">{{ payload.document | json }}</pre>
-    </template>
-    <template v-else-if="payload?.data">
-      <!-- KV payload is normalized to { data: {...} } -->
-      <n-descriptions bordered column="1">
-        <n-descriptions-item
-          v-for="(v, k) in payload.data || {}"
-          :key="k"
-          :label="k"
-        >
-          {{ v }}
-        </n-descriptions-item>
-      </n-descriptions>
-    </template>
-    <template v-else>
-      <div class="text-gray-500">No Results</div>
-    </template>
+  <div class="w-full overflow-auto">
+    <ResultViewerRdbms v-if="viewType === 'rdbms'" :payload="payload" />
+    <ResultViewerDocument v-else-if="viewType === 'document'" :payload="payload" />
+    <ResultViewerKeyValue v-else-if="viewType === 'kv'" :payload="payload" />
+    <div v-else class="text-gray-500">No Results</div>
   </div>
 </template>
 
 <script setup>
 import { computed } from "vue"
+import ResultViewerRdbms from "@/components/ResultViewerRdbms.vue"
+import ResultViewerDocument from "@/components/ResultViewerDocument.vue"
+import ResultViewerKeyValue from "@/components/ResultViewerKeyValue.vue"
 
 const props = defineProps({
   result: {
@@ -44,22 +21,25 @@ const props = defineProps({
 })
 
 const payload = computed(() => {
-  // unwrap potential ExecResult envelope produced by core-service
+  // Unwrap the ExecResult envelope produced by core-service.
+  // The result coming from the backend may be:
+  //   { columns:…, rows:… }            -- already unwrapped RDBMS
+  //   { sql: {…} }                      -- lowercase sql wrapper
+  //   { Sql: {…} }                      -- capitalised sql wrapper
+  //   { document: {…} }                 -- document wrapper
+  //   { kv: {…} }                       -- kv wrapper
+  //   PluginV1_ExecResult instance       -- JS class with Payload field
   const result = props.result || {}
   console.debug("ResultViewer received result prop", result)
-  // The result coming from the backend may be:
-  //   { columns:…, rows:… }            -- already unwrapped
-  //   { sql: {…} }                      -- lowercase wrapper
-  //   { Sql: {…} }                      -- capitalised wrapper
-  //   PluginV1_ExecResult instance       -- JS class with Payload field
-  // Unwrap repeatedly until we have the raw payload object.
+
   let r = result
 
-  // if it's a protobuf class with Payload property, unwrap it
+  // unwrap protobuf class envelope
   if (r && typeof r === "object" && "Payload" in r) {
     r = r.Payload
   }
 
+  // first unwrap pass
   if (r.sql) r = r.sql
   else if (r.Sql) r = r.Sql
   else if (r.document) r = r.document
@@ -81,51 +61,13 @@ const payload = computed(() => {
   return r
 })
 
-const tableColumns = computed(() => {
-  // payload.value.columns may be a Vue proxy with numeric properties rather
-  // than a true Array.  Use Array.from to normalise it.
-  let cols = payload.value.columns || []
-  if (!Array.isArray(cols)) {
-    cols = Array.from(cols)
-  }
-
-  return cols.map((c, idx) => ({
-    title: c.name || `col${idx}`,
-    key: `col${idx}`,
-    align: "left",
-    ellipsis: true,
-    resizable: true,
-    minWidth: 80,
-    width: 150,
-  }))
+// Determine which sub-viewer to render based on the payload shape.
+const viewType = computed(() => {
+  const p = payload.value
+  if (!p) return null
+  if (p.columns) return "rdbms"
+  if (p.document !== undefined) return "document"
+  if (p.data !== undefined) return "kv"
+  return null
 })
-
-const tableData = computed(() => {
-  let rows = payload.value.rows || []
-  if (!Array.isArray(rows)) {
-    rows = Array.from(rows)
-  }
-
-  return rows.map((r, rowIdx) => {
-    const obj = { key: rowIdx }
-    // support various shapes: r.values, r.Values, r.getValues()
-    let vals = []
-    if (r) {
-      if (Array.isArray(r.values)) vals = r.values
-      else if (Array.isArray(r.Values)) vals = r.Values
-      else if (typeof r.getValues === "function") vals = r.getValues()
-    }
-    (vals || []).forEach((v, i) => {
-      obj[`col${i}`] = v
-    })
-    return obj
-  })
-})
-
-const scrollX = computed(() =>
-  tableColumns.value.reduce((sum, col) => sum + (col.width || 150), 0)
-)
-
-// helper for row-key prop
-const rowKeyFunction = (row) => row && row.key
 </script>
