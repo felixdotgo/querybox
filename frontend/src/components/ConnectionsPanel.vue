@@ -198,31 +198,14 @@ const treeData = computed(() => {
   })
 })
 
-// recursively filter a hierarchy of nodes.  If a node's label matches
-// the query it is kept verbatim.  Otherwise we recurse into its children and
-// keep the node only if any child survives, replacing `children` with the
-// pruned list.
-function filterNodes(nodes, q) {
-  return nodes
-    .map((node) => {
-      const matches = (node.label || "").toLowerCase().includes(q)
-      let children = []
-      if (Array.isArray(node.children)) {
-        children = filterNodes(node.children, q)
-      }
-      if (matches || children.length > 0) {
-        // shallow clone to avoid mutating original treeData
-        return { ...node, children: children.length ? children : undefined }
-      }
-      return null
-    })
-    .filter((n) => n !== null)
-}
-
+// Retain original node references — only slice the top-level connections array.
+// Child nodes are never cloned so all tree interactions remain intact.
 const filteredTreeData = computed(() => {
   const q = (filter.value || "").toLowerCase().trim()
   if (!q) return treeData.value
-  return filterNodes(treeData.value, q)
+  return treeData.value.filter((node) =>
+    (node.label || "").toLowerCase().includes(q),
+  )
 })
 
 async function loadConnections() {
@@ -571,39 +554,16 @@ async function fetchTreeFor(conn) {
   if (!conn) return
   await loadConnectionTree(conn)
   if (!expandedKeys.value.includes(conn.id)) {
-    expandedKeys.value.push(conn.id)
+    expandedKeys.value = [...expandedKeys.value, conn.id]
   }
 }
 
-// watch to ensure driver groups expanded when connections reload
-// keep expandedKeys in sync when connection list or cache changes
-watch([connections, () => Object.keys(connectionTrees)], () => {
-  expandedKeys.value = defaultExpandedKeys.value
-})
-
-// when a search query is entered we want to expand all nodes that would
-// appear so the match is visible.  Clearing the filter restores the normal
-// default expansion state.
+// When filter is cleared, reset scroll so the first connection is visible.
+// Naive UI's built-in pattern/filter props handle expanding matching nodes.
 watch(filter, (q) => {
-  const query = (q || "").toLowerCase().trim()
-  if (!query) {
-    expandedKeys.value = defaultExpandedKeys.value
-    // scroll back to top so the first connection isn’t hidden offscreen
-    if (treeScrollRef.value && treeScrollRef.value.scrollTop !== undefined) {
-      treeScrollRef.value.scrollTop = 0
-    }
-    return
+  if (!(q || "").trim() && treeScrollRef.value) {
+    treeScrollRef.value.scrollTop = 0
   }
-
-  const keys = new Set()
-  function collect(nlist) {
-    nlist.forEach((n) => {
-      keys.add(n.key)
-      if (Array.isArray(n.children)) collect(n.children)
-    })
-  }
-  collect(filteredTreeData.value)
-  expandedKeys.value = Array.from(keys)
 })
 
 // initialize
