@@ -10,7 +10,7 @@
         @dragstart="startDrag"
       >
         <template #left>
-          <div class="bg-slate-50 min-h-full">
+          <div class="bg-slate-50 h-full">
             <SafeZone />
             <ConnectionsPanel
               :activeConnectionId="activeConnectionId"

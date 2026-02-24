@@ -1,6 +1,6 @@
 <template>
-  <div class="w-full overflow-auto">
-    <ResultViewerRdbms v-if="viewType === 'rdbms'" :payload="payload" />
+  <div class="h-full w-full flex flex-col overflow-hidden">
+    <ResultViewerRdbms v-if="viewType === 'rdbms'" class="flex-1 min-h-0" :payload="payload" />
     <ResultViewerDocument v-else-if="viewType === 'document'" :payload="payload" />
     <ResultViewerKeyValue v-else-if="viewType === 'kv'" :payload="payload" />
     <div v-else class="text-gray-500">No Results</div>

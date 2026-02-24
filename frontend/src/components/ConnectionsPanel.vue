@@ -25,7 +25,12 @@
       placeholder="Filter"
     />
 
-    <div class="flex-1 overflow-auto mt-2 px-1 min-h-0">
+    <div
+      ref="treeScrollRef"
+      class="flex-1 overflow-auto mt-2 px-1 min-h-0 transition-shadow duration-150"
+      :class="{ 'shadow-[inset_0_6px_6px_-6px_rgba(0,0,0,0.12)]': isScrolled }"
+      @scroll.passive="isScrolled = $event.target.scrollTop > 0"
+    >
       <n-tree
         :data="filteredTreeData"
         v-model:expanded-keys="expandedKeys"
@@ -77,7 +82,6 @@ import ActionFormModal from "@/components/ActionFormModal.vue"
 import ConnectionNodeLabel from "@/components/ConnectionNodeLabel.vue"
 import ConnectionTreeNodeLabel from "@/components/ConnectionTreeNodeLabel.vue"
 import {
-  LayersOutline,
   ServerOutline,
   AddCircleOutline,
   nodeTypeIconMap,
@@ -123,6 +127,8 @@ async function openConnections() {
 }
 
 // panel state -------------------------------------------------------------
+const treeScrollRef = ref(null)
+const isScrolled = ref(false)
 const connections = ref([])
 const filter = ref("")
 const connectionTrees = ref({})
@@ -132,7 +138,7 @@ const deleteModal = ref({ visible: false, conn: null })
 const actionModal = ref({ visible: false, action: null, conn: null, node: null })
 
 const defaultExpandedKeys = computed(() => {
-  return treeData.value.map((g) => g.key)
+  return Object.keys(connectionTrees.value)
 })
 
 /**
@@ -151,35 +157,18 @@ function tagWithConnId(nodes, connId) {
 }
 
 const treeData = computed(() => {
-  const groups = {}
-  for (const c of connections.value || []) {
-    const key = c.driver_type || "unknown"
-    if (!groups[key]) groups[key] = []
-    groups[key].push(c)
-  }
-  return Object.entries(groups).map(([driver, conns]) => ({
-    key: `driver:${driver}`,
-    label: `${driver} (${conns.length})`,
-    children: conns.map((cc) => {
-      const extra = tagWithConnId(connectionTrees.value[cc.id] || [], cc.id)
-      return { key: cc.id, label: cc.name, children: extra }
-    }),
-  }))
+  return (connections.value || []).map((cc) => {
+    const extra = tagWithConnId(connectionTrees.value[cc.id] || [], cc.id)
+    return { key: cc.id, label: cc.name, children: extra.length ? extra : undefined }
+  })
 })
 
 const filteredTreeData = computed(() => {
   const q = (filter.value || "").toLowerCase().trim()
   if (!q) return treeData.value
-  return treeData.value
-    .map((g) => ({
-      ...g,
-      children: g.children.filter((ch) =>
-        (ch.label || "").toLowerCase().includes(q),
-      ),
-    }))
-    .filter(
-      (g) => g.children.length > 0 || (g.label || "").toLowerCase().includes(q),
-    )
+  return treeData.value.filter((node) =>
+    (node.label || "").toLowerCase().includes(q),
+  )
 })
 
 async function loadConnections() {
@@ -282,9 +271,7 @@ function renderLabel({ option }) {
 function renderPrefix({ option }) {
   let icon
   const conn = connections.value.find((c) => c.id === option.key)
-  if (String(option.key).startsWith("driver:")) {
-    icon = LayersOutline
-  } else if (conn) {
+  if (conn) {
     icon = ServerOutline
   } else {
     icon = nodeTypeIconMap[option.node_type] ?? nodeTypeFallbackIcon
