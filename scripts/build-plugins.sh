@@ -20,6 +20,8 @@ mkdir -p "$OUT_DIR"
 echo "Building plugins from $PLUGINS_DIR -> $OUT_DIR"
 
 built=0
+# report target platform for clarity
+echo "Target GOOS=${GOOS:-$(go env GOOS)} GOARCH=${GOARCH:-$(go env GOARCH)}"
 for d in "$PLUGINS_DIR"/*; do
   [ -d "$d" ] || continue
   name="$(basename "$d")"
@@ -38,9 +40,29 @@ for d in "$PLUGINS_DIR"/*; do
     continue
   fi
 
+  # determine final output path; on Windows add .exe if not already
   out_path="$OUT_DIR/$name"
+
+  # decide GOOS for extension detection; respect explicit env var first,
+  # otherwise try `go env` then fallback to shell platform hints
+  goos=${GOOS:-}
+  if [ -z "$goos" ]; then
+    goos=$(go env GOOS)
+  fi
+  # shells like Git Bash/MSYS/WSL may misreport; check uname for Windows indicators
+  case "$(uname -s)" in
+    *MINGW*|*MSYS*|*CYGWIN*|*Microsoft*)
+      goos=windows
+      ;;
+  esac
+
+  if [ "$goos" = "windows" ] && [[ "$out_path" != *.exe ]]; then
+    out_path="${out_path}.exe"
+  fi
+
   echo "- Building $name -> $out_path"
   if GOOS=${GOOS:-} GOARCH=${GOARCH:-} go build -o "$out_path" "${build_target:-./plugins/$name}"; then
+    # make executable and preserve extension
     chmod +x "$out_path" || true
     built=$((built+1))
   else
