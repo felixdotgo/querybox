@@ -13,6 +13,7 @@
           <div class="bg-slate-50 min-h-full">
             <SafeZone />
             <ConnectionsPanel
+              :activeConnectionId="activeConnectionId"
               @connection-selected="selectedConnection = $event"
               @query-result="openTab"
             />
@@ -23,6 +24,7 @@
           <WorkspacePanel
             ref="workspaceRef"
             :selectedConnection="selectedConnection"
+            @active-connection-changed="activeConnectionId = $event"
           />
         </template>
       </TwoColumnLayout>
@@ -91,6 +93,7 @@ const leftWidth = ref(0)
 // convenience computed pointing at actual DOM element
 const containerRef = computed(() => layoutRef.value?.containerRef)
 const selectedConnection = ref(null)
+const activeConnectionId = ref(null)
 
 const footerCollapsed = ref(false)
 const footerHeight = ref(176)

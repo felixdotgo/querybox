@@ -94,6 +94,9 @@ const tableColumns = computed(() => {
     key: `col${idx}`,
     align: "left",
     ellipsis: true,
+    resizable: true,
+    minWidth: 80,
+    width: 150,
   }))
 })
 

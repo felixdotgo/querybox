@@ -90,6 +90,10 @@ import {
 } from "@/bindings/github.com/felixdotgo/querybox/services/app"
 import SafeZone from "./SafeZone.vue"
 
+const props = defineProps({
+  activeConnectionId: { type: String, default: null },
+})
+
 // declare events emitted by this component
 const emit = defineEmits([
   "connection-selected",
@@ -273,6 +277,7 @@ function renderLabel({ option }) {
   return h(ConnectionNodeLabel, {
     label: option.label,
     hasTree: !!connectionTrees.value[conn.id],
+    isActive: props.activeConnectionId === conn.id,
     onConnect() {
       if (connectionTrees.value[conn.id]) {
         const copy = { ...connectionTrees.value }
@@ -292,14 +297,36 @@ function renderLabel({ option }) {
 
 function renderPrefix({ option }) {
   let icon
+  const conn = connections.value.find((c) => c.id === option.key)
   if (String(option.key).startsWith("driver:")) {
     icon = LayersOutline
-  } else if (connections.value.find((c) => c.id === option.key)) {
+  } else if (conn) {
     icon = ServerOutline
   } else {
     icon = nodeTypeIconMap[option.node_type] ?? nodeTypeFallbackIcon
   }
-  return h(NIcon, { size: 14 }, { default: () => h(icon) })
+
+  const iconNode = h(NIcon, { size: 14 }, { default: () => h(icon) })
+
+  if (conn && props.activeConnectionId === conn.id) {
+    return h("div", { style: { position: "relative", display: "inline-flex" } }, [
+      iconNode,
+      h("span", {
+        style: {
+          position: "absolute",
+          bottom: "-2px",
+          right: "-3px",
+          width: "8px",
+          height: "8px",
+          borderRadius: "50%",
+          backgroundColor: "#22c55e",
+          border: "1px solid white",
+        },
+      }),
+    ])
+  }
+
+  return iconNode
 }
 
 async function confirmDelete() {
