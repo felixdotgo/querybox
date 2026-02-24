@@ -2,6 +2,8 @@
 
 **QueryBox** is a database management tool for executing and managing queries across multiple database systems through a plugin-based architecture.
 
+![QueryBox Desktop](docs/querybox-development.png)
+
 ## Prerequisites
 
 | Tool | Version | Purpose |
