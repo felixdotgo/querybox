@@ -253,6 +253,21 @@ function handleSelect(keys, options, meta) {
     return
   }
 
+  // Container nodes (database, schema, collection, …) that have children
+  // but no select action should expand/collapse on click instead of doing
+  // nothing.  This gives a natural feel when browsing the tree.
+  const hasChildren = Array.isArray(node.children) && node.children.length > 0
+  const hasSelectAction = node.actions?.some((a) => a.type === "select")
+  if (hasChildren && !hasSelectAction) {
+    const idx = expandedKeys.value.indexOf(node.key)
+    if (idx === -1) {
+      expandedKeys.value = [...expandedKeys.value, node.key]
+    } else {
+      expandedKeys.value = expandedKeys.value.filter((k) => k !== node.key)
+    }
+    return
+  }
+
 }
 
 
