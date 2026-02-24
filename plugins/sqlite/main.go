@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/felixdotgo/querybox/pkg/plugin"
 	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
@@ -102,6 +103,23 @@ func (m *sqlitePlugin) Exec(req *plugin.ExecRequest) (*plugin.ExecResponse, erro
 	}
 	defer db.Close()
 
+	// Use Exec for non-SELECT statements (DDL, DML) so they succeed even when
+	// they return no rows.  db.Query on a DROP/CREATE would drain silently on
+	// some drivers and return a confusing empty-result instead of an error.
+	trimmed := strings.TrimSpace(strings.ToUpper(req.Query))
+	if !strings.HasPrefix(trimmed, "SELECT") && !strings.HasPrefix(trimmed, "WITH") && !strings.HasPrefix(trimmed, "PRAGMA") {
+		if _, execErr := db.Exec(req.Query); execErr != nil {
+			return &plugin.ExecResponse{Error: fmt.Sprintf("exec error: %v", execErr)}, nil
+		}
+		return &plugin.ExecResponse{
+			Result: &plugin.ExecResult{
+				Payload: &pluginpb.PluginV1_ExecResult_Sql{
+					Sql: &plugin.SqlResult{},
+				},
+			},
+		}, nil
+	}
+
 	rows, err := db.Query(req.Query)
 	if err != nil {
 		return &plugin.ExecResponse{Error: fmt.Sprintf("query error: %v", err)}, nil
@@ -168,23 +186,39 @@ func (m *sqlitePlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugi
 	}
 	defer rows.Close()
 
-	var nodes []*plugin.ConnectionTreeNode
+	var tableNodes []*plugin.ConnectionTreeNode
 	for rows.Next() {
 		var tbl string
 		if err := rows.Scan(&tbl); err != nil {
 			continue
 		}
-		nodes = append(nodes, &plugin.ConnectionTreeNode{
+		tableNodes = append(tableNodes, &plugin.ConnectionTreeNode{
 			Key:      tbl,
 			Label:    tbl,
 			NodeType: "table",
 			Actions: []*plugin.ConnectionTreeAction{
-				{Type: plugin.ConnectionTreeActionSelect, Title: tbl, Query: fmt.Sprintf(`SELECT * FROM "%s" LIMIT 100;`, tbl)},
+				{Type: plugin.ConnectionTreeActionSelect, Title: "Select rows", Query: fmt.Sprintf(`SELECT * FROM "%s" LIMIT 100;`, tbl)},
+				{Type: plugin.ConnectionTreeActionDropTable, Title: "Drop table", Query: fmt.Sprintf(`DROP TABLE "%s";`, tbl)},
 			},
 		})
 	}
 
-	return &plugin.ConnectionTreeResponse{Nodes: nodes}, nil
+	// Wrap tables under a root server node that exposes the create-table action.
+	serverNode := &plugin.ConnectionTreeNode{
+		Key:      "__server__",
+		Label:    "Tables",
+		NodeType: "server",
+		Children: tableNodes,
+		Actions: []*plugin.ConnectionTreeAction{
+			{
+				Type:  plugin.ConnectionTreeActionCreateTable,
+				Title: "Create table",
+				Query: "CREATE TABLE \"new_table\" (\n    \"id\" INTEGER PRIMARY KEY AUTOINCREMENT\n);",
+			},
+		},
+	}
+
+	return &plugin.ConnectionTreeResponse{Nodes: []*plugin.ConnectionTreeNode{serverNode}}, nil
 }
 
 // TestConnection verifies the connection is reachable without persisting any state.
