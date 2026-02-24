@@ -32,6 +32,7 @@
       @scroll.passive="isScrolled = $event.target.scrollTop > 0"
     >
       <n-tree
+        show-line
         :data="filteredTreeData"
         v-model:expanded-keys="expandedKeys"
         :default-expanded-keys="defaultExpandedKeys"
