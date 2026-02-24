@@ -21,24 +21,21 @@
             <!-- Query Editor Area -->
             <div
               v-if="tab.context"
-              class="p-2 border-b border-gray-100 flex flex-col gap-2 bg-slate-50 shrink-0"
+              class="border-b border-gray-200 flex flex-col bg-white shrink-0 relative h-48 pb-10"
             >
-              <n-input
-                v-model:value="tab.query"
-                type="textarea"
-                :autosize="{ minRows: 2, maxRows: 10 }"
-                placeholder="Type query..."
-                size="small"
-                class="font-mono text-[11px]"
-                @keypress.enter.prevent.ctrl="handleRefresh(tab)"
+              <QueryEditor
+                v-model="tab.query"
+                :language="tab.language || 'sql'"
+                @execute="handleRefresh(tab)"
               />
-              <div class="flex">
+              <div class="absolute bottom-2 left-2 flex gap-2 z-10 pointer-events-none">
                 <n-button
                   size="small"
                   type="primary"
                   :loading="tab.loading"
                   @click="handleRefresh(tab)"
                   title="Execute (Ctrl+Enter)"
+                  class="pointer-events-auto shadow-md"
                 >
                   <template #icon>
                     <n-icon :size="12"><RefreshOutline /></n-icon>
@@ -67,9 +64,10 @@
 
 <script setup>
 import { ref, watch } from "vue"
-import { NButton, NIcon, NInput } from "naive-ui"
+import { NButton, NIcon } from "naive-ui"
 import { RefreshOutline } from "@/lib/icons"
 import ResultViewer from "@/components/ResultViewer.vue"
+import QueryEditor from "@/components/QueryEditor.vue"
 
 const props = defineProps({
   selectedConnection: { type: Object, default: null },
@@ -78,6 +76,17 @@ const emit = defineEmits(["tab-closed", "active-connection-changed", "refresh-ta
 
 const tabs = ref([])
 const activeTabKey = ref("")
+
+function getMonacoLanguage(driver) {
+  if (!driver) return "sql"
+  const d = driver.toLowerCase()
+  if (d.includes("postgres") || d.includes("psql")) return "pgsql"
+  if (d.includes("mysql")) return "mysql"
+  if (d.includes("sqlite")) return "sql"
+  if (d.includes("redis")) return "redis"
+  if (d.includes("arangodb")) return "javascript" // AQL is not supported, javascript is close enough or use sql
+  return "sql"
+}
 
 watch(activeTabKey, (key) => {
   // tabKey format: conn.id + ":" + node.key — extract the connection ID
@@ -139,6 +148,7 @@ function openTab(title, result, error, tabKey, version, context) {
     context,
     loading: false,
     query: context?.action?.query || "",
+    language: getMonacoLanguage(context?.conn?.driver_type),
   }
 
   if (existing) {
