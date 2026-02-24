@@ -32,6 +32,7 @@
       @scroll.passive="isScrolled = $event.target.scrollTop > 0"
     >
       <n-tree
+        show-line
         :data="filteredTreeData"
         v-model:expanded-keys="expandedKeys"
         :default-expanded-keys="defaultExpandedKeys"
@@ -92,6 +93,7 @@ import {
   GetCredential,
   DeleteConnection,
 } from "@/bindings/github.com/felixdotgo/querybox/services/connectionservice"
+import { useConnectionTree } from "@/composables/useConnectionTree"
 // @ts-ignore: may be generated after adding new methods
 import {
   GetConnectionTree,
@@ -131,14 +133,15 @@ const treeScrollRef = ref(null)
 const isScrolled = ref(false)
 const connections = ref([])
 const filter = ref("")
-const connectionTrees = ref({})
+// connectionTrees replaced by shared cache from composable
+const { cache: connectionTrees, load: loadConnectionTree } = useConnectionTree()
 const selectedConnection = ref(null)
 const expandedKeys = ref([])
 const deleteModal = ref({ visible: false, conn: null })
 const actionModal = ref({ visible: false, action: null, conn: null, node: null })
 
 const defaultExpandedKeys = computed(() => {
-  return Object.keys(connectionTrees.value)
+  return Object.keys(connectionTrees)
 })
 
 /**
@@ -184,7 +187,7 @@ function tagWithConnId(nodes, connId) {
 
 const treeData = computed(() => {
   return (connections.value || []).map((cc) => {
-    const extra = tagWithConnId(connectionTrees.value[cc.id] || [], cc.id)
+    const extra = tagWithConnId(connectionTrees[cc.id] || [], cc.id)
     return { key: cc.id, label: cc.name, children: extra.length ? extra : undefined }
   })
 })
@@ -200,11 +203,12 @@ const filteredTreeData = computed(() => {
 async function loadConnections() {
   try {
     connections.value = (await ListConnections()) || []
-    connectionTrees.value = {}
+    // clear cache when whole list is reloaded; avoids stale entries
+    Object.keys(connectionTrees).forEach((k) => delete connectionTrees[k])
   } catch (err) {
     console.error("ListConnections", err)
     connections.value = []
-    connectionTrees.value = {}
+    Object.keys(connectionTrees).forEach((k) => delete connectionTrees[k])
   }
 }
 
@@ -274,9 +278,8 @@ function handleSelect(keys, options, meta) {
 function handleConnectionDblclick(conn) {
   if (!conn) return
   selectedConnection.value = conn
-  const copy = { ...connectionTrees.value }
-  delete copy[conn.id]
-  connectionTrees.value = copy
+  // remove cached tree so that a fresh fetch happens on reconnect
+  delete connectionTrees[conn.id]
   checkConnection(conn)
   // tree load remains tied to the explicit connect button so we don't
   // auto-fetch here
@@ -325,13 +328,11 @@ function renderLabel({ option }) {
 
   return h(ConnectionNodeLabel, {
     label: option.label,
-    hasTree: !!connectionTrees.value[conn.id],
+    hasTree: !!connectionTrees[conn.id],
     isActive: props.activeConnectionId === conn.id,
     onConnect() {
-      if (connectionTrees.value[conn.id]) {
-        const copy = { ...connectionTrees.value }
-        delete copy[conn.id]
-        connectionTrees.value = copy
+      if (connectionTrees[conn.id]) {
+        delete connectionTrees[conn.id]
       }
       fetchTreeFor(conn)
     },
@@ -456,9 +457,7 @@ async function runTreeAction(conn, action, node) {
       } else {
         console.debug("runTreeAction [hidden] ok", action.type)
         // Refresh the tree so newly created tables/databases appear.
-        const copy = { ...connectionTrees.value }
-        delete copy[conn.id]
-        connectionTrees.value = copy
+        delete connectionTrees[conn.id]
         fetchTreeFor(conn)
       }
     } catch (err) {
@@ -544,29 +543,16 @@ async function checkConnection(conn) {
 }
 
 async function fetchTreeFor(conn) {
-  if (connectionTrees.value[conn.id]) {
-    return
-  }
-  try {
-    const cred = await GetCredential(conn.id)
-    const params = {}
-    if (cred) params.credential_blob = cred
-    const resp = await GetConnectionTree(conn.driver_type, params)
-    connectionTrees.value = {
-      ...connectionTrees.value,
-      [conn.id]: resp.nodes || [],
-    }
-    if (!expandedKeys.value.includes(conn.id)) {
-      expandedKeys.value.push(conn.id)
-    }
-  } catch (err) {
-    console.error("GetConnectionTree", conn.id, err)
-    connectionTrees.value = { ...connectionTrees.value, [conn.id]: [] }
+  if (!conn) return
+  await loadConnectionTree(conn)
+  if (!expandedKeys.value.includes(conn.id)) {
+    expandedKeys.value.push(conn.id)
   }
 }
 
 // watch to ensure driver groups expanded when connections reload
-watch(connections, () => {
+// keep expandedKeys in sync when connection list or cache changes
+watch([connections, () => Object.keys(connectionTrees)], () => {
   expandedKeys.value = defaultExpandedKeys.value
 })
 
@@ -587,7 +573,7 @@ const offConnectionDeleted = Events.On("connection:deleted", (event) => {
   const id = (event?.data ?? event)?.id
   if (!id) return
   connections.value = connections.value.filter((c) => c.id !== id)
-  delete connectionTrees.value[id]
+  delete connectionTrees[id]
   if (selectedConnection.value?.id === id) selectedConnection.value = null
   expandedKeys.value = expandedKeys.value.filter((k) => k !== id)
 })
