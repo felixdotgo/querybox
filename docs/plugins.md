@@ -7,7 +7,7 @@ Overview
 
 Developer flow
 1. Create plugin under `plugins/<name>` (package `main`).
-2. Build: `task build:plugins` (binary appears in `bin/plugins/<name>`).
+2. Build: `task build:plugins` (binary appears in `bin/plugins/<name>`; Windows builds get a `.exe` extension).
 3. Drop the built binary into `bin/plugins`; the host will discover it automatically.
 
 Contract (CLI)

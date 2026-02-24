@@ -40,14 +40,22 @@ The production executable is placed in `bin/`.
 
 ### Build Plugins
 
-Plugins are standalone executables that live in `bin/plugins/`. The app discovers them automatically at runtime.
+Plugins are standalone executables that live in `bin/plugins/` (on Windows the files will have `.exe` suffix).
+The app discovers them automatically at runtime.
 
 ```bash
 # Build all plugins at once
 task build:plugins
 ```
 
-Binaries are placed in `bin/plugins/` and picked up by the app within 2 seconds.
+By default the host OS is detected; you can override using standard Go
+cross‑compile vars:
+
+```bash
+GOOS=windows GOARCH=amd64 task build:plugins
+```
+
+Binaries are placed in `bin/plugins/` (Windows builds get `.exe`) and picked up by the app within 2 seconds.
 
 ### Create a New Plugin
 
