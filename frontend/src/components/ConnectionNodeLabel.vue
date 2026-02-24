@@ -15,7 +15,7 @@
         <template #trigger>
           <n-button
             size="tiny"
-            :type="hasTree ? 'default' : 'primary'"
+            type="primary"
             primary
             @click.stop="emit('connect')"
           >

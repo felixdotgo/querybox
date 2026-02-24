@@ -76,7 +76,7 @@
 
 <script setup>
 import { ref, computed, h, watch, onUnmounted, defineEmits } from "vue"
-import { NIcon, useDialog } from "naive-ui"
+import { NIcon, NButton, useDialog } from "naive-ui"
 import { Events } from "@wailsio/runtime"
 import { useRouter } from "vue-router"
 import ActionFormModal from "@/components/ActionFormModal.vue"
@@ -311,10 +311,18 @@ function getNodeProps(node) {
 function renderLabel({ option }) {
   const conn = connections.value.find((c) => c.id === option.key)
 
-  // "action" leaf nodes (New database, New table, …) have no extra buttons —
-  // clicking the row itself fires the action via handleSelect.
+  // "action" leaf nodes (New database, New table, …) are rendered as secondary
+  // buttons with their icon embedded; clicking the row fires the action via handleSelect.
   if (!conn && option.node_type === "action") {
-    return option.label
+    const actionIcon = nodeTypeIconMap[option.node_type] ?? nodeTypeFallbackIcon
+    return h(
+      NButton,
+      { size: "tiny", secondary: true, style: "margin: 1px 0", type: "primary" },
+      {
+        icon: () => h(NIcon, { size: 14 }, { default: () => h(actionIcon) }),
+        default: () => option.label,
+      },
+    )
   }
 
   // non-connection nodes with plugin-defined actions: render action buttons on hover
@@ -354,6 +362,9 @@ function renderLabel({ option }) {
 }
 
 function renderPrefix({ option }) {
+  // action nodes render their icon inside the button label; skip the prefix.
+  if (option.node_type === "action") return null
+
   let icon
   const conn = connections.value.find((c) => c.id === option.key)
   if (conn) {
