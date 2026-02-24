@@ -1,6 +1,4 @@
 import './styles/tailwind.css';
-import 'vfonts/Inter.css';
-import 'vfonts/FiraCode.css';
 // syntax highlighting styles for document results
 import 'highlight.js/styles/github.css';
 import { createApp } from 'vue';
