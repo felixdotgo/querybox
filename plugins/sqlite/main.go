@@ -8,6 +8,7 @@ import (
 	"github.com/felixdotgo/querybox/pkg/plugin"
 	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
 
+	_ "github.com/tursodatabase/go-libsql"
 	_ "modernc.org/sqlite"
 )
 
@@ -24,7 +25,7 @@ func (m *sqlitePlugin) Info() (plugin.InfoResponse, error) {
 }
 
 func (m *sqlitePlugin) AuthForms(*plugin.AuthFormsRequest) (*plugin.AuthFormsResponse, error) {
-	// only support a single form for now
+	// Basic: a file path
 	basic := plugin.AuthForm{
 		Key:  "basic",
 		Name: "Basic",
@@ -32,29 +33,70 @@ func (m *sqlitePlugin) AuthForms(*plugin.AuthFormsRequest) (*plugin.AuthFormsRes
 			{Type: plugin.AuthFieldFilePath, Name: "file", Label: "Database file path", Required: true, Placeholder: "/path/to/database.db"},
 		},
 	}
-	return &plugin.AuthFormsResponse{Forms: map[string]*plugin.AuthForm{"basic": &basic}}, nil
+
+	// turso-cloud: a remote database
+	turso := plugin.AuthForm{
+		Key:  "turso-cloud",
+		Name: "Turso Cloud",
+		Fields: []*plugin.AuthField{
+			{Type: plugin.AuthFieldText, Name: "database_url", Label: "Database URL", Required: true, Placeholder: "libsql://example.aws-region.turso.io"},
+			{Type: plugin.AuthFieldPassword, Name: "token", Label: "Auth Token", Required: true, Placeholder: "your-turso-auth-token"},
+		},
+	}
+	return &plugin.AuthFormsResponse{Forms: map[string]*plugin.AuthForm{"basic": &basic, "turso-cloud": &turso}}, nil
 }
 
-func filePath(connection map[string]string) string {
+type credential struct {
+	Form   string            `json:"form"`
+	Values map[string]string `json:"values"`
+}
+
+func parseCredential(connection map[string]string) credential {
 	if blob, ok := connection["credential_blob"]; ok && blob != "" {
-		var payload struct {
-			Form   string            `json:"form"`
-			Values map[string]string `json:"values"`
-		}
-		if err := json.Unmarshal([]byte(blob), &payload); err == nil {
-			return payload.Values["file"]
+		var c credential
+		if err := json.Unmarshal([]byte(blob), &c); err == nil {
+			return c
 		}
 	}
-	return ""
+	return credential{}
+}
+
+func tursoURL(c credential) string {
+	url := c.Values["database_url"]
+	if url == "" {
+		return ""
+	}
+	if token := c.Values["token"]; token != "" {
+		url += "?authToken=" + token
+	}
+	return url
+}
+
+// driverDSN resolves the SQL driver name and DSN from the credential form.
+func driverDSN(c credential) (driver, dsn string, err error) {
+	if c.Form == "turso-cloud" {
+		dsn = tursoURL(c)
+		if dsn == "" {
+			return "", "", fmt.Errorf("missing database_url in connection")
+		}
+		return "libsql", dsn, nil
+	}
+	dsn = c.Values["file"]
+	if dsn == "" {
+		return "", "", fmt.Errorf("missing file path in connection")
+	}
+	return "sqlite", dsn, nil
 }
 
 func (m *sqlitePlugin) Exec(req *plugin.ExecRequest) (*plugin.ExecResponse, error) {
-	path := filePath(req.Connection)
-	if path == "" {
-		return &plugin.ExecResponse{Error: "missing file path in connection"}, nil
+	c := parseCredential(req.Connection)
+
+	driver, dsn, err := driverDSN(c)
+	if err != nil {
+		return &plugin.ExecResponse{Error: err.Error()}, nil
 	}
 
-	db, err := sql.Open("sqlite", path)
+	db, err := sql.Open(driver, dsn)
 	if err != nil {
 		return &plugin.ExecResponse{Error: fmt.Sprintf("open error: %v", err)}, nil
 	}
@@ -107,12 +149,14 @@ func (m *sqlitePlugin) Exec(req *plugin.ExecRequest) (*plugin.ExecResponse, erro
 
 // ConnectionTree returns a list of tables in the SQLite database.
 func (m *sqlitePlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugin.ConnectionTreeResponse, error) {
-	path := filePath(req.Connection)
-	if path == "" {
+	c := parseCredential(req.Connection)
+
+	driver, dsn, err := driverDSN(c)
+	if err != nil {
 		return &plugin.ConnectionTreeResponse{}, nil
 	}
 
-	db, err := sql.Open("sqlite", path)
+	db, err := sql.Open(driver, dsn)
 	if err != nil {
 		return &plugin.ConnectionTreeResponse{}, nil
 	}
@@ -143,22 +187,25 @@ func (m *sqlitePlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugi
 	return &plugin.ConnectionTreeResponse{Nodes: nodes}, nil
 }
 
-// TestConnection opens a SQLite file and pings the handle to verify the file
-// path is accessible. Nothing is persisted (SQLite creates the file on open,
-// but the caller's path must exist for a database-backed connection).
+// TestConnection verifies the connection is reachable without persisting any state.
 func (m *sqlitePlugin) TestConnection(req *plugin.TestConnectionRequest) (*plugin.TestConnectionResponse, error) {
-	path := filePath(req.Connection)
-	if path == "" {
-		return &plugin.TestConnectionResponse{Ok: false, Message: "missing file path in connection"}, nil
+	c := parseCredential(req.Connection)
+
+	driver, dsn, err := driverDSN(c)
+	if err != nil {
+		return &plugin.TestConnectionResponse{Ok: false, Message: err.Error()}, nil
 	}
-	db, err := sql.Open("sqlite", path)
+
+	db, err := sql.Open(driver, dsn)
 	if err != nil {
 		return &plugin.TestConnectionResponse{Ok: false, Message: fmt.Sprintf("open error: %v", err)}, nil
 	}
 	defer db.Close()
+
 	if err := db.Ping(); err != nil {
 		return &plugin.TestConnectionResponse{Ok: false, Message: fmt.Sprintf("ping error: %v", err)}, nil
 	}
+
 	return &plugin.TestConnectionResponse{Ok: true, Message: "Connection successful"}, nil
 }
 

@@ -85,7 +85,7 @@
 - **Storage**: SQLite via `modernc.org/sqlite` for connection metadata (`data/connections.db`) and credential fallback (`data/credentials.db`).
 - **Credentials**: 3-tier — `go-keyring` (OS keyring) → sqlite file → in-memory map.
 - **Plugins**: Standalone Go executables using CLI JSON interchange (stdin/stdout) with proto-derived types from `rpc/contracts/plugin/v1`.
-- **Reference Plugins**: MySQL (`go-sql-driver/mysql`), PostgreSQL (`github.com/lib/pq`), and SQLite (`modernc.org/sqlite`); MySQL and PostgreSQL support arbitrary connection parameters (tls/settings) with a built-in dialing timeout. All three implement `connection-tree` (MySQL/PostgreSQL return schemas → tables; SQLite returns the flat table list from `sqlite_master`) and `test-connection` (`db.Open` + `db.Ping()` checks for all three drivers).
+- **Reference Plugins**: MySQL (`go-sql-driver/mysql`), PostgreSQL (`github.com/lib/pq`), and SQLite (`modernc.org/sqlite` for local files; `tursodatabase/go-libsql` for Turso Cloud remote databases); MySQL and PostgreSQL support arbitrary connection parameters (tls/settings) with a built-in dialing timeout. All three implement `connection-tree` (MySQL/PostgreSQL return schemas → tables; SQLite returns the flat table list from `sqlite_master`) and `test-connection` (`db.Open` + `db.Ping()` checks for all three drivers).
 - **Frontend**: Vue 3 + Naive UI components, Tailwind CSS for styling, TypeScript bindings auto-generated from Go services.
 
 ### 3.2 Current Implementation Status
@@ -94,7 +94,7 @@
 - PluginManager with on-demand discovery, scanning, and CLI-based execution (`ExecPlugin`, `GetConnectionTree`, `ExecTreeAction`, `TestConnection`).
 - MySQL plugin implementing `info`, `exec`, `authforms`, `connection-tree`, and `test-connection` commands (TLS/query-parameter support; built-in connection timeout).
 - PostgreSQL plugin implementing `info`, `exec`, `authforms`, `connection-tree`, and `test-connection` commands.
-- SQLite plugin implementing `info`, `exec`, `authforms`, `connection-tree`, and `test-connection` commands (file-path based connection; tables sourced from `sqlite_master`).
+- SQLite plugin implementing `info`, `exec`, `authforms`, `connection-tree`, and `test-connection` commands. Supports two auth forms: `basic` (local file path via `modernc.org/sqlite`) and `turso-cloud` (remote Turso database via `database_url` + `token` using `go-libsql`); tables sourced from `sqlite_master`.
 - Plugin SDK (`pkg/plugin`) with ServeCLI helper, protobuf type aliases (`TestConnectionRequest`, `TestConnectionResponse`), and `FormatSQLValue` utility.
 - Structured event system: all services emit `app:log` / `LogEntry`; `ConnectionService` emits `connection:created` and `connection:deleted` domain events. Event constants defined in `services/events.go`. Frontend only subscribes — never emits domain events.
 - Frontend Wails bindings for ConnectionService and PluginManager.
