@@ -17,6 +17,7 @@ import (
 type InfoResponse = pluginpb.PluginV1_InfoResponse
 
 type ExecRequest = pluginpb.PluginV1_ExecRequest
+
 // ExecResponse now contains a typed ExecResult which can represent SQL rows,
 // document lists, or key/value maps. Plugins should return one of those
 // payloads rather than a flat string.
@@ -29,25 +30,25 @@ type ExecResponse = pluginpb.PluginV1_ExecResponse
 // to strings rather than letting fmt.Sprintf render them as numeric byte
 // slices. A nil value becomes the empty string.
 func FormatSQLValue(v interface{}) string {
-    if v == nil {
-        return ""
-    }
-    switch t := v.(type) {
-    case []byte:
-        // Drivers commonly return []byte for text columns. Convert to
-        // string when the bytes represent valid UTF-8; otherwise encode as a
-        // hex string so the frontend can still display something sensible and
-        // avoid embedding potentially invalid/unprintable data in the JSON
-        // payload.
-        if utf8.Valid(t) {
-            return string(t)
-        }
-        // show binary data as hex prefixed with 0x (similar to SQL conventions)
-        return fmt.Sprintf("0x%x", t)
-    default:
-        // Fallback to the generic formatter used previously.
-        return fmt.Sprintf("%v", v)
-    }
+	if v == nil {
+		return ""
+	}
+	switch t := v.(type) {
+	case []byte:
+		// Drivers commonly return []byte for text columns. Convert to
+		// string when the bytes represent valid UTF-8; otherwise encode as a
+		// hex string so the frontend can still display something sensible and
+		// avoid embedding potentially invalid/unprintable data in the JSON
+		// payload.
+		if utf8.Valid(t) {
+			return string(t)
+		}
+		// show binary data as hex prefixed with 0x (similar to SQL conventions)
+		return fmt.Sprintf("0x%x", t)
+	default:
+		// Fallback to the generic formatter used previously.
+		return fmt.Sprintf("%v", v)
+	}
 }
 
 type ExecResult = pluginpb.PluginV1_ExecResult
@@ -110,6 +111,16 @@ const (
 	ConnectionTreeActionDropDatabase   = "drop-database"
 	ConnectionTreeActionCreateTable    = "create-table"
 	ConnectionTreeActionDropTable      = "drop-table"
+
+	// Common node types for ConnectionTree.  The core uses these to determine
+	ConnectionTreeNodeTypeDatabase   = pluginpb.PluginV1_NODE_TYPE_DATABASE
+	ConnectionTreeNodeTypeTable      = pluginpb.PluginV1_NODE_TYPE_TABLE
+	ConnectionTreeNodeTypeColumn     = pluginpb.PluginV1_NODE_TYPE_COLUMN
+	ConnectionTreeNodeTypeSchema     = pluginpb.PluginV1_NODE_TYPE_SCHEMA
+	ConnectionTreeNodeTypeView       = pluginpb.PluginV1_NODE_TYPE_VIEW
+	ConnectionTreeNodeTypeAction     = pluginpb.PluginV1_NODE_TYPE_ACTION
+	ConnectionTreeNodeTypeCollection = pluginpb.PluginV1_NODE_TYPE_COLLECTION
+	ConnectionTreeNodeTypeKey        = pluginpb.PluginV1_NODE_TYPE_KEY
 )
 
 // Plugin describes the minimal contract a plugin should implement. Keeping
@@ -130,13 +141,14 @@ type Plugin interface {
 	AuthForms(*AuthFormsRequest) (*AuthFormsResponse, error)
 
 	// ConnectionTree returns a driver-specific hierarchy of nodes and actions for
- 	// a given connection.  Drivers that do not support browsing can return an
- 	// empty Response or an error; the core will treat that as “no tree”.
- 	ConnectionTree(*ConnectionTreeRequest) (*ConnectionTreeResponse, error)
+	// a given connection.  Drivers that do not support browsing can return an
+	// empty Response or an error; the core will treat that as “no tree”.
+	ConnectionTree(*ConnectionTreeRequest) (*ConnectionTreeResponse, error)
 	// TestConnection verifies the provided connection parameters by attempting
 	// to open and ping the underlying data store. It must NOT persist any state.
 	// Plugins that cannot meaningfully test connectivity should return Ok=true.
-	TestConnection(*TestConnectionRequest) (*TestConnectionResponse, error)}
+	TestConnection(*TestConnectionRequest) (*TestConnectionResponse, error)
+}
 
 // ServeCLI runs a Plugin implementation as a small CLI shim that supports
 // three commands used by the host: `info`, `exec` and `authforms`.

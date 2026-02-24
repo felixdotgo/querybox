@@ -353,12 +353,13 @@ func (r *redisPlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugin
 					keyNodes = append(keyNodes, &plugin.ConnectionTreeNode{
 						Key:      fmt.Sprintf("db%d:%s", dbIdx, k),
 						Label:    fmt.Sprintf("%s (%s)", k, kType),
-						NodeType: "key",
+						NodeType: plugin.ConnectionTreeNodeTypeKey,
 						Actions: []*plugin.ConnectionTreeAction{
 							{
-								Type:  plugin.ConnectionTreeActionSelect,
-								Title: k,
-								Query: keyQuery(k, kType),
+								Type:   plugin.ConnectionTreeActionSelect,
+								Title:  k,
+								Query:  keyQuery(k, kType),
+								NewTab: true,
 							},
 						},
 					})
@@ -370,10 +371,10 @@ func (r *redisPlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugin
 		nodes = append(nodes, &plugin.ConnectionTreeNode{
 			Key:      fmt.Sprintf("db%d", dbIdx),
 			Label:    dbLabel,
-			NodeType: "database",
+			NodeType: plugin.ConnectionTreeNodeTypeDatabase,
 			Children: keyNodes,
 			Actions: []*plugin.ConnectionTreeAction{
-				{Type: plugin.ConnectionTreeActionSelect, Title: "Select DB", Query: fmt.Sprintf("SCAN %d MATCH * COUNT 100", dbIdx)},
+				{Type: plugin.ConnectionTreeActionSelect, Title: "Select DB", Query: fmt.Sprintf("SCAN %d MATCH * COUNT 100", dbIdx), NewTab: true},
 				// Redis logical databases cannot be created or dropped; FLUSHDB
 				// removes all keys from the selected database (use with care).
 				{Type: plugin.ConnectionTreeActionDropDatabase, Title: "Flush DB (delete all keys)", Query: "FLUSHDB"},

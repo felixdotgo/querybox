@@ -195,30 +195,31 @@ func (m *sqlitePlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugi
 		tableNodes = append(tableNodes, &plugin.ConnectionTreeNode{
 			Key:      tbl,
 			Label:    tbl,
-			NodeType: "table",
+			NodeType: plugin.ConnectionTreeNodeTypeTable,
 			Actions: []*plugin.ConnectionTreeAction{
-				{Type: plugin.ConnectionTreeActionSelect, Title: "Select rows", Query: fmt.Sprintf(`SELECT * FROM "%s" LIMIT 100;`, tbl)},
+				{Type: plugin.ConnectionTreeActionSelect, Title: "Select rows", Query: fmt.Sprintf(`SELECT * FROM "%s"`, tbl), Hidden: true, NewTab: true},
 				{Type: plugin.ConnectionTreeActionDropTable, Title: "Drop table", Query: fmt.Sprintf(`DROP TABLE "%s";`, tbl)},
 			},
 		})
 	}
 
-	// Wrap tables under a root server node that exposes the create-table action.
-	serverNode := &plugin.ConnectionTreeNode{
-		Key:      "__server__",
-		Label:    "Tables",
-		NodeType: "server",
-		Children: tableNodes,
+	// Prepend a leaf node for the create-table action so the user can
+	// create a new table without a redundant wrapper server node.
+	createNode := &plugin.ConnectionTreeNode{
+		Key:      "__create_table__",
+		Label:    "New table",
+		NodeType: plugin.ConnectionTreeNodeTypeAction,
 		Actions: []*plugin.ConnectionTreeAction{
 			{
 				Type:  plugin.ConnectionTreeActionCreateTable,
 				Title: "Create table",
 				Query: "CREATE TABLE \"new_table\" (\n    \"id\" INTEGER PRIMARY KEY AUTOINCREMENT\n);",
+				Hidden: true, // hide the action from the UI since it doesn't work out-of-the-box and requires user editing
 			},
 		},
 	}
 
-	return &plugin.ConnectionTreeResponse{Nodes: []*plugin.ConnectionTreeNode{serverNode}}, nil
+	return &plugin.ConnectionTreeResponse{Nodes: append([]*plugin.ConnectionTreeNode{createNode}, tableNodes...)}, nil
 }
 
 // TestConnection verifies the connection is reachable without persisting any state.

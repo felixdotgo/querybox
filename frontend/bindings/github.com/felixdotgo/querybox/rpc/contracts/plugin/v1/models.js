@@ -194,6 +194,24 @@ export class PluginV1_ConnectionTreeAction {
              */
             this["query"] = undefined;
         }
+        if (/** @type {any} */(false)) {
+            /**
+             * hidden suppresses the action from the context menu / action buttons.
+             * Use this for actions that should only fire on leaf-node click, not be
+             * explicitly listed as selectable options.
+             * @member
+             * @type {boolean | undefined}
+             */
+            this["hidden"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * whether the core should open a new tab when this action is executed
+             * @member
+             * @type {boolean | undefined}
+             */
+            this["new_tab"] = undefined;
+        }
 
         Object.assign(this, $$source);
     }
@@ -247,10 +265,8 @@ export class PluginV1_ConnectionTreeNode {
         }
         if (/** @type {any} */(false)) {
             /**
-             * node_type is an optional hint for the frontend icon renderer.
-             * Recognised values: "database", "table", "column".  Empty means generic.
              * @member
-             * @type {string | undefined}
+             * @type {PluginV1_NodeType | undefined}
              */
             this["node_type"] = undefined;
         }
@@ -392,6 +408,45 @@ export class PluginV1_ExecResult {
         return new PluginV1_ExecResult(/** @type {Partial<PluginV1_ExecResult>} */($$parsedSource));
     }
 }
+
+/**
+ * NodeType is an optional hint for the frontend icon renderer and lets Go
+ * code reference well-known node kinds via generated constants instead of
+ * raw strings.
+ * @readonly
+ * @enum {number}
+ */
+export const PluginV1_NodeType = {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero: 0,
+
+    /**
+     * generic / unspecified
+     */
+    PluginV1_NODE_TYPE_UNKNOWN: 0,
+    PluginV1_NODE_TYPE_DATABASE: 1,
+    PluginV1_NODE_TYPE_TABLE: 2,
+    PluginV1_NODE_TYPE_COLUMN: 3,
+    PluginV1_NODE_TYPE_SCHEMA: 4,
+    PluginV1_NODE_TYPE_VIEW: 5,
+
+    /**
+     * indicates a leaf node that represents an action, not a database object
+     */
+    PluginV1_NODE_TYPE_ACTION: 6,
+
+    /**
+     * for document stores like Mongo
+     */
+    PluginV1_NODE_TYPE_COLLECTION: 7,
+
+    /**
+     * for key/value stores like Redis
+     */
+    PluginV1_NODE_TYPE_KEY: 8,
+};
 
 /**
  * TestConnectionResponse indicates whether the connection attempt succeeded.

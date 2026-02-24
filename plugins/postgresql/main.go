@@ -259,12 +259,14 @@ ORDER BY c.relname`, schemaName)
 					tables = append(tables, &plugin.ConnectionTreeNode{
 						Key:      key,
 						Label:    tbl,
-						NodeType: "table", // keep 'table' for now so it gets the grid icon
+						NodeType: plugin.ConnectionTreeNodeTypeTable, // keep 'table' for now so it gets the grid icon
 						Actions: []*plugin.ConnectionTreeAction{
 							{
 								Type:  plugin.ConnectionTreeActionSelect,
 								Title: "Select rows",
 								Query: fmt.Sprintf(`SELECT * FROM "%s"."%s" LIMIT 100;`, schemaName, tbl),
+								Hidden: true,
+								NewTab: true,
 							},
 							{
 								Type:  plugin.ConnectionTreeActionDropTable,
@@ -281,7 +283,7 @@ ORDER BY c.relname`, schemaName)
 		schemaNode := &plugin.ConnectionTreeNode{
 			Key:      schemaName,
 			Label:    schemaName,
-			NodeType: "schema",
+			NodeType: plugin.ConnectionTreeNodeTypeSchema,
 			Children: tables,
 			Actions: []*plugin.ConnectionTreeAction{
 				{
@@ -300,7 +302,7 @@ ORDER BY c.relname`, schemaName)
 	dbNode := &plugin.ConnectionTreeNode{
 		Key:      currentDB,
 		Label:    currentDB,
-		NodeType: "database",
+		NodeType: plugin.ConnectionTreeNodeTypeDatabase,
 		Children: schemaNodes,
 		Actions: []*plugin.ConnectionTreeAction{
 			{
@@ -311,24 +313,23 @@ ORDER BY c.relname`, schemaName)
 		},
 	}
 
-	// Root node for Databases (similar to MySQL plugin)
-	return &plugin.ConnectionTreeResponse{
-		Nodes: []*plugin.ConnectionTreeNode{
+	// Prepend a leaf node for the create-database action so the user can
+	// create a new database without a redundant wrapper server node.
+	createNode := &plugin.ConnectionTreeNode{
+		Key:      "__create_database__",
+		Label:    "New database",
+		NodeType: plugin.ConnectionTreeNodeTypeAction,
+		Actions: []*plugin.ConnectionTreeAction{
 			{
-				Key:      "__server__",
-				Label:    "Databases",
-				NodeType: "server",
-				Children: []*plugin.ConnectionTreeNode{dbNode},
-				Actions: []*plugin.ConnectionTreeAction{
-					{
-						Type:  plugin.ConnectionTreeActionCreateDatabase,
-						Title: "Create database",
-						Query: `CREATE DATABASE "new_database";`,
-					},
-				},
+				Type:  plugin.ConnectionTreeActionCreateDatabase,
+				Title: "Create database",
+				Query: `CREATE DATABASE "new_database";`,
+				Hidden: true, // this action is only relevant when the root node is selected, so hide it from the context menu
 			},
 		},
-	}, nil
+	}
+
+	return &plugin.ConnectionTreeResponse{Nodes: []*plugin.ConnectionTreeNode{createNode, dbNode}}, nil
 }
 
 // TestConnection opens a PostgreSQL connection and pings the server to verify

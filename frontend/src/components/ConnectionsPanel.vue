@@ -142,19 +142,44 @@ const defaultExpandedKeys = computed(() => {
 })
 
 /**
+ * Maps proto NodeType enum integers (as serialized by encoding/json) to the
+ * lowercase strings expected by INSTANT_SELECT_TYPES, nodeTypeIconMap, and
+ * the node-type guards throughout this component.
+ */
+const NODE_TYPE_ENUM_MAP = {
+  1: "database",
+  2: "table",
+  3: "column",
+  4: "schema",
+  5: "view",
+  6: "action",
+  7: "collection",
+  8: "key",  // plugin-local extension for key-value store leaf nodes (e.g. Redis)
+}
+
+/**
  * Recursively stamps every node (and its descendants) with the owning
  * connection id.  This lets the three parentConn-finder loops below resolve
  * the correct connection in O(1) instead of scanning every loaded tree,
  * which previously picked the wrong driver when two connections shared a
  * node key such as "__server__".
+ *
+ * Also normalises node_type from proto enum integers (e.g. 2) to the
+ * lowercase strings the rest of the component expects (e.g. "table").
  */
 function tagWithConnId(nodes, connId) {
-  return nodes.map((n) => ({
-    ...n,
-    key: connId + ":" + n.key,
-    _connectionId: connId,
-    children: n.children ? tagWithConnId(n.children, connId) : n.children,
-  }))
+  return nodes.map((n) => {
+    const nodeType = typeof n.node_type === "number"
+      ? (NODE_TYPE_ENUM_MAP[n.node_type] ?? null)
+      : n.node_type
+    return {
+      ...n,
+      key: connId + ":" + n.key,
+      _connectionId: connId,
+      node_type: nodeType,
+      children: n.children ? tagWithConnId(n.children, connId) : n.children,
+    }
+  })
 }
 
 const treeData = computed(() => {
@@ -183,9 +208,12 @@ async function loadConnections() {
   }
 }
 
+// Node types that are data-bearing leaves: clicking them should immediately
+// open a tab showing the data via their "select" action.
+const INSTANT_SELECT_TYPES = new Set(["table", "collection", "key", "view", "foreign-table"])
+
 function handleSelect(keys, options, meta) {
   const key = meta?.node?.key ?? (Array.isArray(keys) ? keys[0] : keys)
-  console.debug("handleSelect key", key, "meta.node", meta?.node)
   if (key == null) return
 
   // top‑level connection selected
@@ -196,6 +224,32 @@ function handleSelect(keys, options, meta) {
     // button now. this keeps connection selection lightweight and avoids
     // surprise network calls on click.
     emit("connection-selected", conn)
+    return
+  }
+
+  // Tree node clicked — resolve the owning connection.
+  const node = meta?.node
+  if (!node) return
+
+  const parentConn = node._connectionId
+    ? connections.value.find((c) => c.id === node._connectionId)
+    : selectedConnection.value
+  if (!parentConn) return
+
+  const nodeType = node.node_type
+
+  // "action" leaf nodes (e.g. "New database", "New table"): fire the
+  // first action immediately on click without needing to hover.
+  if (nodeType === "action" && node.actions?.length > 0) {
+    handleAction(parentConn, node.actions[0], node)
+    return
+  }
+
+  // Data-bearing leaf nodes: fire the "select" action immediately to
+  // open a result tab, giving instant feedback on single click.
+  if (INSTANT_SELECT_TYPES.has(nodeType)) {
+    const selectAction = node.actions?.find((a) => a.type === "select")
+    if (selectAction) handleAction(parentConn, selectAction, node)
     return
   }
 
@@ -230,6 +284,12 @@ function getNodeProps(node) {
 
 function renderLabel({ option }) {
   const conn = connections.value.find((c) => c.id === option.key)
+
+  // "action" leaf nodes (New database, New table, …) have no extra buttons —
+  // clicking the row itself fires the action via handleSelect.
+  if (!conn && option.node_type === "action") {
+    return option.label
+  }
 
   // non-connection nodes with plugin-defined actions: render action buttons on hover
   if (!conn && option.actions && option.actions.length > 0) {
@@ -365,6 +425,32 @@ async function runTreeAction(conn, action, node) {
     : conn.id + ":" + nodeKey
   let title = (node && node.key) || action.title || action.query || "Query"
   title = title.split(":").pop()
+
+  // Actions with new_tab=false run silently in the background: no tab is opened.
+  // The result is only logged to the console / backend log stream.
+  // After a successful silent action the connection tree is refreshed so
+  // any structural change (create-table, etc.) is reflected immediately.
+  if (!action.new_tab) {
+    try {
+      const cred = await GetCredential(conn.id)
+      const params = {}
+      if (cred) params.credential_blob = cred
+      const res = await ExecTreeAction(conn.driver_type, params, action.query || "")
+      if (res.error) {
+        console.error("runTreeAction [hidden]", action.type, res.error)
+      } else {
+        console.debug("runTreeAction [hidden] ok", action.type)
+        // Refresh the tree so newly created tables/databases appear.
+        const copy = { ...connectionTrees.value }
+        delete copy[conn.id]
+        connectionTrees.value = copy
+        fetchTreeFor(conn)
+      }
+    } catch (err) {
+      console.error("runTreeAction [hidden] error", action.type, err?.message || err)
+    }
+    return
+  }
 
   try {
     const cred = await GetCredential(conn.id)

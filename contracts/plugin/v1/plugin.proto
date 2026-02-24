@@ -159,20 +159,38 @@ message PluginV1 {
     repeated ConnectionTreeNode nodes = 1;
   }
 
+  // NodeType is an optional hint for the frontend icon renderer and lets Go
+  // code reference well-known node kinds via generated constants instead of
+  // raw strings.
+  enum NodeType {
+    NODE_TYPE_UNKNOWN    = 0; // generic / unspecified
+    NODE_TYPE_DATABASE   = 1;
+    NODE_TYPE_TABLE      = 2;
+    NODE_TYPE_COLUMN     = 3;
+    NODE_TYPE_SCHEMA     = 4;
+    NODE_TYPE_VIEW       = 5;
+    NODE_TYPE_ACTION     = 6; // indicates a leaf node that represents an action, not a database object
+    NODE_TYPE_COLLECTION = 7; // for document stores like Mongo
+    NODE_TYPE_KEY        = 8; // for key/value stores like Redis
+  }
+
   message ConnectionTreeNode {
     string key       = 1;              // unique within the returned tree
     string label     = 2;              // user-visible text
     repeated ConnectionTreeNode children = 3;
     repeated ConnectionTreeAction actions = 4;
-    // node_type is an optional hint for the frontend icon renderer.
-    // Recognised values: "database", "table", "column".  Empty means generic.
-    string node_type = 5;
+    NodeType node_type = 5;
   }
 
   message ConnectionTreeAction {
-    string type  = 1; // machine name (e.g. "select", "describe")
-    string title = 2; // displayed in a context menu or double-click
-    string query = 3; // plugin-interpreted payload (often SQL)
+    string type   = 1; // machine name (e.g. "select", "describe")
+    string title  = 2; // displayed in a context menu or double-click
+    string query  = 3; // plugin-interpreted payload (often SQL)
+    // hidden suppresses the action from the context menu / action buttons.
+    // Use this for actions that should only fire on leaf-node click, not be
+    // explicitly listed as selectable options.
+    bool   hidden = 4;
+    bool new_tab = 5; // whether the core should open a new tab when this action is executed
   }
 
   // TestConnectionRequest carries the same credential map as ExecRequest so

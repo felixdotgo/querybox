@@ -11,5 +11,6 @@ export {
     PluginV1_ConnectionTreeResponse,
     PluginV1_ExecResponse,
     PluginV1_ExecResult,
+    PluginV1_NodeType,
     PluginV1_TestConnectionResponse
 } from "./models.js";
