@@ -1,7 +1,7 @@
 # QueryBox Basic Design
 
 **Version**: 0.0.1 (Draft)
-**Updated**: February 23, 2026
+**Updated**: February 24, 2026
 
 ## 1. Architecture
 
@@ -116,10 +116,10 @@
 - Document any deliberate deviations from the default Tailwind palette in design docs and PR descriptions.
 
 #### Typography
-- **UI font**: [Inter](https://rsms.me/inter/) — professional, developer-focused sans-serif (same as MongoDB Compass). Loaded via `vfonts/Inter.css`.
-- **Mono font**: [Fira Code](https://github.com/tonsky/FiraCode) — for code cells, query editors, and result tables with identifiers. Loaded via `vfonts/FiraCode.css`.
-- Both are injected globally in `frontend/src/main.js` and set as the default `fontFamily` / `fontFamilyMono` in the Naive UI `themeOverrides` in `App.vue`.
-- Tailwind's `@layer base` in `tailwind.css` mirrors the same font stack so that Tailwind-styled elements are consistent.
+- **UI font**: [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) — free & open-source (Apache 2.0) monospace font used for **all** UI text and code/mono elements. Self-hosted as `public/JetBrainsMono-Regular.ttf` and `public/JetBrainsMono-Medium.ttf`.
+- A single font family is used for both UI and mono contexts, giving the app a unified developer-tool aesthetic.
+- Declared via `@font-face` in `frontend/src/styles/tailwind.css` and set as `fontFamily` / `fontFamilyMono` in the Naive UI `themeOverrides` in `App.vue`.
+- Tailwind's `@layer base` in `tailwind.css` applies the same stack to `html`, `body`, `code`, `pre`, `kbd`, `samp`, and `.mono`.
 - Inter `cv02–cv11` OpenType features are enabled for improved readability at small sizes; Fira Code ligatures (`liga`, `calt`) are enabled for code contexts.
 
 ### 3.5 Icon System

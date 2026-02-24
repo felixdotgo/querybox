@@ -12,14 +12,14 @@
 // n-config-provider is required for teleport-based components (n-dropdown,
 // n-modal, n-message, etc.) to mount correctly.
 //
-// themeOverrides enforce Inter (UI) + Fira Code (mono) across all Naive UI
-// components, matching the developer-focused aesthetic of tools like MongoDB Compass.
+// themeOverrides enforce JetBrains Mono across all Naive UI components —
+// unified monospace type for a developer-tool aesthetic.
 const themeOverrides = {
   common: {
     fontFamily:
-      '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
+      '"JetBrains Mono", ui-monospace, monospace',
     fontFamilyMono:
-      '"Fira Code", "Cascadia Code", "JetBrains Mono", ui-monospace, monospace',
+      '"JetBrains Mono", ui-monospace, monospace',
   },
 };
 </script>
