@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* Global CSS variables */
+:root {
+  --macos-safe-zone: 40px;
+}
+
 /* Global font stack — Inter for UI, Fira Code for code/mono */
 @layer base {
   html, body {
@@ -7,6 +12,7 @@
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    overscroll-behavior: none;
   }
   code, pre, kbd, samp, .mono {
     font-family: "Fira Code", "Cascadia Code", "JetBrains Mono", ui-monospace, monospace;

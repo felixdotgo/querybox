@@ -3,6 +3,7 @@
     <div class="flex flex-1 min-h-0">
       <!-- Left: connection type list, fixed, no scroll -->
       <div class="w-52 shrink-0 border-r border-slate-200 overflow-y-auto bg-slate-50">
+        <SafeZone />
         <div class="p-4">
           <h3 class="mb-2 font-bold">Connection Type</h3>
           <ul class="list-none p-0 m-0 flex flex-col gap-1.5">
@@ -111,6 +112,7 @@ import {
 import { CloseConnectionsWindow } from "@/bindings/github.com/felixdotgo/querybox/services/app"
 import { CreateConnection } from "@/bindings/github.com/felixdotgo/querybox/services/connectionservice"
 import AuthFormRenderer from "@/components/AuthFormRenderer.vue"
+import SafeZone from "@/components/SafeZone.vue"
 
 const plugins = ref([])
 const pluginFilter = ref("")

@@ -1,5 +1,5 @@
 <template>
-  <div class="p-3 h-full flex flex-col gap-3 bg-slate-50">
+  <div class="p-3 h-full flex flex-col gap-3">
     <!-- small toolbar -->
     <div class="flex items-center justify-between gap-2">
       <div class="flex items-center gap-2">
@@ -88,6 +88,7 @@ import {
 import {
   ShowConnectionsWindow,
 } from "@/bindings/github.com/felixdotgo/querybox/services/app"
+import SafeZone from "./SafeZone.vue"
 
 // declare events emitted by this component
 const emit = defineEmits([
