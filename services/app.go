@@ -143,3 +143,16 @@ func (a *App) CloseConnectionsWindow() {
 		a.App.Event.Emit(EventConnectionsWindowClosed, true)
 	}
 }
+
+// OpenURL opens the specified URL in the system's default browser.
+func (a *App) OpenURL(url string) {
+	a.App.Browser.OpenURL(url)
+}
+
+// ShowAboutDialog displays a native About dialog for the application.
+func (a *App) ShowAboutDialog() {
+	a.App.Dialog.Info().
+		SetTitle("About QueryBox").
+		SetMessage("QueryBox\nVersion 0.1.0\n\n© 2024 Felixdotgo").
+		Show()
+}
