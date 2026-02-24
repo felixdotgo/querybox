@@ -181,10 +181,10 @@ func (m *mysqlPlugin) Exec(req *plugin.ExecRequest) (*plugin.ExecResponse, error
 	}, nil
 }
 
-// ConnectionTree returns a simple list of databases for browsing.  Each
-// database node includes a trivial `USE` action so the frontend can proxy an
-// ExecTreeAction if the user clicks it.  If the connection is invalid or the
-// query fails we return an empty tree (core treats that as "no tree").
+// ConnectionTree returns a server root node, a list of databases, and their
+// tables for browsing.  Each level exposes DDL actions so the user can create
+// or drop databases and tables directly from the connection tree.  If the
+// connection is invalid or the query fails an empty tree is returned.
 func (m *mysqlPlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugin.ConnectionTreeResponse, error) {
 	dsn, err := buildDSN(req.Connection)
 	if err != nil || dsn == "" {
@@ -202,18 +202,15 @@ func (m *mysqlPlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugin
 	}
 	defer rows.Close()
 
-	var nodes []*plugin.ConnectionTreeNode
+	var dbNodes []*plugin.ConnectionTreeNode
 	for rows.Next() {
 		var dbname string
 		if err := rows.Scan(&dbname); err != nil {
 			continue
 		}
-		// for each database we expose a child list of tables; clicking a table
-		// will perform a SELECT * LIMIT 100 against it. we also keep the
-		// original `USE` action so the connection's default database can be
-		// switched if the host wants that behaviour.
+		// For each database expose a child list of tables.  Clicking a table
+		// pre-fills a SELECT query; the DDL actions allow create/drop.
 		tables := []*plugin.ConnectionTreeNode{}
-		// attempt to list tables, ignore errors so driver still works
 		tblRows, err := db.Query(fmt.Sprintf("SHOW TABLES FROM `%s`", dbname))
 		if err == nil {
 			for tblRows.Next() {
@@ -224,26 +221,39 @@ func (m *mysqlPlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugin
 						Label:    tbl,
 						NodeType: "table",
 						Actions: []*plugin.ConnectionTreeAction{
-							// use fully qualified name for clarity
-							{Type: plugin.ConnectionTreeActionSelect, Title: fmt.Sprintf("%s.%s", dbname, tbl), Query: fmt.Sprintf("SELECT * FROM `%s`.`%s` LIMIT 100;", dbname, tbl)},
+							{Type: plugin.ConnectionTreeActionSelect, Title: "Select rows", Query: fmt.Sprintf("SELECT * FROM `%s`.`%s` LIMIT 100;", dbname, tbl)},
+							{Type: plugin.ConnectionTreeActionDropTable, Title: "Drop table", Query: fmt.Sprintf("DROP TABLE `%s`.`%s`;", dbname, tbl)},
 						},
 					})
 				}
 			}
 			tblRows.Close()
 		}
-		nodes = append(nodes, &plugin.ConnectionTreeNode{
+		dbNodes = append(dbNodes, &plugin.ConnectionTreeNode{
 			Key:      dbname,
 			Label:    dbname,
 			NodeType: "database",
 			Children: tables,
 			Actions: []*plugin.ConnectionTreeAction{
-				{Type: plugin.ConnectionTreeActionSelect, Title: "Use", Query: fmt.Sprintf("USE `%s`;", dbname)},
+				{Type: plugin.ConnectionTreeActionCreateTable, Title: "Create table", Query: fmt.Sprintf("CREATE TABLE `%s`.`new_table` (\n  `id` INT NOT NULL AUTO_INCREMENT,\n  PRIMARY KEY (`id`)\n);", dbname)},
+				{Type: plugin.ConnectionTreeActionDropDatabase, Title: "Drop database", Query: fmt.Sprintf("DROP DATABASE `%s`;", dbname)},
 			},
 		})
 	}
 
-	return &plugin.ConnectionTreeResponse{Nodes: nodes}, nil
+	// Wrap all databases under a server root node that exposes the
+	// create-database action at the connection level.
+	serverNode := &plugin.ConnectionTreeNode{
+		Key:      "__server__",
+		Label:    "Databases",
+		NodeType: "server",
+		Children: dbNodes,
+		Actions: []*plugin.ConnectionTreeAction{
+			{Type: plugin.ConnectionTreeActionCreateDatabase, Title: "Create database", Query: "CREATE DATABASE `new_database`;"},
+		},
+	}
+
+	return &plugin.ConnectionTreeResponse{Nodes: []*plugin.ConnectionTreeNode{serverNode}}, nil
 }
 
 // TestConnection opens a MySQL connection and pings the server to verify the

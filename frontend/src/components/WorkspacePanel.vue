@@ -6,7 +6,7 @@
       @close="handleTabClose"
       class="flex flex-col h-full"
       :tab-bar-style="{ position: 'sticky', top: 0, zIndex: 10, flexShrink: 0 }"
-      :pane-style="{ overflow: 'auto', flex: '1 1 0', minHeight: 0 }"
+      :pane-style="{ display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: '1 1 0', minHeight: 0, padding: 0 }"
     >
       <n-tab-pane
         v-for="tab in tabs"

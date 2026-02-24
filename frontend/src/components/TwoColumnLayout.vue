@@ -1,7 +1,7 @@
 <template>
   <div ref="containerRef" class="flex w-full h-full overflow-hidden">
     <div
-      class="flex-shrink-0"
+      class="flex-shrink-0 h-full overflow-hidden"
       :style="{ width: leftWidth + 'px', minWidth: minLeftWidth + 'px' }"
     >
       <slot name="left" />
@@ -16,7 +16,7 @@
       <div class="w-0.5 h-full bg-transparent mx-auto"></div>
     </div>
 
-    <div class="flex-1 p-4 min-h-0 overflow-auto flex flex-col">
+    <div class="flex-1 min-h-0 overflow-auto flex flex-col">
       <slot name="right" />
     </div>
   </div>

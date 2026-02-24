@@ -21,6 +21,7 @@ import {
 
   // actions
   AddCircleOutline,
+  EyeOutline,
   FlashOutline,
   RefreshOutline,
   TrashOutline,
@@ -37,6 +38,7 @@ export {
   ArrowDownOutline,  // log panel auto-scroll toggle
 
   AddCircleOutline,  // new connection toolbar button
+  EyeOutline,        // "select" action on tree nodes
   FlashOutline,      // "Connect" action on connection row
   RefreshOutline,    // "Refresh" action on connection row
   TrashOutline,      // "Delete" action on connection row
@@ -55,3 +57,20 @@ export const nodeTypeIconMap = {
 
 /** Used when a plugin node has no recognised node_type value. */
 export const nodeTypeFallbackIcon = DocumentOutline
+
+/**
+ * Maps ConnectionTreeAction type strings (constants defined in pkg/plugin/plugin.go)
+ * to their icon component.  Falls back to actionTypeFallbackIcon when unknown.
+ * @type {Record<string, object>}
+ */
+export const actionTypeIconMap = {
+  "select":          EyeOutline,
+  "describe":        CodeSlashOutline,
+  "create-database": AddCircleOutline,
+  "create-table":    AddCircleOutline,
+  "drop-database":   TrashOutline,
+  "drop-table":      TrashOutline,
+}
+
+/** Used when an action has no recognised type value. */
+export const actionTypeFallbackIcon = FlashOutline

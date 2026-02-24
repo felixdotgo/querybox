@@ -104,6 +104,12 @@ const (
 	// document the set of recognised actions.
 	ConnectionTreeActionSelect   = "select"
 	ConnectionTreeActionDescribe = "describe"
+
+	// DDL action types – rendered as context-menu items on database/table nodes.
+	ConnectionTreeActionCreateDatabase = "create-database"
+	ConnectionTreeActionDropDatabase   = "drop-database"
+	ConnectionTreeActionCreateTable    = "create-table"
+	ConnectionTreeActionDropTable      = "drop-table"
 )
 
 // Plugin describes the minimal contract a plugin should implement. Keeping
