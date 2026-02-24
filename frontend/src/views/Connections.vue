@@ -10,11 +10,11 @@
             <li v-if="drivers.length === 0" class="opacity-70">
               No drivers available
             </li>
-            <li v-for="p in filteredDrivers" :key="p.name">
+            <li v-for="p in filteredDrivers" :key="p.id">
               <n-button
                 block
                 :type="
-                  selectedDriver && selectedDriver.name === p.name
+                  selectedDriver && selectedDriver.id === p.id
                     ? 'primary'
                     : 'default'
                 "
@@ -104,6 +104,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from "vue"
+import { Events } from "@wailsio/runtime"
 import {
   ListPlugins,
   GetPluginAuthForms,
@@ -196,13 +197,13 @@ async function load() {
 
 async function selectPlugin(p) {
   selectedDriver.value = p
-  form.value.driver = p.name || ""
+  form.value.driver = p.id || ""
   testResult.value = null
 
   // probe plugin for auth forms (graceful fallback to DSN input)
   resetAuthState()
   try {
-    const resp = await GetPluginAuthForms(p.name)
+    const resp = await GetPluginAuthForms(p.id)
     if (resp && Object.keys(resp).length > 0) {
       authForms.value = resp || {}
       const keys = Object.keys(authForms.value)
@@ -300,5 +301,17 @@ async function saveConnection() {
 
 onMounted(async () => {
   await load()
+
+  // Clear form when window is closed (hidden)
+  Events.On("connections-window:closed", async () => {
+    clearForm()
+    resetAuthState()
+
+    // Re-select first driver if available
+    const firstDriver = (plugins.value || []).find((p) => p && p.type === 1)
+    if (firstDriver) {
+      await selectPlugin(firstDriver)
+    }
+  })
 })
 </script>

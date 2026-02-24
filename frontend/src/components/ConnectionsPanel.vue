@@ -5,7 +5,7 @@
       <div class="flex items-center gap-2">
         <span class="text-lg font-semibold m-0">Connections</span>
       </div>
-      <div class="flex items-center gap-2">
+      <div class="flex">
         <n-button
           size="small"
           secondary
@@ -151,6 +151,7 @@ const defaultExpandedKeys = computed(() => {
 function tagWithConnId(nodes, connId) {
   return nodes.map((n) => ({
     ...n,
+    key: connId + ":" + n.key,
     _connectionId: connId,
     children: n.children ? tagWithConnId(n.children, connId) : n.children,
   }))
@@ -358,7 +359,10 @@ async function runTreeAction(conn, action, node) {
   const invocationVersion = Date.now()
 
   // Hoist stable identifiers so they are available in the catch block too.
-  const tabKey = conn.id + ":" + (node && node.key ? node.key : action.query || invocationVersion)
+  const nodeKey = node && node.key ? node.key : (action.query || String(invocationVersion))
+  const tabKey = (typeof nodeKey === "string" && nodeKey.startsWith(conn.id + ":"))
+    ? nodeKey
+    : conn.id + ":" + nodeKey
   let title = (node && node.key) || action.title || action.query || "Query"
   title = title.split(":").pop()
 

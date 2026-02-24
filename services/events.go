@@ -21,6 +21,9 @@ const (
 
 	// EventMenuLogsToggled is emitted by the native menu to request the frontend toggle the logs panel.
 	EventMenuLogsToggled = "menu:logs-toggled"
+
+	// EventConnectionsWindowClosed is emitted when the connections window is hidden.
+	EventConnectionsWindowClosed = "connections-window:closed"
 )
 
 // LogLevel represents the severity of a log entry.

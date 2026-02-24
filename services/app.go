@@ -140,5 +140,6 @@ func (a *App) CloseConnectionsWindow() {
 		// Hide the window instead of closing it. Closing destroys the underlying webview
 		// which can cause "WEBKIT_IS_WEB_VIEW" assertion failures when reopened.
 		a.ConnectionsWindow.Hide()
+		a.App.Event.Emit(EventConnectionsWindowClosed, true)
 	}
 }
