@@ -43,6 +43,15 @@ export function MinimiseMainWindow() {
 }
 
 /**
+ * @returns {$CancellablePromise<application$0.Menu | null>}
+ */
+export function NewAppMenu() {
+    return $Call.ByID(3712612547).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType1($result);
+    }));
+}
+
+/**
  * NewConnectionsWindow creates a new connections window with specific options and event handlers to manage its behavior.
  * The window is initially hidden and configured to prevent resizing, maximising, and minimising.
  * It also includes OS-specific options for the title bar and backdrop.
@@ -50,7 +59,7 @@ export function MinimiseMainWindow() {
  */
 export function NewConnectionsWindow() {
     return $Call.ByID(3366044994).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType1($result);
+        return $$createType3($result);
     }));
 }
 
@@ -60,7 +69,7 @@ export function NewConnectionsWindow() {
  */
 export function NewMainWindow() {
     return $Call.ByID(3430597588).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType1($result);
+        return $$createType3($result);
     }));
 }
 
@@ -81,5 +90,7 @@ export function ToggleFullScreenMainWindow() {
 }
 
 // Private type creation functions
-const $$createType0 = application$0.WebviewWindow.createFrom;
+const $$createType0 = application$0.Menu.createFrom;
 const $$createType1 = $Create.Nullable($$createType0);
+const $$createType2 = application$0.WebviewWindow.createFrom;
+const $$createType3 = $Create.Nullable($$createType2);

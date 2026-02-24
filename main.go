@@ -72,6 +72,11 @@ func main() {
 	app.MainWindow = app.NewMainWindow()
 	app.ConnectionsWindow = app.NewConnectionsWindow()
 
+	// Set the native application menu (macOS only).
+	if menu := app.NewAppMenu(); menu != nil {
+		app.App.Menu.SetApplicationMenu(menu)
+	}
+
 	// Run the application. This blocks until the application has been exited.
 	err := app.App.Run()
 

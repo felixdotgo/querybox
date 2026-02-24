@@ -332,6 +332,27 @@ export class KeyBindingManager {
     }
 }
 
+export class Menu {
+    /**
+     * Creates a new Menu instance.
+     * @param {Partial<Menu>} [$$source = {}] - The source object to create the Menu.
+     */
+    constructor($$source = {}) {
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Menu instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {Menu}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new Menu(/** @type {Partial<Menu>} */($$parsedSource));
+    }
+}
+
 /**
  * MenuManager manages menu-related operations
  */

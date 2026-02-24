@@ -11,6 +11,7 @@ export {
     EnvironmentManager,
     EventManager,
     KeyBindingManager,
+    Menu,
     MenuManager,
     ScreenManager,
     SystemTrayManager,

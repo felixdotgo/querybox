@@ -1,6 +1,6 @@
 <template>
   <div class="container-fluid p-0 flex flex-col h-screen bg-white">
-    <AppMenuBar ref="menuBarRef" @toggle-logs="toggleFooter" />
+    <AppMenuBar v-if="!isMac" ref="menuBarRef" @toggle-logs="toggleFooter" />
 
     <!-- Content: two-column resizable layout -->
     <main class="flex-1 min-h-0">
@@ -10,10 +10,13 @@
         @dragstart="startDrag"
       >
         <template #left>
-          <ConnectionsPanel
-            @connection-selected="selectedConnection = $event"
-            @query-result="openTab"
-          />
+          <div class="bg-slate-50 min-h-full">
+            <SafeZone />
+            <ConnectionsPanel
+              @connection-selected="selectedConnection = $event"
+              @query-result="openTab"
+            />
+          </div>
         </template>
 
         <template #right>
@@ -71,6 +74,7 @@ import ConnectionsPanel from "@/components/ConnectionsPanel.vue"
 import WorkspacePanel from "@/components/WorkspacePanel.vue"
 import LogsPanel from "@/components/LogsPanel.vue"
 import AppMenuBar from "@/components/AppMenuBar.vue"
+import SafeZone from "@/components/SafeZone.vue"
 import { Events } from "@wailsio/runtime"
 import { ChevronDownOutline } from "@/lib/icons"
 import {
@@ -78,6 +82,7 @@ import {
   createVerticalResizer,
 } from "@/composables/useResize"
 
+const isMac = navigator.userAgent.includes("Mac")
 const menuBarRef = ref(null)
 // reference to TwoColumnLayout component instance; exposes inner containerRef
 const layoutRef = ref(null)
@@ -170,6 +175,8 @@ onMounted(() => {
     if (!entry) return
     logs.value.push(entry)
   })
+
+  Events.On("menu:logs-toggled", () => toggleFooter())
 
   // ensure initial sizes are within computed bounds
   horizontalResizer.clamp()
