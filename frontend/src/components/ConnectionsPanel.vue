@@ -75,7 +75,7 @@
 </template>
 
 <script setup>
-import { ref, computed, h, watch, onUnmounted, defineEmits } from "vue"
+import { ref, computed, h, watch, onUnmounted } from "vue"
 import { NIcon, NButton, useDialog } from "naive-ui"
 import { Events } from "@wailsio/runtime"
 import { useRouter } from "vue-router"
