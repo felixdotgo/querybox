@@ -1,22 +1,5 @@
-<template>
-  <div ref="wrapperRef" class="h-full w-full">
-    <n-data-table
-      :columns="tableColumns"
-      :data="tableData"
-      :row-key="rowKeyFunction"
-      :scroll-x="scrollX"
-      :max-height="tableHeight"
-      size="small"
-      bordered
-      striped
-      scrollable
-      class="w-full"
-    />
-  </div>
-</template>
-
 <script setup>
-import { computed, ref, onMounted, onBeforeUnmount } from "vue"
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 const props = defineProps({
   // Already-unwrapped RDBMS payload: { columns: [...], rows: [...] }
@@ -41,7 +24,7 @@ const tableColumns = computed(() => {
     return {
       title: name,
       key: `col${idx}`,
-      align: "left",
+      align: 'left',
       minWidth,
       ellipsis: { tooltip: true },
     }
@@ -65,7 +48,8 @@ onMounted(() => {
   ro = new ResizeObserver(([entry]) => {
     tableHeight.value = Math.floor(entry.contentRect.height)
   })
-  if (wrapperRef.value) ro.observe(wrapperRef.value)
+  if (wrapperRef.value)
+    ro.observe(wrapperRef.value)
 })
 onBeforeUnmount(() => ro?.disconnect())
 
@@ -80,9 +64,12 @@ const tableData = computed(() => {
     // support various shapes: r.values, r.Values, r.getValues()
     let vals = []
     if (r) {
-      if (Array.isArray(r.values)) vals = r.values
-      else if (Array.isArray(r.Values)) vals = r.Values
-      else if (typeof r.getValues === "function") vals = r.getValues()
+      if (Array.isArray(r.values))
+        vals = r.values
+      else if (Array.isArray(r.Values))
+        vals = r.Values
+      else if (typeof r.getValues === 'function')
+        vals = r.getValues()
     }
     ;(vals || []).forEach((v, i) => {
       obj[`col${i}`] = v
@@ -91,5 +78,22 @@ const tableData = computed(() => {
   })
 })
 
-const rowKeyFunction = (row) => row && row.key
+const rowKeyFunction = row => row && row.key
 </script>
+
+<template>
+  <div ref="wrapperRef" class="h-full w-full">
+    <n-data-table
+      :columns="tableColumns"
+      :data="tableData"
+      :row-key="rowKeyFunction"
+      :scroll-x="scrollX"
+      :max-height="tableHeight"
+      size="small"
+      bordered
+      striped
+      scrollable
+      class="w-full"
+    />
+  </div>
+</template>

@@ -1,10 +1,36 @@
+<script setup>
+import { FlashOutline, RefreshOutline, TrashOutline } from '@/lib/icons'
+
+defineProps({
+  /** Display name of the connection */
+  label: {
+    type: String,
+    required: true,
+  },
+  /** True when the connection tree has already been fetched */
+  hasTree: {
+    type: Boolean,
+    default: false,
+  },
+  /** True when this connection's result is currently active in the workspace */
+  isActive: {
+    type: Boolean,
+    default: false,
+  },
+})
+
+const emit = defineEmits(['connect', 'delete', 'dblclick'])
+</script>
+
 <template>
   <div
     class="flex items-center justify-between w-full group/conn pr-1"
     @dblclick.stop="emit('dblclick')"
   >
     <!-- connection name -->
-    <n-ellipsis class="flex-1 min-w-0 text-sm">{{ label }}</n-ellipsis>
+    <n-ellipsis class="flex-1 min-w-0 text-sm">
+      {{ label }}
+    </n-ellipsis>
 
     <!-- action buttons — revealed on hover via CSS group -->
     <div
@@ -22,7 +48,7 @@
             <template #icon>
               <n-icon><component :is="hasTree ? RefreshOutline : FlashOutline" /></n-icon>
             </template>
-             {{ hasTree ? "Reconnect" : "Connect" }}
+            {{ hasTree ? "Reconnect" : "Connect" }}
           </n-button>
         </template>
         {{ hasTree ? "Reconnect" : "Connect" }}
@@ -47,27 +73,3 @@
     </div>
   </div>
 </template>
-
-<script setup>
-import { FlashOutline, RefreshOutline, TrashOutline } from "@/lib/icons"
-
-defineProps({
-  /** Display name of the connection */
-  label: {
-    type: String,
-    required: true,
-  },
-  /** True when the connection tree has already been fetched */
-  hasTree: {
-    type: Boolean,
-    default: false,
-  },
-  /** True when this connection's result is currently active in the workspace */
-  isActive: {
-    type: Boolean,
-    default: false,
-  },
-})
-
-const emit = defineEmits(["connect", "delete", "dblclick"])
-</script>

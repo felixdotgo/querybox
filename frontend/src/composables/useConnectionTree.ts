@@ -1,7 +1,8 @@
-import { ref, reactive, watch, Ref } from 'vue'
-// @ts-ignore: generated bindings may not yet have typings
+import type { Ref } from 'vue'
+import { reactive, ref, watch } from 'vue'
+// @ts-expect-error: generated bindings may not yet have typings
 import { GetCredential } from '@/bindings/github.com/felixdotgo/querybox/services/connectionservice'
-// @ts-ignore: generated bindings may not yet have typings
+// @ts-expect-error: generated bindings may not yet have typings
 import { GetConnectionTree } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
 
 // global reactive cache mapping connection id -> nodes array
@@ -50,24 +51,28 @@ export function useConnectionTree(connRef?: Ref<any | null>) {
   if (connRef) {
     watch(connRef, async (conn) => {
       if (conn && typeof conn === 'object') {
-        await load(conn as { id: string; driver_type: string })
+        await load(conn as { id: string, driver_type: string })
       }
       updateLocal()
     }, { immediate: true })
   }
 
-  async function load(conn: { id: string; driver_type: string }) {
-    if (!conn || !conn.id) return
+  async function load(conn: { id: string, driver_type: string }) {
+    if (!conn || !conn.id)
+      return
     const id = conn.id
-    if (treeCache[id]) return // already fetched
+    if (treeCache[id])
+      return // already fetched
     try {
       const cred = await GetCredential(id)
       const params: Record<string, any> = {}
-      if (cred) params.credential_blob = cred
+      if (cred)
+        params.credential_blob = cred
       const resp = await GetConnectionTree(conn.driver_type, params)
       treeCache[id] = normalizeNodes(resp.nodes || [])
       console.debug('useConnectionTree.load: cached nodes for', id, treeCache[id])
-    } catch (err) {
+    }
+    catch (err) {
       console.error('useConnectionTree load', id, err)
       treeCache[id] = []
     }
@@ -79,12 +84,12 @@ export function useConnectionTree(connRef?: Ref<any | null>) {
     const gather = (items: any[]) => {
       for (const n of items) {
         // log each node inspected
-        // eslint-disable-next-line no-console
         console.log('getTableNames inspecting', n.label, 'type', n.node_type)
         if (['table', 'view', 'collection'].includes(n.node_type)) {
           out.push(n.label)
         }
-        if (Array.isArray(n.children)) gather(n.children)
+        if (Array.isArray(n.children))
+          gather(n.children)
       }
     }
     gather(nodes.value)
@@ -100,7 +105,8 @@ export function useConnectionTree(connRef?: Ref<any | null>) {
           cols = n.children.map((c: any) => c.label)
           return true
         }
-        if (Array.isArray(n.children) && findTable(n.children)) return true
+        if (Array.isArray(n.children) && findTable(n.children))
+          return true
       }
       return false
     }

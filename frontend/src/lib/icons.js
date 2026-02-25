@@ -9,39 +9,39 @@
  *  - Preferred sizes: 16 for toolbar / buttons, 14 for tree-node prefixes.
  */
 import {
-  // tree / navigation
-  LayersOutline,
-  ServerOutline,
-  LibraryOutline,
-  GridOutline,
-  CodeSlashOutline,
-  DocumentOutline,
-  ChevronDownOutline,
-  ArrowDownOutline,
-
   // actions
   AddCircleOutline,
+  ArrowDownOutline,
+  ChevronDownOutline,
+  CodeSlashOutline,
+  DocumentOutline,
   EyeOutline,
   FlashOutline,
+  GridOutline,
+
+  // tree / navigation
+  LayersOutline,
+  LibraryOutline,
   RefreshOutline,
+  ServerOutline,
   TrashOutline,
-} from "@vicons/ionicons5"
+} from '@vicons/ionicons5'
 
 export {
-  LayersOutline,     // driver group node
-  ServerOutline,     // connection node
-  LibraryOutline,    // node_type === "database"
-  GridOutline,       // node_type === "table"
-  CodeSlashOutline,  // node_type === "column"
-  DocumentOutline,   // unknown / generic fallback
-  ChevronDownOutline,// footer collapse toggle (rotate -90deg when collapsed)
-  ArrowDownOutline,  // log panel auto-scroll toggle
+  AddCircleOutline, // new connection toolbar button
+  ArrowDownOutline, // log panel auto-scroll toggle
+  ChevronDownOutline, // footer collapse toggle (rotate -90deg when collapsed)
+  CodeSlashOutline, // node_type === "column"
+  DocumentOutline, // unknown / generic fallback
+  EyeOutline, // "select" action on tree nodes
+  FlashOutline, // "Connect" action on connection row
+  GridOutline, // node_type === "table"
 
-  AddCircleOutline,  // new connection toolbar button
-  EyeOutline,        // "select" action on tree nodes
-  FlashOutline,      // "Connect" action on connection row
-  RefreshOutline,    // "Refresh" action on connection row
-  TrashOutline,      // "Delete" action on connection row
+  LayersOutline, // driver group node
+  LibraryOutline, // node_type === "database"
+  RefreshOutline, // "Refresh" action on connection row
+  ServerOutline, // connection node
+  TrashOutline, // "Delete" action on connection row
 }
 
 /**
@@ -50,12 +50,12 @@ export {
  * @type {Record<string, object>}
  */
 export const nodeTypeIconMap = {
-  server:   ServerOutline,
+  server: ServerOutline,
   database: LibraryOutline,
-  schema:   LayersOutline,
-  table:    GridOutline,
-  column:   CodeSlashOutline,
-  action:   AddCircleOutline,
+  schema: LayersOutline,
+  table: GridOutline,
+  column: CodeSlashOutline,
+  action: AddCircleOutline,
 }
 
 /** Used when a plugin node has no recognised node_type value. */
@@ -67,12 +67,12 @@ export const nodeTypeFallbackIcon = DocumentOutline
  * @type {Record<string, object>}
  */
 export const actionTypeIconMap = {
-  "select":          EyeOutline,
-  "describe":        CodeSlashOutline,
-  "create-database": AddCircleOutline,
-  "create-table":    AddCircleOutline,
-  "drop-database":   TrashOutline,
-  "drop-table":      TrashOutline,
+  'select': EyeOutline,
+  'describe': CodeSlashOutline,
+  'create-database': AddCircleOutline,
+  'create-table': AddCircleOutline,
+  'drop-database': TrashOutline,
+  'drop-table': TrashOutline,
 }
 
 /** Used when an action has no recognised type value. */

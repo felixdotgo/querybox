@@ -1,13 +1,15 @@
 {
   "name": "frontend",
-  "private": true,
-  "version": "0.0.0",
   "type": "module",
+  "version": "0.0.0",
+  "private": true,
   "scripts": {
     "dev": "vite",
     "build:dev": "vite build --minify false --mode development",
     "build": "vite build --mode production",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint": "eslint",
+    "lint:fix": "eslint --fix"
   },
   "dependencies": {
     "@guolao/vue-monaco-editor": "^1.6.0",
@@ -22,8 +24,10 @@
     "vue-router": "^4.2.2"
   },
   "devDependencies": {
+    "@antfu/eslint-config": "^7.6.0",
     "@vitejs/plugin-vue": "^6.0.0",
     "autoprefixer": "^10.4.14",
+    "eslint": "^9.39.3",
     "naive-ui": "^2.43.2",
     "tailwindcss": "^4.2.0",
     "vfonts": "^0.0.3",
