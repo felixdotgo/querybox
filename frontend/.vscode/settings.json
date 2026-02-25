@@ -62,7 +62,7 @@
       "fixable": true
     }
   ],
-  
+
   // Enable eslint for all supported languages
   "eslint.validate": [
     "javascript",
