@@ -204,7 +204,7 @@ defineExpose({ openTab })
             <!-- Query Editor Area -->
             <div
               v-if="tab.context"
-              class="border-b border-gray-200 flex flex-col bg-white shrink-0 relative h-48 pb-10"
+              class="border-b border-gray-200 flex flex-col bg-slate-50 shrink-0 relative h-48 pb-10"
             >
               <QueryEditor
                 v-model="tab.query"
@@ -213,7 +213,7 @@ defineExpose({ openTab })
                 :connection="props.selectedConnection"
                 @execute="handleRefresh(tab)"
               />
-              <div class="absolute bottom-2 left-2 flex gap-2 z-10 pointer-events-none">
+              <div class="absolute bottom-1.5 left-1.5 flex gap-2 z-10 pointer-events-none">
                 <NButton
                   size="small"
                   type="primary"
@@ -245,11 +245,15 @@ defineExpose({ openTab })
 
             <n-tabs
               v-model:value="tab.innerTab"
-              type="card"
+              type="line"
+              animated
               class="flex-1"
               pane-class="flex-1 overflow-hidden"
               nav-wrapper-style="{paddingLeft:'0.5rem'}"
             >
+              <template #prefix>
+                &nbsp;
+              </template>
               <n-tab-pane name="result" tab="Result">
                 <template #default>
                   <ResultViewer v-if="tab.result" :result="tab.result" class="h-full" />
