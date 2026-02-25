@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -123,40 +124,19 @@ const (
 	ConnectionTreeNodeTypeKey        = pluginpb.PluginV1_NODE_TYPE_KEY
 )
 
-// Plugin describes the minimal contract a plugin should implement. Keeping
-// this small and explicit makes it easy to implement either an in-process
-// plugin or an on-demand executable that uses ServeCLI below.
-type Plugin interface {
-	// Info returns metadata about the plugin that the host can display.
-	Info() (InfoResponse, error)
+// Historically this package exported a custom `Plugin` interface, but the
+// protobuf contract now defines the canonical server API.  Plugins should
+// implement the generated `pluginpb.PluginServiceServer` interface directly.
+// We keep a handful of lightweight type aliases for convenience, but the
+// local interface has been removed to keep this package lean.
 
-	// Exec executes a request from the host and returns a response.
-	// The host will pass a query and a map of connection/authentication parameters (e.g. host, user, password)
-	// that the plugin can use to connect to a database or service and execute the query. The plugin is responsible
-	// for defining the expected connection parameters and handling the execution logic.
-	Exec(*ExecRequest) (*ExecResponse, error)
-
-	// AuthForms returns available authentication forms the plugin supports.
-	// Optional for existing plugins — implementations may return an empty map.
-	AuthForms(*AuthFormsRequest) (*AuthFormsResponse, error)
-
-	// ConnectionTree returns a driver-specific hierarchy of nodes and actions for
-	// a given connection.  Drivers that do not support browsing can return an
-	// empty Response or an error; the core will treat that as “no tree”.
-	ConnectionTree(*ConnectionTreeRequest) (*ConnectionTreeResponse, error)
-	// TestConnection verifies the provided connection parameters by attempting
-	// to open and ping the underlying data store. It must NOT persist any state.
-	// Plugins that cannot meaningfully test connectivity should return Ok=true.
-	TestConnection(*TestConnectionRequest) (*TestConnectionResponse, error)
-}
-
-// ServeCLI runs a Plugin implementation as a small CLI shim that supports
-// three commands used by the host: `info`, `exec` and `authforms`.
+// ServeCLI runs a protobuf-based service implementation over stdin/stdout.
+// Plugins written in any language can implement the service; the helper simply
+// invokes the corresponding RPC-style methods on the provided server object.
 //
-// - `plugin info` prints InfoResponse as JSON to stdout
-// - `plugin exec` reads ExecRequest JSON from stdin and writes ExecResponse JSON to stdout
-// - `plugin authforms` prints AuthFormsResponse as JSON to stdout
-func ServeCLI(p Plugin) {
+// Supported commands are identical to the previous Go-only helper but now use
+// protojson for marshalling so communication is language-agnostic.
+func ServeCLI(s pluginpb.PluginServiceServer) {
 	args := os.Args[1:]
 	if len(args) == 0 {
 		usage()
@@ -165,12 +145,12 @@ func ServeCLI(p Plugin) {
 
 	switch args[0] {
 	case "info":
-		info, err := p.Info()
+		info, err := s.Info(context.Background(), &pluginpb.PluginV1_InfoRequest{})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "plugin: info error: %v\n", err)
 			os.Exit(1)
 		}
-		b, _ := protojson.Marshal(&info)
+		b, _ := protojson.Marshal(info)
 		_, _ = os.Stdout.Write(b)
 	case "exec":
 		in, err := io.ReadAll(os.Stdin)
@@ -178,17 +158,20 @@ func ServeCLI(p Plugin) {
 			fmt.Fprintf(os.Stderr, "plugin: failed to read stdin: %v\n", err)
 			os.Exit(1)
 		}
-		var req ExecRequest
+		var req pluginpb.PluginV1_ExecRequest
 		if err := json.Unmarshal(in, &req); err != nil {
 			fmt.Fprintf(os.Stderr, "plugin: invalid request json: %v\n", err)
 			os.Exit(1)
 		}
-		res, _ := p.Exec(&req)
+		res, err := s.Exec(context.Background(), &req)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "plugin: exec error: %v\n", err)
+			os.Exit(1)
+		}
 		b, _ := protojson.Marshal(res)
 		_, _ = os.Stdout.Write(b)
 	case "authforms":
-		// no stdin input expected; plugins should return available forms
-		res, err := p.AuthForms(&AuthFormsRequest{})
+		res, err := s.AuthForms(context.Background(), &pluginpb.PluginV1_AuthFormsRequest{})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "plugin: authforms error: %v\n", err)
 			os.Exit(1)
@@ -201,12 +184,16 @@ func ServeCLI(p Plugin) {
 			fmt.Fprintf(os.Stderr, "plugin: failed to read stdin: %v\n", err)
 			os.Exit(1)
 		}
-		var req ConnectionTreeRequest
+		var req pluginpb.PluginV1_ConnectionTreeRequest
 		if err := json.Unmarshal(in, &req); err != nil {
 			fmt.Fprintf(os.Stderr, "plugin: invalid tree request json: %v\n", err)
 			os.Exit(1)
 		}
-		res, _ := p.ConnectionTree(&req)
+		res, err := s.ConnectionTree(context.Background(), &req)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "plugin: connection-tree error: %v\n", err)
+			os.Exit(1)
+		}
 		b, _ := protojson.Marshal(res)
 		_, _ = os.Stdout.Write(b)
 	case "test-connection":
@@ -215,16 +202,16 @@ func ServeCLI(p Plugin) {
 			fmt.Fprintf(os.Stderr, "plugin: failed to read stdin: %v\n", err)
 			os.Exit(1)
 		}
-		var req TestConnectionRequest
+		var req pluginpb.PluginV1_TestConnectionRequest
 		if err := json.Unmarshal(in, &req); err != nil {
 			fmt.Fprintf(os.Stderr, "plugin: invalid test-connection request json: %v\n", err)
 			os.Exit(1)
 		}
-		res, err := p.TestConnection(&req)
+		res, err := s.TestConnection(context.Background(), &req)
 		if err != nil {
-			res = &TestConnectionResponse{Ok: false, Message: err.Error()}
+			res = &pluginpb.PluginV1_TestConnectionResponse{Ok: false, Message: err.Error()}
 		}
-		b, _ := json.Marshal(res)
+		b, _ := protojson.Marshal(res)
 		_, _ = os.Stdout.Write(b)
 	default:
 		usage()

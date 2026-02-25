@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -13,11 +14,13 @@ import (
 	_ "github.com/lib/pq" // postgres driver
 )
 
-// postgresqlPlugin implements the plugin.Plugin interface for a simple PostgreSQL executor.
-type postgresqlPlugin struct{}
+// postgresqlPlugin implements the protobuf PluginServiceServer interface for a simple PostgreSQL executor.
+type postgresqlPlugin struct {
+	pluginpb.UnimplementedPluginServiceServer
+}
 
-func (m *postgresqlPlugin) Info() (plugin.InfoResponse, error) {
-	return plugin.InfoResponse{
+func (m *postgresqlPlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRequest) (*plugin.InfoResponse, error) {
+	return &plugin.InfoResponse{
 		Type:        plugin.TypeDriver,
 		Name:        "PostgreSQL",
 		Version:     "0.1.0",
@@ -25,7 +28,7 @@ func (m *postgresqlPlugin) Info() (plugin.InfoResponse, error) {
 	}, nil
 }
 
-func (m *postgresqlPlugin) AuthForms(*plugin.AuthFormsRequest) (*plugin.AuthFormsResponse, error) {
+func (m *postgresqlPlugin) AuthForms(ctx context.Context, _ *plugin.AuthFormsRequest) (*plugin.AuthFormsResponse, error) {
 	// Provide two options: a `basic` property-based form and a `dsn` fallback.
 	basic := plugin.AuthForm{
 		Key: "basic",
@@ -128,7 +131,7 @@ func buildConnString(connection map[string]string) (string, error) {
 	return dsn, nil
 }
 
-func (m *postgresqlPlugin) Exec(req *plugin.ExecRequest) (*plugin.ExecResponse, error) {
+func (m *postgresqlPlugin) Exec(ctx context.Context, req *plugin.ExecRequest) (*plugin.ExecResponse, error) {
 	dsn, err := buildConnString(req.Connection)
 	if err != nil {
 		return &plugin.ExecResponse{Error: fmt.Sprintf("invalid connection: %v", err)}, nil
@@ -192,7 +195,7 @@ func (m *postgresqlPlugin) Exec(req *plugin.ExecRequest) (*plugin.ExecResponse, 
 // ConnectionTree returns a server → database → schema → table hierarchy.
 // DDL actions (create/drop database, create/drop table) are attached at the
 // appropriate level.  Errors or missing credentials result in an empty tree.
-func (m *postgresqlPlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugin.ConnectionTreeResponse, error) {
+func (m *postgresqlPlugin) ConnectionTree(ctx context.Context, req *plugin.ConnectionTreeRequest) (*plugin.ConnectionTreeResponse, error) {
 	dsn, err := buildConnString(req.Connection)
 	if err != nil || dsn == "" {
 		fmt.Fprintf(os.Stderr, "postgresql: ConnectionTree: DSN error: %v dsn=%q\n", err, dsn)
@@ -334,7 +337,7 @@ ORDER BY c.relname`, schemaName)
 
 // TestConnection opens a PostgreSQL connection and pings the server to verify
 // the supplied credentials are valid. Nothing is persisted.
-func (m *postgresqlPlugin) TestConnection(req *plugin.TestConnectionRequest) (*plugin.TestConnectionResponse, error) {
+func (m *postgresqlPlugin) TestConnection(ctx context.Context, req *plugin.TestConnectionRequest) (*plugin.TestConnectionResponse, error) {
 	dsn, err := buildConnString(req.Connection)
 	if err != nil || dsn == "" {
 		msg := "invalid connection parameters"

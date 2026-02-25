@@ -13,11 +13,14 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// redisPlugin implements the plugin.Plugin interface for Redis.
-type redisPlugin struct{}
+// redisPlugin implements the protobuf PluginServiceServer interface for Redis.
+// embedding the unimplemented struct keeps forward compatibility.
+type redisPlugin struct {
+	pluginpb.UnimplementedPluginServiceServer
+}
 
-func (r *redisPlugin) Info() (plugin.InfoResponse, error) {
-	return plugin.InfoResponse{
+func (r *redisPlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRequest) (*plugin.InfoResponse, error) {
+	return &plugin.InfoResponse{
 		Type:        plugin.TypeDriver,
 		Name:        "Redis",
 		Version:     "0.1.0",
@@ -25,7 +28,7 @@ func (r *redisPlugin) Info() (plugin.InfoResponse, error) {
 	}, nil
 }
 
-func (r *redisPlugin) AuthForms(*plugin.AuthFormsRequest) (*plugin.AuthFormsResponse, error) {
+func (r *redisPlugin) AuthForms(ctx context.Context, _ *plugin.AuthFormsRequest) (*plugin.AuthFormsResponse, error) {
 	basic := plugin.AuthForm{
 		Key:  "basic",
 		Name: "Basic",
@@ -203,7 +206,7 @@ func kvSingleResult(value string) *plugin.ExecResult {
 	}
 }
 
-func (r *redisPlugin) Exec(req *plugin.ExecRequest) (*plugin.ExecResponse, error) {
+func (r *redisPlugin) Exec(ctx context.Context, req *plugin.ExecRequest) (*plugin.ExecResponse, error) {
 	client, err := buildClient(req.Connection)
 	if err != nil {
 		return &plugin.ExecResponse{Error: fmt.Sprintf("connection error: %v", err)}, nil
@@ -214,8 +217,6 @@ func (r *redisPlugin) Exec(req *plugin.ExecRequest) (*plugin.ExecResponse, error
 	if len(args) == 0 {
 		return &plugin.ExecResponse{Error: "empty command"}, nil
 	}
-
-	ctx := context.Background()
 
 	// SELECT is a connection-state command that go-redis cannot execute via Do
 	// on a pooled client.  Handle it by reconnecting to the requested DB and
@@ -316,14 +317,12 @@ func parseKeyspaceInfo(info string) map[int]string {
 // populated.  Databases that contain keys show a SCAN-based preview of the
 // first 50 keys as children.  Key nodes carry a type-appropriate read action
 // so the result is always rendered as a key-value payload.
-func (r *redisPlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugin.ConnectionTreeResponse, error) {
+func (r *redisPlugin) ConnectionTree(ctx context.Context, req *plugin.ConnectionTreeRequest) (*plugin.ConnectionTreeResponse, error) {
 	client, err := buildClient(req.Connection)
 	if err != nil {
 		return &plugin.ConnectionTreeResponse{}, nil
 	}
 	defer client.Close()
-
-	ctx := context.Background()
 
 	// Retrieve keyspace info for key counts; errors are non-fatal.
 	infoStr, _ := client.Info(ctx, "keyspace").Result()
@@ -386,7 +385,7 @@ func (r *redisPlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugin
 }
 
 // TestConnection pings the Redis server to verify the supplied credentials.
-func (r *redisPlugin) TestConnection(req *plugin.TestConnectionRequest) (*plugin.TestConnectionResponse, error) {
+func (r *redisPlugin) TestConnection(ctx context.Context, req *plugin.TestConnectionRequest) (*plugin.TestConnectionResponse, error) {
 	client, err := buildClient(req.Connection)
 	if err != nil {
 		return &plugin.TestConnectionResponse{Ok: false, Message: err.Error()}, nil

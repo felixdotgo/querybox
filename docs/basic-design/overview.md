@@ -10,7 +10,7 @@
 - Plugins are on-demand executables discovered under `bin/plugins` that implement database-specific behavior.
 - Frontend initiates operations through Wails service bindings to Core and receives execution results.
 - **ConnectionService** embeds all persistence and credential-delegation logic (no separate `ConnectionManager` struct). Exposes `CreateConnection`, `ListConnections`, `GetConnection`, `GetCredential`, and `DeleteConnection` via Wails bindings.
-- **PluginManager** exposes `ListPlugins`, `Rescan`, `ExecPlugin`, `GetPluginAuthForms`, `GetConnectionTree`, `ExecTreeAction`, and `TestConnection` via Wails bindings. `pkg/plugin` provides a CLI helper (`ServeCLI`) and the canonical proto is at `contracts/plugin/v1/plugin.proto` (generated package `pluginpb`).
+- **PluginManager** exposes `ListPlugins`, `Rescan`, `ExecPlugin`, `GetPluginAuthForms`, `GetConnectionTree`, `ExecTreeAction`, and `TestConnection` via Wails bindings. Communication with plugins uses protobuf‑defined messages encoded as JSON over stdin/stdout, enabling language‑agnostic binaries; `pkg/plugin` provides a Go helper (`ServeCLI`) and the canonical proto lives at `contracts/plugin/v1/plugin.proto` (generated package `pluginpb`).
 - **Event System**: QueryBox follows a **backend-emits / frontend-listens** contract. All domain events are emitted exclusively by Go services; the frontend only subscribes and reacts — it never calls `Events.Emit` for domain topics.
   - `app:log` → structured `LogEntry{Level, Message, Timestamp}` emitted by every service for observability.
   - `connection:created` → emitted by `ConnectionService` after a successful `CreateConnection`; payload is the full `Connection` object.

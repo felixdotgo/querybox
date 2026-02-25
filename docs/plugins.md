@@ -2,6 +2,7 @@
 
 Overview
 - Plugins are single-shot executables discovered in `./bin/plugins`.
+- Communication with plugins happens over **stdin/stdout using protobuf‑defined JSON**; because the format is language-agnostic any executable can implement the contract (Go, Python, Rust, etc).
 - The host does NOT keep plugin processes running. Instead it invokes plugins on-demand when the user requests an action.
 - This enables adding/removing/updating plugin binaries while the app is running without restarting.
 
@@ -19,7 +20,7 @@ Contract (CLI)
 Contract (proto)
 - `contracts/plugin/v1/plugin.proto` defines `Info`, `Exec`, `AuthForms`, `ConnectionTree`, and `TestConnection` messages — the canonical proto for plugins (generated Go package: `rpc/contracts/plugin/v1`, `package pluginpb`).
 - `TestConnectionRequest` carries `map<string, string> connection` (same format as `ExecRequest.connection`).  `TestConnectionResponse` carries `bool ok` and `string message`.
-- `pkg/plugin` provides a small Go shim (`ServeCLI`), type aliases to `pluginpb` (including `TestConnectionRequest` / `TestConnectionResponse`), and the `FormatSQLValue(v interface{}) string` utility for safely converting `database/sql` scan values to human-readable strings (handles `[]byte` → UTF-8 string or hex).
+- `pkg/plugin` is deliberately minimal: it exposes `ServeCLI` (a helper that speaks the protobuf‑defined CLI protocol over stdin/stdout) and a few convenience aliases/constants plus `FormatSQLValue`. Plugins may import `pluginpb` directly if they prefer; the SDK is small so language‑specific implementations need not depend on Go at all.
 
 Auth forms
 - Plugins can now expose structured authentication forms via `authforms` (CLI) / `AuthForms` (proto).

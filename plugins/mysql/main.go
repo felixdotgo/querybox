@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -13,11 +14,13 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-// mysqlPlugin implements the plugin.Plugin interface for a simple MySQL executor.
-type mysqlPlugin struct{}
+// mysqlPlugin implements the protobuf PluginServiceServer interface for a simple MySQL executor.
+type mysqlPlugin struct {
+	pluginpb.UnimplementedPluginServiceServer
+}
 
-func (m *mysqlPlugin) Info() (plugin.InfoResponse, error) {
-	return plugin.InfoResponse{
+func (m *mysqlPlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRequest) (*plugin.InfoResponse, error) {
+	return &plugin.InfoResponse{
 		Type:        plugin.TypeDriver,
 		Name:        "MySQL",
 		Version:     "0.1.0",
@@ -25,7 +28,7 @@ func (m *mysqlPlugin) Info() (plugin.InfoResponse, error) {
 	}, nil
 }
 
-func (m *mysqlPlugin) AuthForms(*plugin.AuthFormsRequest) (*plugin.AuthFormsResponse, error) {
+func (m *mysqlPlugin) AuthForms(ctx context.Context, _ *plugin.AuthFormsRequest) (*plugin.AuthFormsResponse, error) {
 	// Provide two options: a `basic` property-based form and a `dsn` fallback.
 	basic := plugin.AuthForm{
 		Key:  "basic",
@@ -120,7 +123,7 @@ func buildDSN(connection map[string]string) (string, error) {
 	return dsn, nil
 }
 
-func (m *mysqlPlugin) Exec(req *plugin.ExecRequest) (*plugin.ExecResponse, error) {
+func (m *mysqlPlugin) Exec(ctx context.Context, req *plugin.ExecRequest) (*plugin.ExecResponse, error) {
 	dsn, err := buildDSN(req.Connection)
 	if err != nil {
 		return &plugin.ExecResponse{Error: fmt.Sprintf("invalid connection: %v", err)}, nil
@@ -185,7 +188,7 @@ func (m *mysqlPlugin) Exec(req *plugin.ExecRequest) (*plugin.ExecResponse, error
 // tables for browsing.  Each level exposes DDL actions so the user can create
 // or drop databases and tables directly from the connection tree.  If the
 // connection is invalid or the query fails an empty tree is returned.
-func (m *mysqlPlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugin.ConnectionTreeResponse, error) {
+func (m *mysqlPlugin) ConnectionTree(ctx context.Context, req *plugin.ConnectionTreeRequest) (*plugin.ConnectionTreeResponse, error) {
 	dsn, err := buildDSN(req.Connection)
 	if err != nil || dsn == "" {
 		return &plugin.ConnectionTreeResponse{}, nil
@@ -257,7 +260,7 @@ func (m *mysqlPlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugin
 
 // TestConnection opens a MySQL connection and pings the server to verify the
 // supplied credentials are valid. Nothing is persisted.
-func (m *mysqlPlugin) TestConnection(req *plugin.TestConnectionRequest) (*plugin.TestConnectionResponse, error) {
+func (m *mysqlPlugin) TestConnection(ctx context.Context, req *plugin.TestConnectionRequest) (*plugin.TestConnectionResponse, error) {
 	dsn, err := buildDSN(req.Connection)
 	if err != nil || dsn == "" {
 		msg := "invalid connection parameters"

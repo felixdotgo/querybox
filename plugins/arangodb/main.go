@@ -15,11 +15,14 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-// arangoPlugin implements the plugin.Plugin interface for ArangoDB.
-type arangoPlugin struct{}
+// arangoPlugin implements the protobuf PluginServiceServer interface for ArangoDB.
+// embedding the unimplemented server ensures compatibility with future additions.
+type arangoPlugin struct {
+	pluginpb.UnimplementedPluginServiceServer
+}
 
-func (a *arangoPlugin) Info() (plugin.InfoResponse, error) {
-	return plugin.InfoResponse{
+func (a *arangoPlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRequest) (*plugin.InfoResponse, error) {
+	return &plugin.InfoResponse{
 		Type:        plugin.TypeDriver,
 		Name:        "ArangoDB",
 		Version:     "0.1.0",
@@ -27,7 +30,7 @@ func (a *arangoPlugin) Info() (plugin.InfoResponse, error) {
 	}, nil
 }
 
-func (a *arangoPlugin) AuthForms(*plugin.AuthFormsRequest) (*plugin.AuthFormsResponse, error) {
+func (a *arangoPlugin) AuthForms(ctx context.Context, _ *plugin.AuthFormsRequest) (*plugin.AuthFormsResponse, error) {
 	basic := plugin.AuthForm{
 		Key:  "basic",
 		Name: "Basic",
@@ -279,7 +282,7 @@ func splitDBFromQuery(query string) (dbName, rewritten string) {
 	return m[1], rewritten
 }
 
-func (a *arangoPlugin) Exec(req *plugin.ExecRequest) (*plugin.ExecResponse, error) {
+func (a *arangoPlugin) Exec(ctx context.Context, req *plugin.ExecRequest) (*plugin.ExecResponse, error) {
 	p, err := parseConnParams(req.Connection)
 	if err != nil {
 		return &plugin.ExecResponse{Error: fmt.Sprintf("connection error: %v", err)}, nil
@@ -289,8 +292,6 @@ func (a *arangoPlugin) Exec(req *plugin.ExecRequest) (*plugin.ExecResponse, erro
 	if err != nil {
 		return &plugin.ExecResponse{Error: fmt.Sprintf("client error: %v", err)}, nil
 	}
-
-	ctx := context.Background()
 
 	// Intercept DDL meta-commands (CREATE/DROP DATABASE|COLLECTION) before
 	// passing the query to the AQL engine, which does not support DDL.
@@ -351,7 +352,7 @@ func (a *arangoPlugin) Exec(req *plugin.ExecRequest) (*plugin.ExecResponse, erro
 // DDL actions are exposed at the server (create database), database (drop
 // database, create collection) and collection (drop collection) levels.
 // The query templates use the DDL meta-commands intercepted by Exec.
-func (a *arangoPlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugin.ConnectionTreeResponse, error) {
+func (a *arangoPlugin) ConnectionTree(ctx context.Context, req *plugin.ConnectionTreeRequest) (*plugin.ConnectionTreeResponse, error) {
 	p, err := parseConnParams(req.Connection)
 	if err != nil {
 		return &plugin.ConnectionTreeResponse{}, nil
@@ -361,8 +362,6 @@ func (a *arangoPlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugi
 	if err != nil {
 		return &plugin.ConnectionTreeResponse{}, nil
 	}
-
-	ctx := context.Background()
 
 	// List all accessible databases.
 	databases, err := client.AccessibleDatabases(ctx)
@@ -472,7 +471,7 @@ func (a *arangoPlugin) collectionNodes(ctx context.Context, db driver.Database, 
 }
 
 // TestConnection verifies the ArangoDB connection by checking server version.
-func (a *arangoPlugin) TestConnection(req *plugin.TestConnectionRequest) (*plugin.TestConnectionResponse, error) {
+func (a *arangoPlugin) TestConnection(ctx context.Context, req *plugin.TestConnectionRequest) (*plugin.TestConnectionResponse, error) {
 	p, err := parseConnParams(req.Connection)
 	if err != nil {
 		return &plugin.TestConnectionResponse{Ok: false, Message: err.Error()}, nil
@@ -483,7 +482,6 @@ func (a *arangoPlugin) TestConnection(req *plugin.TestConnectionRequest) (*plugi
 		return &plugin.TestConnectionResponse{Ok: false, Message: fmt.Sprintf("client error: %v", err)}, nil
 	}
 
-	ctx := context.Background()
 	v, err := client.Version(ctx)
 	if err != nil {
 		return &plugin.TestConnectionResponse{Ok: false, Message: fmt.Sprintf("version check error: %v", err)}, nil

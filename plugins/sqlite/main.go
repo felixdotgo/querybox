@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -13,11 +14,15 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// sqlitePlugin implements the plugin.Plugin interface for a simple SQLite executor.
-type sqlitePlugin struct{}
+// sqlitePlugin implements the protobuf-generated PluginServiceServer interface.
+// embedding the unimplemented struct ensures forward compatibility when new
+// methods are added to the service definition.
+type sqlitePlugin struct {
+	pluginpb.UnimplementedPluginServiceServer
+}
 
-func (m *sqlitePlugin) Info() (plugin.InfoResponse, error) {
-	return plugin.InfoResponse{
+func (m *sqlitePlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRequest) (*plugin.InfoResponse, error) {
+	return &plugin.InfoResponse{
 		Type:        plugin.TypeDriver,
 		Name:        "SQLite",
 		Version:     "0.1.0",
@@ -25,7 +30,7 @@ func (m *sqlitePlugin) Info() (plugin.InfoResponse, error) {
 	}, nil
 }
 
-func (m *sqlitePlugin) AuthForms(*plugin.AuthFormsRequest) (*plugin.AuthFormsResponse, error) {
+func (m *sqlitePlugin) AuthForms(ctx context.Context, _ *plugin.AuthFormsRequest) (*plugin.AuthFormsResponse, error) {
 	// Basic: a file path
 	basic := plugin.AuthForm{
 		Key:  "basic",
@@ -93,7 +98,7 @@ func driverDSN(c credential) (driver, dsn string, err error) {
 	return "sqlite", dsn, nil
 }
 
-func (m *sqlitePlugin) Exec(req *plugin.ExecRequest) (*plugin.ExecResponse, error) {
+func (m *sqlitePlugin) Exec(ctx context.Context, req *plugin.ExecRequest) (*plugin.ExecResponse, error) {
 	c := parseCredential(req.Connection)
 
 	driver, dsn, err := driverDSN(c)
@@ -170,7 +175,7 @@ func (m *sqlitePlugin) Exec(req *plugin.ExecRequest) (*plugin.ExecResponse, erro
 }
 
 // ConnectionTree returns a list of tables in the SQLite database.
-func (m *sqlitePlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugin.ConnectionTreeResponse, error) {
+func (m *sqlitePlugin) ConnectionTree(ctx context.Context, req *plugin.ConnectionTreeRequest) (*plugin.ConnectionTreeResponse, error) {
 	c := parseCredential(req.Connection)
 
 	driver, dsn, err := driverDSN(c)
@@ -227,7 +232,7 @@ func (m *sqlitePlugin) ConnectionTree(req *plugin.ConnectionTreeRequest) (*plugi
 }
 
 // TestConnection verifies the connection is reachable without persisting any state.
-func (m *sqlitePlugin) TestConnection(req *plugin.TestConnectionRequest) (*plugin.TestConnectionResponse, error) {
+func (m *sqlitePlugin) TestConnection(ctx context.Context, req *plugin.TestConnectionRequest) (*plugin.TestConnectionResponse, error) {
 	c := parseCredential(req.Connection)
 
 	driver, dsn, err := driverDSN(c)

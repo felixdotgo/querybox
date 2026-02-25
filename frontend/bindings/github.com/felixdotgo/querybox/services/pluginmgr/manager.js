@@ -46,10 +46,13 @@ export function EnablePlugin(name) {
 
 /**
  * ExecPlugin runs the named plugin with the provided connection info and query.
- * The plugin is invoked as an executable: `plugin exec` and receives a JSON
- * payload on stdin. The method returns the structured `plugin.ExecResponse` or
- * an error.  Historically this returned a raw string; callers may need to
- * examine the `Result` field to access rows, documents, or key/value data.
+ * Under the hood the manager spawns the binary, writes a protobuf-JSON
+ * `PluginV1_ExecRequest` to stdin, and reads a `PluginV1_ExecResponse` from
+ * stdout.  The `plugin` package exposes convenient aliases but the contract is
+ * defined in `contracts/plugin/v1/plugin.proto`. Callers receive the structured
+ * `plugin.ExecResponse` (alias for the proto type) or an error.  Historically
+ * this returned a raw string; callers may need to examine the `Result` field to
+ * access rows, documents, or key/value data.
  * @param {string} name
  * @param {{ [_ in string]?: string }} connection
  * @param {string} query

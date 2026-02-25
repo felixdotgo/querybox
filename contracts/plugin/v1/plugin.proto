@@ -5,7 +5,11 @@ option go_package = "plugin/v1;pluginpb";
 
 import "google/protobuf/struct.proto";
 
-// Contract for on-demand plugins (CLI-invoked). Plugins SHOULD implement
+// Contract for on-demand plugins (CLI-invoked).
+// At runtime the host and plugin exchange protobuf messages encoded as
+// JSON (using `protojson`) over standard input/output.  This serializer is
+// intentionally language-agnostic so plugins can be written in any language.
+// Plugins SHOULD implement the PluginService
 service PluginService {
   // Info returns basic information about the plugin (type, name, version, description).
   rpc Info(PluginV1.InfoRequest) returns (PluginV1.InfoResponse);
