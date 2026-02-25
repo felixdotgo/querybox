@@ -10,8 +10,13 @@
      * Builds will error if you use a feature that cannot be compiled down to the target level.
      */
     "target": "ESNext",
+    "baseUrl": ".",
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "paths": {
+      "@/bindings/*": ["bindings/*"],
+      "@/*": ["src/*"]
+    },
     "resolveJsonModule": true,
     "allowJs": true,
     /**
