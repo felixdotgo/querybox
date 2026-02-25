@@ -3,6 +3,7 @@ import { Events } from '@wailsio/runtime'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ClosePluginsWindow } from '@/bindings/github.com/felixdotgo/querybox/services/app'
 import { ListPlugins, Rescan } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
+import SafeZone from '@/components/SafeZone.vue'
 
 const TYPE_LABELS = { 1: 'Driver', 2: 'Transformer', 3: 'Formatter' }
 
@@ -80,8 +81,10 @@ function sortPlugins(list) {
   return list.slice().sort((a, b) => {
     const aName = (a.name || a.id || '').toLowerCase()
     const bName = (b.name || b.id || '').toLowerCase()
-    if (aName < bName) return -1
-    if (aName > bName) return 1
+    if (aName < bName)
+      return -1
+    if (aName > bName)
+      return 1
     return 0
   })
 }
@@ -89,6 +92,8 @@ function sortPlugins(list) {
 
 <template>
   <div class="h-screen flex flex-col bg-white font-mono text-sm">
+    <SafeZone />
+
     <!-- Top bar -->
     <div class="shrink-0 flex items-center justify-between px-4 py-2.5 border-b border-slate-200">
       <span class="font-semibold text-slate-700">Installed Plugins</span>
