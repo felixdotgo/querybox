@@ -27,7 +27,7 @@ func (m *mysqlPlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRequest
 		Description: "MySQL database driver",
 		Url:         "https://www.mysql.com/",
 		Author:      "Oracle",
-		Capabilities: []string{"transactions", "replication"},
+		Capabilities: []string{"query", "explain-query"},
 		Tags:        []string{"sql", "relational"},
 		License:     "GPL-2.0",
 		IconUrl:     "https://www.mysql.com/common/logos/logo-mysql-170x115.png",
@@ -130,6 +130,11 @@ func buildDSN(connection map[string]string) (string, error) {
 }
 
 func (m *mysqlPlugin) Exec(ctx context.Context, req *plugin.ExecRequest) (*plugin.ExecResponse, error) {
+	if req.Options != nil {
+		if v, ok := req.Options["explain-query"]; ok && v == "yes" {
+			req.Query = "EXPLAIN " + req.Query
+		}
+	}
 	dsn, err := buildDSN(req.Connection)
 	if err != nil {
 		return &plugin.ExecResponse{Error: fmt.Sprintf("invalid connection: %v", err)}, nil

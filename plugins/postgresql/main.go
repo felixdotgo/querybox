@@ -27,7 +27,7 @@ func (m *postgresqlPlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRe
 		Description: "PostgreSQL database driver",
 		Url:         "https://www.postgresql.org/",
 		Author:      "PostgreSQL Global Development Group",
-		Capabilities: []string{"transactions", "json"},
+		Capabilities: []string{"query", "explain-query"},
 		Tags:        []string{"sql", "relational"},
 		License:     "PostgreSQL",
 		IconUrl:     "https://www.postgresql.org/media/img/about/press/elephant.png",
@@ -138,6 +138,11 @@ func buildConnString(connection map[string]string) (string, error) {
 }
 
 func (m *postgresqlPlugin) Exec(ctx context.Context, req *plugin.ExecRequest) (*plugin.ExecResponse, error) {
+	if req.Options != nil {
+		if v, ok := req.Options["explain-query"]; ok && v == "yes" {
+			req.Query = "EXPLAIN " + req.Query
+		}
+	}
 	dsn, err := buildConnString(req.Connection)
 	if err != nil {
 		return &plugin.ExecResponse{Error: fmt.Sprintf("invalid connection: %v", err)}, nil

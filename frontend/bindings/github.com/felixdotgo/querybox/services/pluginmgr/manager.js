@@ -45,35 +45,38 @@ export function EnablePlugin(name) {
 }
 
 /**
- * ExecPlugin runs the named plugin with the provided connection info and query.
- * Under the hood the manager spawns the binary, writes a protobuf-JSON
- * `PluginV1_ExecRequest` to stdin, and reads a `PluginV1_ExecResponse` from
- * stdout.  The `plugin` package exposes convenient aliases but the contract is
- * defined in `contracts/plugin/v1/plugin.proto`. Callers receive the structured
- * `plugin.ExecResponse` (alias for the proto type) or an error.  Historically
- * this returned a raw string; callers may need to examine the `Result` field to
- * access rows, documents, or key/value data.
+ * ExecPlugin runs the named plugin with the provided connection info, query
+ * and optional options map.  Under the hood the manager spawns the binary,
+ * writes a protobuf-JSON `PluginV1_ExecRequest` to stdin, and reads a
+ * `PluginV1_ExecResponse` from stdout.  The `plugin` package exposes convenient
+ * aliases but the contract is defined in `contracts/plugin/v1/plugin.proto`.
+ * Callers receive the structured `plugin.ExecResponse` (alias for the proto
+ * type) or an error.  Historically this returned a raw string; callers may need
+ * to examine the `Result` field to access rows, documents, or key/value data.
  * @param {string} name
  * @param {{ [_ in string]?: string }} connection
  * @param {string} query
+ * @param {{ [_ in string]?: string }} options
  * @returns {$CancellablePromise<plugin$0.ExecResponse | null>}
  */
-export function ExecPlugin(name, connection, query) {
-    return $Call.ByID(2332402495, name, connection, query).then(/** @type {($result: any) => any} */(($result) => {
+export function ExecPlugin(name, connection, query, options) {
+    return $Call.ByID(2332402495, name, connection, query, options).then(/** @type {($result: any) => any} */(($result) => {
         return $$createType1($result);
     }));
 }
 
 /**
  * ExecTreeAction is a convenience wrapper for executing the query payload
- * attached to a tree node action.  It simply forwards to ExecPlugin.
+ * attached to a tree node action.  It simply forwards to ExecPlugin and
+ * propagates any provided options map (for example "explain-query").
  * @param {string} name
  * @param {{ [_ in string]?: string }} connection
  * @param {string} actionQuery
+ * @param {{ [_ in string]?: string }} options
  * @returns {$CancellablePromise<plugin$0.ExecResponse | null>}
  */
-export function ExecTreeAction(name, connection, actionQuery) {
-    return $Call.ByID(987162126, name, connection, actionQuery).then(/** @type {($result: any) => any} */(($result) => {
+export function ExecTreeAction(name, connection, actionQuery, options) {
+    return $Call.ByID(987162126, name, connection, actionQuery, options).then(/** @type {($result: any) => any} */(($result) => {
         return $$createType1($result);
     }));
 }

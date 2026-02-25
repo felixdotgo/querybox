@@ -27,7 +27,7 @@ func (r *redisPlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRequest
 		Description: "Redis key-value store driver",
 		Url:         "https://redis.io/",
 		Author:      "Redis Ltd.",
-		Capabilities: []string{"keyvalue", "pubsub"},
+		Capabilities: []string{"query"},
 		Tags:        []string{"nosql", "cache"},
 		License:     "BSD-3-Clause",
 		IconUrl:     "https://redis.io/images/redis-white.png",

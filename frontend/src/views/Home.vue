@@ -65,7 +65,11 @@ function openTab(title, result, error, tabKey, version, context) {
 function handleRefreshTab(context) {
   if (!context || !context.conn || !context.action)
     return
-  connectionsRef.value?.runTreeAction(context.conn, context.action, context.node)
+  const extras = {}
+  if (context.explain) {
+    extras.explain = true
+  }
+  connectionsRef.value?.runTreeAction(context.conn, context.action, context.node, extras)
 }
 
 function startDrag(e) {

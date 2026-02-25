@@ -71,6 +71,37 @@ func TestProbeInfoDecoding(t *testing.T) {
 	}
 }
 
+// TestExecRequestMarshalling ensures that the internal execRequest struct
+// correctly serialises the optional options map so the plugin receives it.
+func TestExecRequestMarshalling(t *testing.T) {
+	r := execRequest{
+		Connection: map[string]string{"a": "b"},
+		Query:      "SELECT 1",
+		Options:    map[string]string{"explain-query": "yes"},
+	}
+	b, err := json.Marshal(&r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if opts, ok := m["options"].(map[string]interface{}); !ok {
+		t.Errorf("options field missing or wrong type: %#v", m)
+	} else if opts["explain-query"] != "yes" {
+		t.Errorf("unexpected options content: %#v", opts)
+	}
+}
+
+func TestExecTreeActionForwardsOptions(t *testing.T) {
+	m := New()
+	_, err := m.ExecTreeAction("nonexistent", nil, "SELECT 1", map[string]string{"explain-query": "yes"})
+	if err == nil {
+		t.Errorf("expected error for missing plugin")
+	}
+}
+
 // helper extracted from probeInfo so we can call without executing command
 func probeInfoFromRaw(raw map[string]interface{}) (PluginInfo, error) {
 	// copy logic from probeInfo, including normalization

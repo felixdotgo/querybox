@@ -29,7 +29,7 @@ func (m *sqlitePlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoReques
 		Description: "SQLite database driver",
 		Url:         "https://www.sqlite.org/",
 		Author:      "SQLite Consortium",
-		Capabilities: []string{"transactions", "embedded"},
+		Capabilities: []string{"query", "explain-query"},
 		Tags:        []string{"sql", "relational"},
 		License:     "Public Domain",
 		IconUrl:     "https://www.sqlite.org/images/logo-square.jpg",
@@ -105,6 +105,15 @@ func driverDSN(c credential) (driver, dsn string, err error) {
 }
 
 func (m *sqlitePlugin) Exec(ctx context.Context, req *plugin.ExecRequest) (*plugin.ExecResponse, error) {
+	// honour explain-request flag by prefixing the query; plugins may
+	// interpret this differently but most SQL drivers simply prepend
+	// "EXPLAIN".
+	if req.Options != nil {
+		if v, ok := req.Options["explain-query"]; ok && v == "yes" {
+			req.Query = "EXPLAIN " + req.Query
+		}
+	}
+
 	c := parseCredential(req.Connection)
 
 	driver, dsn, err := driverDSN(c)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/felixdotgo/querybox/pkg/plugin"
 	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
@@ -34,6 +35,9 @@ func (t *templatePlugin) Exec(ctx context.Context, req *plugin.ExecRequest) (*pl
 	data := map[string]string{"query": req.Query}
 	for k, v := range req.Connection {
 		data[k] = v
+	}
+	if req.Options != nil {
+		data["options"] = fmt.Sprintf("%v", req.Options)
 	}
 	return &plugin.ExecResponse{
 		Result: &plugin.ExecResult{

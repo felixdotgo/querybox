@@ -72,6 +72,13 @@ message PluginV1 {
     // connection is plugin-defined key/value (host, user, password, ...)
     map<string, string> connection = 1;
     string query = 2; // Query or plugin-specific payload (SQL/NoSQL/etc.)
+
+    // optional extensible parameters that the host may forward to plugins.
+    // currently used by SQL/relational drivers to indicate an explain request
+    // (`options["explain-query"] == "yes"`).  Plugins are free to define
+    // additional keys for their own features; forwards-compatible hosts will
+    // simply include them in the map and ignore unknown values.
+    map<string, string> options = 3;
   }
 
   // ExecResponse contains the output of an Exec call,

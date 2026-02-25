@@ -13,6 +13,26 @@ const emit = defineEmits(['tab-closed', 'active-connection-changed', 'refresh-ta
 const tabs = ref([])
 const activeTabKey = ref('')
 
+function supportsExplain(tab) {
+  return !!(tab && tab.context && Array.isArray(tab.context.capabilities) && tab.context.capabilities.includes('explain-query'))
+}
+
+function handleExplain(tab) {
+  if (!tab.context)
+    return
+  tab.loading = true
+  tab.innerTab = 'explain'
+  const explainContext = {
+    ...tab.context,
+    action: {
+      ...tab.context.action,
+      query: tab.query,
+    },
+    explain: true,
+  }
+  emit('refresh-tab', explainContext)
+}
+
 function getMonacoLanguage(driver) {
   if (!driver)
     return 'sql'
@@ -88,11 +108,28 @@ function openTab(title, result, error, tabKey, version, context) {
     title,
     result,
     error,
+    explainResult: null,
+    explainError: null,
+    innerTab: 'result',
     version: version || Date.now(),
     context,
     loading: false,
     query: context?.action?.query || '',
     language: getMonacoLanguage(context?.conn?.driver_type),
+  }
+
+  if (context && context.explain) {
+    newTab.explainResult = result
+    newTab.explainError = error
+    newTab.innerTab = 'explain'
+    if (existing) {
+      newTab.result = existing.result
+      newTab.error = existing.error
+    }
+    else {
+      newTab.result = null
+      newTab.error = null
+    }
   }
 
   if (existing) {
@@ -122,13 +159,22 @@ function handleRefresh(tab) {
   if (!tab.context)
     return
   tab.loading = true
-  // Re-execute with the potentially modified query from the textbox
+  tab.explainResult = null
+  tab.explainError = null
+  tab.innerTab = 'result'
+  // Re-execute with the potentially modified query from the textbox.
+  // If the existing context came from an earlier explain call it may
+  // still contain an `explain` flag.  Removing that ensures the
+  // subsequent execution is a normal query.
   const refreshContext = {
     ...tab.context,
     action: {
       ...tab.context.action,
       query: tab.query,
     },
+  }
+  if ('explain' in refreshContext) {
+    delete refreshContext.explain
   }
   emit('refresh-tab', refreshContext)
 }
@@ -173,7 +219,7 @@ defineExpose({ openTab })
                   type="primary"
                   :loading="tab.loading"
                   title="Execute (Ctrl+Enter)"
-                  class="pointer-events-auto shadow-md"
+                  class="pointer-events-auto"
                   @click="handleRefresh(tab)"
                 >
                   <template #icon>
@@ -183,16 +229,51 @@ defineExpose({ openTab })
                   </template>
                   Execute
                 </NButton>
+                <NButton
+                  v-if="supportsExplain(tab)"
+                  size="small"
+                  tertiary
+                  :loading="tab.loading"
+                  title="Explain query"
+                  class="pointer-events-auto"
+                  @click="handleExplain(tab)"
+                >
+                  Explain
+                </NButton>
               </div>
             </div>
 
-            <ResultViewer v-if="tab.result" :result="tab.result" class="flex-1" />
-            <pre
-              v-else-if="tab.error"
-              class="whitespace-pre-wrap p-4 text-red-600 bg-red-50 flex-1 overflow-auto font-mono text-sm"
+            <n-tabs
+              v-model:value="tab.innerTab"
+              type="card"
+              class="flex-1"
+              pane-class="flex-1 overflow-hidden"
+              nav-wrapper-style="{paddingLeft:'0.5rem'}"
             >
+              <n-tab-pane name="result" tab="Result">
+                <template #default>
+                  <ResultViewer v-if="tab.result" :result="tab.result" class="h-full" />
+                  <pre
+                    v-else-if="tab.error"
+                    class="whitespace-pre-wrap p-4 text-red-600 bg-red-50 flex-1 overflow-auto font-mono text-sm"
+                  >
 {{ tab.error }}
-            </pre>
+                  </pre>
+                  <div v-else class="text-gray-500 p-4">No Results</div>
+                </template>
+              </n-tab-pane>
+              <n-tab-pane v-if="tab.explainResult || tab.explainError" name="explain" tab="Explain">
+                <template #default>
+                  <ResultViewer v-if="tab.explainResult" :result="tab.explainResult" class="h-full" />
+                  <pre
+                    v-else-if="tab.explainError"
+                    class="whitespace-pre-wrap p-4 text-red-600 bg-red-50 flex-1 overflow-auto font-mono text-sm"
+                  >
+{{ tab.explainError }}
+                  </pre>
+                </template>
+              </n-tab-pane>
+            </n-tabs>
           </div>
           <div v-else class="text-gray-500 p-4">
             No Results

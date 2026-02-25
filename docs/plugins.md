@@ -15,7 +15,7 @@ Contract (CLI)
 - `plugin info` → plugin prints JSON: `{ name, version, description, type }` plus optional metadata fields.  The standard keys now include:
   - `type` (PluginV1_Type enum).
   - `name`, `version`, `description` (existing fields).
-  - **optional** extras: `url`, `author`, `capabilities` (string array), `tags` (string array),
+  - **optional** extras: `url`, `author`, `capabilities` (string array; e.g. `"transactions"`, `"json"`, **`"explain-query"`**), `tags` (string array),
     `license`, `icon_url`, `contact`, plus two free-form maps `metadata` and
     `settings`.  Hosts ignore unknown keys so older plugins continue working.
     The UI renders a fixed set of metadata rows (type, version, author, license,
@@ -26,7 +26,7 @@ Contract (CLI)
     of them.
   Older plugins emitted the numeric value while new ones produce the enum name
   (e.g. `"DRIVER"`); hosts post‑0.0.1 parse either form transparently.
-- `plugin exec` → plugin reads JSON `{ connection, query }` from stdin and writes JSON `{ result, error }` to stdout.  `connection` may be a simple DSN string or a credential blob JSON; arbitrary extra query parameters (including `tls` settings for SSL) are allowed and appended by the host. `result` is now a structured object containing one of `sql`, `document`, or `kv` payloads; older plugins may still return a raw string which will be wrapped in a `kv` map by the host.
+- `plugin exec` → plugin reads JSON `{ connection, query, options }` from stdin and writes JSON `{ result, error }` to stdout.  `connection` may be a simple DSN string or a credential blob JSON; arbitrary extra query parameters (including `tls` settings for SSL) are allowed and appended by the host. `options` is an opaque map that the host can use to signal special behaviours (currently drivers honour `{"explain-query":"yes"}`).  `result` is now a structured object containing one of `sql`, `document`, or `kv` payloads; older plugins may still return a raw string which will be wrapped in a `kv` map by the host.
 - `plugin connection-tree` (or simply `plugin tree`) → plugin reads JSON `{ connection }` and returns `{ nodes: [...]}` describing a hierarchical browse structure.  Each node may include an `actions` array describing what the core should do when the user activates that node.
 - `plugin test-connection` → plugin reads JSON `{ connection }` from stdin and writes JSON `{ ok: bool, message: string }` to stdout.  The plugin must attempt to open and verify connectivity (e.g. `db.Open` + `db.Ping()` for SQL drivers) without persisting any state.  Plugins that cannot meaningfully probe connectivity should return `{ ok: true, message: "..." }`.  The host uses a **15-second** timeout for this command.
 
@@ -37,6 +37,17 @@ Contract (proto)
 
 Auth forms
 - Plugins can now expose structured authentication forms via `authforms` (CLI) / `AuthForms` (proto).
+
+### Explain-capable drivers
+
+If a plugin returns the capability string `"explain-query"` in its `info`
+response the host will render an **Explain** button in the result workspace.
+Clicking the button reruns the current SQL query prefixed with `EXPLAIN` (or
+whatever the plugin chooses to interpret) and displays the returned payload in
+an adjacent **Explain** tab.  The normal result set remains intact so users
+can toggle between the two views.  Plugins are responsible for any dialect-
+specific formatting; the host simply forwards the translated query and renders
+the returned rows like a normal execution result.
 - The host will call `GetPluginAuthForms(pluginName)` and render one or more tabs for the plugin's supported forms.
 - Credential storage: the UI serializes the selected form values as a JSON string and sends it to Core (previously stored in `credential_blob`). Core now stores the sensitive secret in the OS keyring and persists only a `credential_key` reference in SQLite; plugins *still* receive the credential JSON in the execution request.
 - Backwards compatibility: plugins that don't implement `authforms` will continue to work; the UI falls back to the single DSN/credential input.

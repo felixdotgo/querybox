@@ -155,10 +155,10 @@ Discover plugin executables, manage plugin registry, execute plugins on-demand w
 | Method | Signature | Description |
 |--------|-----------|-------------|
 | `ListPlugins` | `() → []PluginInfo` | Return discovered plugins (does not spawn processes) |
-| `ExecPlugin` | `(name, connParams, query) → (*ExecResponse, error)` | Execute plugin with 30s timeout; `ExecResponse` carries a typed result (sql/document/kv) |
+| `ExecPlugin` | `(name, connParams, query, options?) → (*ExecResponse, error)` | Execute plugin with 30s timeout; `ExecResponse` carries a typed result (sql/document/kv). `options` map is forwarded to the plugin (e.g. explain-query). |
 | `GetPluginAuthForms` | `(name) → (map[string]*AuthForm, error)` | Probe plugin for auth form definitions (2s timeout); returns nil on unimplemented |
 | `GetConnectionTree` | `(name, connParams) → (*ConnectionTreeResponse, error)` | Retrieve driver-defined tree; nodes may include `select` / `describe` actions |
-| `ExecTreeAction` | `(name, connParams, query) → (*ExecResponse, error)` | Convenience wrapper — delegates to `ExecPlugin` with the action query string |
+| `ExecTreeAction` | `(name, connParams, query, options?) → (*ExecResponse, error)` | Convenience wrapper — delegates to `ExecPlugin` with the action query string and optional options map |
 | `Rescan` | `() → error` | Manual trigger for directory scan |
 
 ### Data Model

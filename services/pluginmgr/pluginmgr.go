@@ -80,6 +80,10 @@ func (m *Manager) emitLog(level services.LogLevel, message string) {
 type execRequest struct {
 	Connection map[string]string `json:"connection"`
 	Query      string            `json:"query"`
+	// opaque options forwarded from the frontend; currently used for
+	// explain-query=yes requests.  This mirrors the protobuf ExecRequest
+	// `options` field and allows the host to signal driver-specific flags.
+	Options    map[string]string `json:"options,omitempty"`
 }
 
 // We reuse the generated protobuf alias for the response so we stay in sync
@@ -272,15 +276,15 @@ func (m *Manager) ListPlugins() []PluginInfo {
 	return ret
 }
 
-// ExecPlugin runs the named plugin with the provided connection info and query.
-// Under the hood the manager spawns the binary, writes a protobuf-JSON
-// `PluginV1_ExecRequest` to stdin, and reads a `PluginV1_ExecResponse` from
-// stdout.  The `plugin` package exposes convenient aliases but the contract is
-// defined in `contracts/plugin/v1/plugin.proto`. Callers receive the structured
-// `plugin.ExecResponse` (alias for the proto type) or an error.  Historically
-// this returned a raw string; callers may need to examine the `Result` field to
-// access rows, documents, or key/value data.
-func (m *Manager) ExecPlugin(name string, connection map[string]string, query string) (*plugin.ExecResponse, error) {
+// ExecPlugin runs the named plugin with the provided connection info, query
+// and optional options map.  Under the hood the manager spawns the binary,
+// writes a protobuf-JSON `PluginV1_ExecRequest` to stdin, and reads a
+// `PluginV1_ExecResponse` from stdout.  The `plugin` package exposes convenient
+// aliases but the contract is defined in `contracts/plugin/v1/plugin.proto`.
+// Callers receive the structured `plugin.ExecResponse` (alias for the proto
+// type) or an error.  Historically this returned a raw string; callers may need
+// to examine the `Result` field to access rows, documents, or key/value data.
+func (m *Manager) ExecPlugin(name string, connection map[string]string, query string, options map[string]string) (*plugin.ExecResponse, error) {
 	m.mu.Lock()
 	info, ok := m.plugins[name]
 	m.mu.Unlock()
@@ -300,9 +304,14 @@ func (m *Manager) ExecPlugin(name string, connection map[string]string, query st
 	if len(logQuery) > 80 {
 		logQuery = logQuery[:80] + "..."
 	}
-	m.emitLog(services.LogLevelInfo, fmt.Sprintf("ExecPlugin: executing (driver: %s, query: %q)", name, logQuery))
+	if len(options) > 0 {
+		m.emitLog(services.LogLevelInfo, fmt.Sprintf("ExecPlugin: executing (driver: %s, query: %q, options: %v)", name, logQuery, options))
+	} else {
+		m.emitLog(services.LogLevelInfo, fmt.Sprintf("ExecPlugin: executing (driver: %s, query: %q)", name, logQuery))
+	}
 
-	req := execRequest{Connection: connection, Query: query}
+	// build request envelope; include options map if supplied
+	req := execRequest{Connection: connection, Query: query, Options: options}
 	b, _ := json.Marshal(&req)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -493,9 +502,10 @@ func (m *Manager) GetConnectionTree(name string, connection map[string]string) (
 }
 
 // ExecTreeAction is a convenience wrapper for executing the query payload
-// attached to a tree node action.  It simply forwards to ExecPlugin.
-func (m *Manager) ExecTreeAction(name string, connection map[string]string, actionQuery string) (*plugin.ExecResponse, error) {
-	return m.ExecPlugin(name, connection, actionQuery)
+// attached to a tree node action.  It simply forwards to ExecPlugin and
+// propagates any provided options map (for example "explain-query").
+func (m *Manager) ExecTreeAction(name string, connection map[string]string, actionQuery string, options map[string]string) (*plugin.ExecResponse, error) {
+	return m.ExecPlugin(name, connection, actionQuery, options)
 }
 
 // TestConnection invokes the named plugin's `test-connection` command to verify

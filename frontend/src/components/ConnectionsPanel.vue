@@ -15,6 +15,7 @@ import {
 import {
   ExecPlugin,
   ExecTreeAction,
+  ListPlugins,
 } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
 import ActionFormModal from '@/components/ActionFormModal.vue'
 import ConnectionNodeLabel from '@/components/ConnectionNodeLabel.vue'
@@ -54,6 +55,27 @@ async function openConnections() {
 const treeScrollRef = ref(null)
 const isScrolled = ref(false)
 const connections = ref([])
+
+// plugin capability cache keyed by plugin id (driver name)
+const pluginCaps = ref({})
+
+// load plugin capabilities once on init so we can attach them to
+// query contexts and enable Explain button visibility.
+async function loadPluginCaps() {
+  try {
+    const plist = await ListPlugins()
+    const map = {}
+    for (const p of plist || []) {
+      if (p && p.id) {
+        map[p.id] = p.capabilities || []
+      }
+    }
+    pluginCaps.value = map
+  }
+  catch (err) {
+    console.error('loadPluginCaps', err)
+  }
+}
 const filter = ref('')
 // connectionTrees replaced by shared cache from composable
 const { cache: connectionTrees, load: loadConnectionTree } = useConnectionTree()
@@ -383,7 +405,16 @@ function onActionModalSubmit(modifiedQuery) {
   runTreeAction(conn, { ...action, query: modifiedQuery }, node)
 }
 
-async function runTreeAction(conn, action, node) {
+async function runTreeAction(conn, action, node, extras = {}) {
+  // ensure we know this plugin's capabilities before emitting context; if not
+  // loaded yet then refresh the cache. this guards against a race where the
+  // user runs a query immediately after opening a connection view.
+  if (conn && conn.driver_type && !pluginCaps.value[conn.driver_type]) {
+    await loadPluginCaps()
+  }
+  // debug: see what capabilities we actually have for this driver
+  console.debug('pluginCaps lookup', conn?.driver_type, pluginCaps.value[conn?.driver_type])
+
   // mark invocation time before hitting the network so we can compare
   // request ordering regardless of return speed.
   const invocationVersion = Date.now()
@@ -406,7 +437,7 @@ async function runTreeAction(conn, action, node) {
       const params = {}
       if (cred)
         params.credential_blob = cred
-      const res = await ExecTreeAction(conn.driver_type, params, action.query || '')
+      const res = await ExecTreeAction(conn.driver_type, params, action.query || '', extras.options || (extras.explain ? { 'explain-query': 'yes' } : {}))
       if (res.error) {
         console.error('runTreeAction [hidden]', action.type, res.error)
       }
@@ -437,7 +468,7 @@ async function runTreeAction(conn, action, node) {
       queryToRun = `${queryToRun.trim()} LIMIT 100`
     }
 
-    const res = await ExecTreeAction(conn.driver_type, params, queryToRun)
+    const res = await ExecTreeAction(conn.driver_type, params, queryToRun, extras.options || (extras.explain ? { 'explain-query': 'yes' } : {}))
 
     // regardless of query type we unwrap and normalise any result that came
     // back; the workspace will decide how to render it (or just show an
@@ -475,8 +506,10 @@ async function runTreeAction(conn, action, node) {
     const version = invocationVersion
     console.debug('runTreeAction result', action, queryToRun, res, payload, tabKey, version)
 
-    // Store context to support Refresh functionality.
-    const context = { conn, action, node }
+    // Store context to support Refresh functionality.  include capabilities
+    // (for explain-button logic) plus any extras passed by caller.
+    const context = { conn, action, node, capabilities: pluginCaps.value[conn.driver_type] || [], ...extras }
+    console.debug('emitting query-result with context', context)
 
     if (res.error) {
       emit('query-result', title, null, res.error, tabKey, version, context)
@@ -527,6 +560,7 @@ watch(filter, (q) => {
 
 // initialize
 loadConnections()
+loadPluginCaps()
 
 // Backend domain events — frontend only listens, never emits these topics.
 
