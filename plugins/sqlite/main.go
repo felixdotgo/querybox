@@ -4,12 +4,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"runtime"
 	"strings"
 
 	"github.com/felixdotgo/querybox/pkg/plugin"
 	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
 
-	_ "github.com/tursodatabase/go-libsql"
 	_ "modernc.org/sqlite"
 )
 
@@ -43,6 +43,10 @@ func (m *sqlitePlugin) AuthForms(*plugin.AuthFormsRequest) (*plugin.AuthFormsRes
 			{Type: plugin.AuthFieldText, Name: "database_url", Label: "Database URL", Required: true, Placeholder: "libsql://example.aws-region.turso.io"},
 			{Type: plugin.AuthFieldPassword, Name: "token", Label: "Auth Token", Required: true, Placeholder: "your-turso-auth-token"},
 		},
+	}
+	// if OS is windows, not return turso-cloud form, because libsql driver does not support windows yet.
+	if strings.Contains(strings.ToLower(runtime.GOOS), "windows") {
+		return &plugin.AuthFormsResponse{Forms: map[string]*plugin.AuthForm{"basic": &basic}}, nil
 	}
 	return &plugin.AuthFormsResponse{Forms: map[string]*plugin.AuthForm{"basic": &basic, "turso-cloud": &turso}}, nil
 }
