@@ -197,6 +197,7 @@ defineExpose({ openTab })
         :key="tab.key"
         :name="tab.key"
         :tab="tab.title || 'Untitled'"
+        class="!p-0"
         closable
       >
         <template #default>
@@ -263,7 +264,9 @@ defineExpose({ openTab })
                   >
 {{ tab.error }}
                   </pre>
-                  <div v-else class="text-gray-500 p-4">No Results</div>
+                  <div v-else class="text-gray-500 p-4">
+                    No Results
+                  </div>
                 </template>
               </n-tab-pane>
               <n-tab-pane v-if="tab.explainResult || tab.explainError" name="explain" tab="Explain">
@@ -287,3 +290,9 @@ defineExpose({ openTab })
     </n-tabs>
   </div>
 </template>
+
+<style scoped>
+:deep(.n-tab-pane) {
+  padding: 0 !important;
+}
+</style>
