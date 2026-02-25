@@ -34,7 +34,7 @@ async function load() {
     const plist = await ListPlugins()
     // JSON round-trip converts class instances to plain objects so Vue's
     // reactivity proxy doesn't corrupt the VNode update cycle.
-    plugins.value = JSON.parse(JSON.stringify(plist ?? []))
+    plugins.value = JSON.parse(JSON.stringify(sortPlugins(plist ?? [])))
     // keep selection in sync after reload
     if (selected.value) {
       selected.value = plugins.value.find(p => p.id === selected.value.id) ?? null
@@ -73,6 +73,17 @@ function handleClose() {
 
 function typeLabel(type) {
   return TYPE_LABELS[type] || (type ? `Type ${type}` : '—')
+}
+
+// sort by name case-insensitively, fall back to id when name is empty
+function sortPlugins(list) {
+  return list.slice().sort((a, b) => {
+    const aName = (a.name || a.id || '').toLowerCase()
+    const bName = (b.name || b.id || '').toLowerCase()
+    if (aName < bName) return -1
+    if (aName > bName) return 1
+    return 0
+  })
 }
 </script>
 

@@ -48,6 +48,17 @@ const filteredDrivers = computed(() => {
   )
 })
 
+// sort by name/id helper
+function sortPlugins(list) {
+  return list.slice().sort((a, b) => {
+    const aName = (a.name || a.id || '').toLowerCase()
+    const bName = (b.name || b.id || '').toLowerCase()
+    if (aName < bName) return -1
+    if (aName > bName) return 1
+    return 0
+  })
+}
+
 const canConnect = computed(() => {
   // if auth forms are present for selected plugin, validate required fields
   const hasForms = Object.keys(authForms.value || {}).length > 0
@@ -78,7 +89,7 @@ const canConnect = computed(() => {
 async function load() {
   try {
     const [plist] = await Promise.all([ListPlugins()])
-    plugins.value = plist || []
+    plugins.value = sortPlugins(plist || [])
 
     // Auto-select the first available driver by default when opening the
     // Connections view and nothing is currently selected.
