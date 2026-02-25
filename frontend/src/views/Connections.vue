@@ -54,8 +54,10 @@ function sortPlugins(list) {
   return list.slice().sort((a, b) => {
     const aName = (a.name || a.id || '').toLowerCase()
     const bName = (b.name || b.id || '').toLowerCase()
-    if (aName < bName) return -1
-    if (aName > bName) return 1
+    if (aName < bName)
+      return -1
+    if (aName > bName)
+      return 1
     return 0
   })
 }
