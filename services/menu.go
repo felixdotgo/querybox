@@ -15,6 +15,10 @@ func (a *App) NewAppMenu() *application.Menu {
 	fileMenu.Add("New Connection").OnClick(func(ctx *application.Context) {
 		a.ShowConnectionsWindow()
 	})
+	// plugin listing window
+	fileMenu.Add("Plugins").OnClick(func(ctx *application.Context) {
+		a.ShowPluginsWindow()
+	})
 	fileMenu.AddSeparator()
 	fileMenu.Add("Quit QueryBox").SetAccelerator("CmdOrCtrl+Q").OnClick(func(ctx *application.Context) {
 		a.CloseMainWindow()

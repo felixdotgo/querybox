@@ -71,6 +71,8 @@ func main() {
 	// while the connections window is used for managing database connections.
 	app.MainWindow = app.NewMainWindow()
 	app.ConnectionsWindow = app.NewConnectionsWindow()
+	// Plugins window starts hidden and will be shown on demand by the UI/menu.
+	app.PluginsWindow = app.NewPluginsWindow()
 
 	// Set the native application menu (macOS only).
 	if menu := app.NewAppMenu(); menu != nil {

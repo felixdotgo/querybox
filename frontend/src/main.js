@@ -1,16 +1,17 @@
 import naive from 'naive-ui'
 import { createApp } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
-import { ShowConnectionsWindow } from '@/bindings/github.com/felixdotgo/querybox/services/app'
+import { ShowConnectionsWindow, ShowPluginsWindow } from '@/bindings/github.com/felixdotgo/querybox/services/app'
 import App from './App.vue'
 import Connections from './views/Connections.vue'
 import Home from './views/Home.vue'
+import Plugins from './views/Plugins.vue'
 import './styles/tailwind.css'
 
 // syntax highlighting styles for document results
 import 'highlight.js/styles/github.css'
 
-// Expose an imperative opener for legacy onclicks / global usage
+// Expose imperative openers for legacy onclicks / global usage
 window.openConnectionsWindow = async function openConnectionsWindow() {
   try {
     await ShowConnectionsWindow()
@@ -20,10 +21,19 @@ window.openConnectionsWindow = async function openConnectionsWindow() {
     window.location.href = '/connections'
   }
 }
+window.openPluginsWindow = async function openPluginsWindow() {
+  try {
+    await ShowPluginsWindow()
+  }
+  catch {
+    window.location.href = '/plugins'
+  }
+}
 
 const routes = [
   { path: '/', component: Home },
   { path: '/connections', component: Connections },
+  { path: '/plugins', component: Plugins },
 ]
 
 const router = createRouter({

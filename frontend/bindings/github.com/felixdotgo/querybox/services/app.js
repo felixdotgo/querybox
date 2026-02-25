@@ -27,6 +27,14 @@ export function CloseMainWindow() {
 }
 
 /**
+ * ClosePluginsWindow hides the plugins window.
+ * @returns {$CancellablePromise<void>}
+ */
+export function ClosePluginsWindow() {
+    return $Call.ByID(2903675125);
+}
+
+/**
  * MaximiseMainWindow maximises the main application window to use the full screen size.
  * @returns {$CancellablePromise<void>}
  */
@@ -74,6 +82,18 @@ export function NewMainWindow() {
 }
 
 /**
+ * NewPluginsWindow creates a new plugins window, mirroring the behaviour of the
+ * connections window.  The window is initially hidden and will be reused rather
+ * than re-created each time it is shown.
+ * @returns {$CancellablePromise<application$0.WebviewWindow | null>}
+ */
+export function NewPluginsWindow() {
+    return $Call.ByID(3042259667).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType3($result);
+    }));
+}
+
+/**
  * OpenFileDialog opens a native file picker and returns the selected file path.
  * Returns an empty string if the user cancels.
  * @returns {$CancellablePromise<string>}
@@ -105,6 +125,14 @@ export function ShowAboutDialog() {
  */
 export function ShowConnectionsWindow() {
     return $Call.ByID(2544478289);
+}
+
+/**
+ * ShowPluginsWindow shows the plugins window, constructing it if necessary.
+ * @returns {$CancellablePromise<void>}
+ */
+export function ShowPluginsWindow() {
+    return $Call.ByID(1409801372);
 }
 
 /**

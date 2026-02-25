@@ -5,6 +5,7 @@ import {
   OpenURL,
   ShowAboutDialog,
   ShowConnectionsWindow,
+  ShowPluginsWindow,
   ToggleFullScreenMainWindow,
 } from '@/bindings/github.com/felixdotgo/querybox/services/app'
 
@@ -18,6 +19,7 @@ defineExpose({ el })
 
 const fileMenu = [
   { label: 'New Connection', key: 'new-connection' },
+  { label: 'Plugins', key: 'plugins' },
   { type: 'divider', key: 'd1' },
   { label: 'Quit', key: 'quit' },
 ]
@@ -37,6 +39,7 @@ const helpMenu = [
 function handleSelect(key) {
   switch (key) {
     case 'new-connection': ShowConnectionsWindow(); break
+    case 'plugins': ShowPluginsWindow(); break
     case 'quit': CloseMainWindow(); break
     case 'toggle-fullscreen': ToggleFullScreenMainWindow(); break
     case 'toggle-logs': emit('toggle-logs'); break

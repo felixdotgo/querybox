@@ -9,6 +9,8 @@ type App struct {
 	App               *application.App
 	MainWindow        *application.WebviewWindow
 	ConnectionsWindow *application.WebviewWindow
+	// PluginsWindow is a secondary window used to display the plugin list.
+	PluginsWindow     *application.WebviewWindow
 }
 
 // NewAppService creates a new instance of the App service, which provides methods for controlling the main application window and the connections window.
@@ -120,6 +122,59 @@ func (a *App) ShowConnectionsWindow() {
 	}
 	a.ConnectionsWindow.Show()
 	a.ConnectionsWindow.Focus()
+}
+
+// NewPluginsWindow creates a new plugins window, mirroring the behaviour of the
+// connections window.  The window is initially hidden and will be reused rather
+// than re-created each time it is shown.
+func (a *App) NewPluginsWindow() *application.WebviewWindow {
+	w := a.App.Window.NewWithOptions(application.WebviewWindowOptions{
+		Name:  "plugins",
+		Title: "Plugins",
+		URL:   "/plugins",
+
+		Frameless:     false,
+		DisableResize: true,
+		Hidden:        true,
+		HideOnEscape:  true,
+		MinWidth:      1024,
+
+		Mac: application.MacWindow{
+			InvisibleTitleBarHeight: 50,
+			Backdrop:                application.MacBackdropTranslucent,
+			TitleBar:                application.MacTitleBarHiddenInset,
+		},
+	})
+
+	// Intercept the close event and hide instead of destroying.
+	w.OnWindowEvent(events.Common.WindowClosing, func(e *application.WindowEvent) {
+		e.Cancel()
+		a.ClosePluginsWindow()
+	})
+
+	// Prevent maximise/minimise just like the connections window.
+	w.OnWindowEvent(events.Common.WindowMaximise, func(e *application.WindowEvent) { e.Cancel() })
+	w.OnWindowEvent(events.Common.WindowMinimise, func(e *application.WindowEvent) { e.Cancel() })
+
+	return w
+}
+
+// ShowPluginsWindow shows the plugins window, constructing it if necessary.
+func (a *App) ShowPluginsWindow() {
+	if a.PluginsWindow == nil {
+		a.PluginsWindow = a.NewPluginsWindow()
+	}
+	a.PluginsWindow.Show()
+	a.PluginsWindow.Focus()
+}
+
+// ClosePluginsWindow hides the plugins window.
+func (a *App) ClosePluginsWindow() {
+	if a.PluginsWindow != nil {
+		a.PluginsWindow.SetAlwaysOnTop(false)
+		// Hide rather than close; destroying the webview later causes crashes.
+		a.PluginsWindow.Hide()
+	}
 }
 
 // OpenFileDialog opens a native file picker and returns the selected file path.
