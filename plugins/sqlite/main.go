@@ -27,6 +27,12 @@ func (m *sqlitePlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoReques
 		Name:        "SQLite",
 		Version:     "0.1.0",
 		Description: "SQLite database driver",
+		Url:         "https://www.sqlite.org/",
+		Author:      "SQLite Consortium",
+		Capabilities: []string{"transactions", "embedded"},
+		Tags:        []string{"sql", "relational"},
+		License:     "Public Domain",
+		IconUrl:     "https://www.sqlite.org/images/logo-square.jpg",
 	}, nil
 }
 

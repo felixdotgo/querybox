@@ -275,11 +275,25 @@ func (*PluginV1_InfoRequest) Descriptor() ([]byte, []int) {
 }
 
 type PluginV1_InfoResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Type          PluginV1_Type          `protobuf:"varint,1,opt,name=type,proto3,enum=plugin.v1.PluginV1_Type" json:"type,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Version       string                 `protobuf:"bytes,3,opt,name=version,proto3" json:"version,omitempty"`
-	Description   string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Type        PluginV1_Type          `protobuf:"varint,1,opt,name=type,proto3,enum=plugin.v1.PluginV1_Type" json:"type,omitempty"`
+	Name        string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Version     string                 `protobuf:"bytes,3,opt,name=version,proto3" json:"version,omitempty"`
+	Description string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
+	// Optional fields for richer metadata.  Older clients will ignore these
+	// without issue; plugins may populate any subset.
+	Url    string `protobuf:"bytes,5,opt,name=url,proto3" json:"url,omitempty"`       // homepage, docs, repo, etc.
+	Author string `protobuf:"bytes,6,opt,name=author,proto3" json:"author,omitempty"` // maintainer or organization name
+	// Free-form maps for extensibility.  Both are string to
+	// string for simplicity; plugins can embed JSON in values if needed.
+	Metadata map[string]string `protobuf:"bytes,7,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // arbitrary plugin-specific info
+	Settings map[string]string `protobuf:"bytes,8,rep,name=settings,proto3" json:"settings,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // hints the core can use (defaults, etc.)
+	// Common use‑cases that a core might care about.
+	Capabilities  []string `protobuf:"bytes,9,rep,name=capabilities,proto3" json:"capabilities,omitempty"`       // e.g. "transactions","ssl"
+	Tags          []string `protobuf:"bytes,10,rep,name=tags,proto3" json:"tags,omitempty"`                      // categories/statistics
+	License       string   `protobuf:"bytes,11,opt,name=license,proto3" json:"license,omitempty"`                // SPDX identifier or text
+	IconUrl       string   `protobuf:"bytes,12,opt,name=icon_url,json=iconUrl,proto3" json:"icon_url,omitempty"` // link to a small icon
+	Contact       string   `protobuf:"bytes,13,opt,name=contact,proto3" json:"contact,omitempty"`                // maintainer email/URL
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -338,6 +352,69 @@ func (x *PluginV1_InfoResponse) GetVersion() string {
 func (x *PluginV1_InfoResponse) GetDescription() string {
 	if x != nil {
 		return x.Description
+	}
+	return ""
+}
+
+func (x *PluginV1_InfoResponse) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *PluginV1_InfoResponse) GetAuthor() string {
+	if x != nil {
+		return x.Author
+	}
+	return ""
+}
+
+func (x *PluginV1_InfoResponse) GetMetadata() map[string]string {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *PluginV1_InfoResponse) GetSettings() map[string]string {
+	if x != nil {
+		return x.Settings
+	}
+	return nil
+}
+
+func (x *PluginV1_InfoResponse) GetCapabilities() []string {
+	if x != nil {
+		return x.Capabilities
+	}
+	return nil
+}
+
+func (x *PluginV1_InfoResponse) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+func (x *PluginV1_InfoResponse) GetLicense() string {
+	if x != nil {
+		return x.License
+	}
+	return ""
+}
+
+func (x *PluginV1_InfoResponse) GetIconUrl() string {
+	if x != nil {
+		return x.IconUrl
+	}
+	return ""
+}
+
+func (x *PluginV1_InfoResponse) GetContact() string {
+	if x != nil {
+		return x.Contact
 	}
 	return ""
 }
@@ -1389,14 +1466,30 @@ var File_contracts_plugin_v1_plugin_proto protoreflect.FileDescriptor
 
 const file_contracts_plugin_v1_plugin_proto_rawDesc = "" +
 	"\n" +
-	" contracts/plugin/v1/plugin.proto\x12\tplugin.v1\x1a\x1cgoogle/protobuf/struct.proto\"\xa1\x16\n" +
+	" contracts/plugin/v1/plugin.proto\x12\tplugin.v1\x1a\x1cgoogle/protobuf/struct.proto\"\xe4\x19\n" +
 	"\bPluginV1\x1a\r\n" +
-	"\vInfoRequest\x1a\x8c\x01\n" +
+	"\vInfoRequest\x1a\xcf\x04\n" +
 	"\fInfoResponse\x12,\n" +
 	"\x04type\x18\x01 \x01(\x0e2\x18.plugin.v1.PluginV1.TypeR\x04type\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
 	"\aversion\x18\x03 \x01(\tR\aversion\x12 \n" +
-	"\vdescription\x18\x04 \x01(\tR\vdescription\x1a\xb3\x01\n" +
+	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x10\n" +
+	"\x03url\x18\x05 \x01(\tR\x03url\x12\x16\n" +
+	"\x06author\x18\x06 \x01(\tR\x06author\x12J\n" +
+	"\bmetadata\x18\a \x03(\v2..plugin.v1.PluginV1.InfoResponse.MetadataEntryR\bmetadata\x12J\n" +
+	"\bsettings\x18\b \x03(\v2..plugin.v1.PluginV1.InfoResponse.SettingsEntryR\bsettings\x12\"\n" +
+	"\fcapabilities\x18\t \x03(\tR\fcapabilities\x12\x12\n" +
+	"\x04tags\x18\n" +
+	" \x03(\tR\x04tags\x12\x18\n" +
+	"\alicense\x18\v \x01(\tR\alicense\x12\x19\n" +
+	"\bicon_url\x18\f \x01(\tR\aiconUrl\x12\x18\n" +
+	"\acontact\x18\r \x01(\tR\acontact\x1a;\n" +
+	"\rMetadataEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a;\n" +
+	"\rSettingsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a\xb3\x01\n" +
 	"\vExecRequest\x12O\n" +
 	"\n" +
 	"connection\x18\x01 \x03(\v2/.plugin.v1.PluginV1.ExecRequest.ConnectionEntryR\n" +
@@ -1523,7 +1616,7 @@ func file_contracts_plugin_v1_plugin_proto_rawDescGZIP() []byte {
 }
 
 var file_contracts_plugin_v1_plugin_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_contracts_plugin_v1_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
+var file_contracts_plugin_v1_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
 var file_contracts_plugin_v1_plugin_proto_goTypes = []any{
 	(PluginV1_Type)(0),                      // 0: plugin.v1.PluginV1.Type
 	(PluginV1_NodeType)(0),                  // 1: plugin.v1.PluginV1.NodeType
@@ -1549,49 +1642,53 @@ var file_contracts_plugin_v1_plugin_proto_goTypes = []any{
 	(*PluginV1_ConnectionTreeAction)(nil),   // 21: plugin.v1.PluginV1.ConnectionTreeAction
 	(*PluginV1_TestConnectionRequest)(nil),  // 22: plugin.v1.PluginV1.TestConnectionRequest
 	(*PluginV1_TestConnectionResponse)(nil), // 23: plugin.v1.PluginV1.TestConnectionResponse
-	nil,                                     // 24: plugin.v1.PluginV1.ExecRequest.ConnectionEntry
-	nil,                                     // 25: plugin.v1.PluginV1.KeyValueResult.DataEntry
-	nil,                                     // 26: plugin.v1.PluginV1.AuthFormsResponse.FormsEntry
-	nil,                                     // 27: plugin.v1.PluginV1.ConnectionTreeRequest.ConnectionEntry
-	nil,                                     // 28: plugin.v1.PluginV1.TestConnectionRequest.ConnectionEntry
-	(*structpb.Struct)(nil),                 // 29: google.protobuf.Struct
+	nil,                                     // 24: plugin.v1.PluginV1.InfoResponse.MetadataEntry
+	nil,                                     // 25: plugin.v1.PluginV1.InfoResponse.SettingsEntry
+	nil,                                     // 26: plugin.v1.PluginV1.ExecRequest.ConnectionEntry
+	nil,                                     // 27: plugin.v1.PluginV1.KeyValueResult.DataEntry
+	nil,                                     // 28: plugin.v1.PluginV1.AuthFormsResponse.FormsEntry
+	nil,                                     // 29: plugin.v1.PluginV1.ConnectionTreeRequest.ConnectionEntry
+	nil,                                     // 30: plugin.v1.PluginV1.TestConnectionRequest.ConnectionEntry
+	(*structpb.Struct)(nil),                 // 31: google.protobuf.Struct
 }
 var file_contracts_plugin_v1_plugin_proto_depIdxs = []int32{
 	0,  // 0: plugin.v1.PluginV1.InfoResponse.type:type_name -> plugin.v1.PluginV1.Type
-	24, // 1: plugin.v1.PluginV1.ExecRequest.connection:type_name -> plugin.v1.PluginV1.ExecRequest.ConnectionEntry
-	8,  // 2: plugin.v1.PluginV1.ExecResponse.result:type_name -> plugin.v1.PluginV1.ExecResult
-	10, // 3: plugin.v1.PluginV1.ExecResult.sql:type_name -> plugin.v1.PluginV1.SqlResult
-	12, // 4: plugin.v1.PluginV1.ExecResult.document:type_name -> plugin.v1.PluginV1.DocumentResult
-	13, // 5: plugin.v1.PluginV1.ExecResult.kv:type_name -> plugin.v1.PluginV1.KeyValueResult
-	9,  // 6: plugin.v1.PluginV1.SqlResult.columns:type_name -> plugin.v1.PluginV1.Column
-	11, // 7: plugin.v1.PluginV1.SqlResult.rows:type_name -> plugin.v1.PluginV1.Row
-	29, // 8: plugin.v1.PluginV1.DocumentResult.documents:type_name -> google.protobuf.Struct
-	25, // 9: plugin.v1.PluginV1.KeyValueResult.data:type_name -> plugin.v1.PluginV1.KeyValueResult.DataEntry
-	2,  // 10: plugin.v1.PluginV1.AuthField.type:type_name -> plugin.v1.PluginV1.AuthField.FieldType
-	14, // 11: plugin.v1.PluginV1.AuthForm.fields:type_name -> plugin.v1.PluginV1.AuthField
-	26, // 12: plugin.v1.PluginV1.AuthFormsResponse.forms:type_name -> plugin.v1.PluginV1.AuthFormsResponse.FormsEntry
-	27, // 13: plugin.v1.PluginV1.ConnectionTreeRequest.connection:type_name -> plugin.v1.PluginV1.ConnectionTreeRequest.ConnectionEntry
-	20, // 14: plugin.v1.PluginV1.ConnectionTreeResponse.nodes:type_name -> plugin.v1.PluginV1.ConnectionTreeNode
-	20, // 15: plugin.v1.PluginV1.ConnectionTreeNode.children:type_name -> plugin.v1.PluginV1.ConnectionTreeNode
-	21, // 16: plugin.v1.PluginV1.ConnectionTreeNode.actions:type_name -> plugin.v1.PluginV1.ConnectionTreeAction
-	1,  // 17: plugin.v1.PluginV1.ConnectionTreeNode.node_type:type_name -> plugin.v1.PluginV1.NodeType
-	28, // 18: plugin.v1.PluginV1.TestConnectionRequest.connection:type_name -> plugin.v1.PluginV1.TestConnectionRequest.ConnectionEntry
-	15, // 19: plugin.v1.PluginV1.AuthFormsResponse.FormsEntry.value:type_name -> plugin.v1.PluginV1.AuthForm
-	4,  // 20: plugin.v1.PluginService.Info:input_type -> plugin.v1.PluginV1.InfoRequest
-	6,  // 21: plugin.v1.PluginService.Exec:input_type -> plugin.v1.PluginV1.ExecRequest
-	16, // 22: plugin.v1.PluginService.AuthForms:input_type -> plugin.v1.PluginV1.AuthFormsRequest
-	18, // 23: plugin.v1.PluginService.ConnectionTree:input_type -> plugin.v1.PluginV1.ConnectionTreeRequest
-	22, // 24: plugin.v1.PluginService.TestConnection:input_type -> plugin.v1.PluginV1.TestConnectionRequest
-	5,  // 25: plugin.v1.PluginService.Info:output_type -> plugin.v1.PluginV1.InfoResponse
-	7,  // 26: plugin.v1.PluginService.Exec:output_type -> plugin.v1.PluginV1.ExecResponse
-	17, // 27: plugin.v1.PluginService.AuthForms:output_type -> plugin.v1.PluginV1.AuthFormsResponse
-	19, // 28: plugin.v1.PluginService.ConnectionTree:output_type -> plugin.v1.PluginV1.ConnectionTreeResponse
-	23, // 29: plugin.v1.PluginService.TestConnection:output_type -> plugin.v1.PluginV1.TestConnectionResponse
-	25, // [25:30] is the sub-list for method output_type
-	20, // [20:25] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	24, // 1: plugin.v1.PluginV1.InfoResponse.metadata:type_name -> plugin.v1.PluginV1.InfoResponse.MetadataEntry
+	25, // 2: plugin.v1.PluginV1.InfoResponse.settings:type_name -> plugin.v1.PluginV1.InfoResponse.SettingsEntry
+	26, // 3: plugin.v1.PluginV1.ExecRequest.connection:type_name -> plugin.v1.PluginV1.ExecRequest.ConnectionEntry
+	8,  // 4: plugin.v1.PluginV1.ExecResponse.result:type_name -> plugin.v1.PluginV1.ExecResult
+	10, // 5: plugin.v1.PluginV1.ExecResult.sql:type_name -> plugin.v1.PluginV1.SqlResult
+	12, // 6: plugin.v1.PluginV1.ExecResult.document:type_name -> plugin.v1.PluginV1.DocumentResult
+	13, // 7: plugin.v1.PluginV1.ExecResult.kv:type_name -> plugin.v1.PluginV1.KeyValueResult
+	9,  // 8: plugin.v1.PluginV1.SqlResult.columns:type_name -> plugin.v1.PluginV1.Column
+	11, // 9: plugin.v1.PluginV1.SqlResult.rows:type_name -> plugin.v1.PluginV1.Row
+	31, // 10: plugin.v1.PluginV1.DocumentResult.documents:type_name -> google.protobuf.Struct
+	27, // 11: plugin.v1.PluginV1.KeyValueResult.data:type_name -> plugin.v1.PluginV1.KeyValueResult.DataEntry
+	2,  // 12: plugin.v1.PluginV1.AuthField.type:type_name -> plugin.v1.PluginV1.AuthField.FieldType
+	14, // 13: plugin.v1.PluginV1.AuthForm.fields:type_name -> plugin.v1.PluginV1.AuthField
+	28, // 14: plugin.v1.PluginV1.AuthFormsResponse.forms:type_name -> plugin.v1.PluginV1.AuthFormsResponse.FormsEntry
+	29, // 15: plugin.v1.PluginV1.ConnectionTreeRequest.connection:type_name -> plugin.v1.PluginV1.ConnectionTreeRequest.ConnectionEntry
+	20, // 16: plugin.v1.PluginV1.ConnectionTreeResponse.nodes:type_name -> plugin.v1.PluginV1.ConnectionTreeNode
+	20, // 17: plugin.v1.PluginV1.ConnectionTreeNode.children:type_name -> plugin.v1.PluginV1.ConnectionTreeNode
+	21, // 18: plugin.v1.PluginV1.ConnectionTreeNode.actions:type_name -> plugin.v1.PluginV1.ConnectionTreeAction
+	1,  // 19: plugin.v1.PluginV1.ConnectionTreeNode.node_type:type_name -> plugin.v1.PluginV1.NodeType
+	30, // 20: plugin.v1.PluginV1.TestConnectionRequest.connection:type_name -> plugin.v1.PluginV1.TestConnectionRequest.ConnectionEntry
+	15, // 21: plugin.v1.PluginV1.AuthFormsResponse.FormsEntry.value:type_name -> plugin.v1.PluginV1.AuthForm
+	4,  // 22: plugin.v1.PluginService.Info:input_type -> plugin.v1.PluginV1.InfoRequest
+	6,  // 23: plugin.v1.PluginService.Exec:input_type -> plugin.v1.PluginV1.ExecRequest
+	16, // 24: plugin.v1.PluginService.AuthForms:input_type -> plugin.v1.PluginV1.AuthFormsRequest
+	18, // 25: plugin.v1.PluginService.ConnectionTree:input_type -> plugin.v1.PluginV1.ConnectionTreeRequest
+	22, // 26: plugin.v1.PluginService.TestConnection:input_type -> plugin.v1.PluginV1.TestConnectionRequest
+	5,  // 27: plugin.v1.PluginService.Info:output_type -> plugin.v1.PluginV1.InfoResponse
+	7,  // 28: plugin.v1.PluginService.Exec:output_type -> plugin.v1.PluginV1.ExecResponse
+	17, // 29: plugin.v1.PluginService.AuthForms:output_type -> plugin.v1.PluginV1.AuthFormsResponse
+	19, // 30: plugin.v1.PluginService.ConnectionTree:output_type -> plugin.v1.PluginV1.ConnectionTreeResponse
+	23, // 31: plugin.v1.PluginService.TestConnection:output_type -> plugin.v1.PluginV1.TestConnectionResponse
+	27, // [27:32] is the sub-list for method output_type
+	22, // [22:27] is the sub-list for method input_type
+	22, // [22:22] is the sub-list for extension type_name
+	22, // [22:22] is the sub-list for extension extendee
+	0,  // [0:22] is the sub-list for field type_name
 }
 
 func init() { file_contracts_plugin_v1_plugin_proto_init() }
@@ -1610,7 +1707,7 @@ func file_contracts_plugin_v1_plugin_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_contracts_plugin_v1_plugin_proto_rawDesc), len(file_contracts_plugin_v1_plugin_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   26,
+			NumMessages:   28,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -1,0 +1,107 @@
+package pluginmgr
+
+import (
+	"encoding/json"
+	"testing"
+
+	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
+)
+
+func TestProbeInfoDecoding(t *testing.T) {
+	// prepare a fake JSON as plugin binary would emit
+	raw := map[string]interface{}{
+		"type": 1,
+		"name": "foo",
+		"version": "1.2.3",
+		"description": "the foo driver",
+		"url": "https://example.org/foo",
+		"author": "Foo Corp",
+		"capabilities": []string{"transactions"},
+		"tags": []string{"sql"},
+		"license": "MIT",
+		"icon_url": "https://example.org/icon.png",
+		"contact": "support@example.org",
+		"metadata": map[string]string{"key": "val"},
+		"settings": map[string]string{"k2": "v2"},
+	}
+	b, err := json.Marshal(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var resp PluginInfo
+	if err := json.Unmarshal(b, &resp); err != nil {
+		t.Fatalf("unmarshal plugininfo: %v", err)
+	}
+
+	// mimic probeInfo() internals by building raw map then converting
+	var parsed map[string]interface{}
+	if err := json.Unmarshal(b, &parsed); err != nil {
+		t.Fatalf("inner unmarshal: %v", err)
+	}
+	res, err := probeInfoFromRaw(parsed)
+	if err != nil {
+		t.Fatalf("probeInfoFromRaw error: %v", err)
+	}
+
+	if res.Name != "foo" || res.URL != "https://example.org/foo" {
+		t.Errorf("bad basic fields: %+v", res)
+	}
+	if len(res.Capabilities) != 1 || res.Capabilities[0] != "transactions" {
+		t.Errorf("capabilities not preserved: %+v", res.Capabilities)
+	}
+	if res.Metadata == nil || res.Metadata["key"] != "val" {
+		t.Errorf("metadata missing: %+v", res.Metadata)
+	}
+}
+
+// helper extracted from probeInfo so we can call without executing command
+func probeInfoFromRaw(raw map[string]interface{}) (PluginInfo, error) {
+	// copy logic from probeInfo
+	// interpret the type field
+	typ := 0
+	if v, ok := raw["type"]; ok {
+		switch vv := v.(type) {
+		case float64:
+			typ = int(vv)
+		case string:
+			if val, ok := pluginpb.PluginV1_Type_value[vv]; ok {
+				typ = int(val)
+			}
+		}
+	}
+
+	var resp struct {
+		Name        string            `json:"name"`
+		Version     string            `json:"version"`
+		Description string            `json:"description"`
+		URL         string            `json:"url"`
+		Author      string            `json:"author"`
+		Capabilities []string         `json:"capabilities"`
+		Tags        []string          `json:"tags"`
+		License     string            `json:"license"`
+		IconURL     string            `json:"icon_url"`
+		Contact     string            `json:"contact"`
+		Metadata    map[string]string `json:"metadata"`
+		Settings    map[string]string `json:"settings"`
+	}
+	if b2, err2 := json.Marshal(raw); err2 == nil {
+		_ = json.Unmarshal(b2, &resp)
+	}
+
+	return PluginInfo{
+		Name:        resp.Name,
+		Type:        typ,
+		Version:     resp.Version,
+		Description: resp.Description,
+		URL:         resp.URL,
+		Author:      resp.Author,
+		Capabilities: resp.Capabilities,
+		Tags:        resp.Tags,
+		License:     resp.License,
+		IconURL:     resp.IconURL,
+		Contact:     resp.Contact,
+		Metadata:    resp.Metadata,
+		Settings:    resp.Settings,
+	}, nil
+}

@@ -12,7 +12,14 @@ Developer flow
 3. Drop the built binary into `bin/plugins`; the host will discover it automatically.
 
 Contract (CLI)
-- `plugin info` → plugin prints JSON: `{ name, version, description, type }`.  The `type` field corresponds to the `PluginV1_Type` enum (DRIVER = 1, etc).  Older plugins emitted the numeric value while new ones produce the enum name (e.g. `"DRIVER"`); hosts post‑0.0.1 parse either form transparently.
+- `plugin info` → plugin prints JSON: `{ name, version, description, type }` plus optional metadata fields.  The standard keys now include:
+  - `type` (PluginV1_Type enum).
+  - `name`, `version`, `description` (existing fields).
+  - **optional** extras: `url`, `author`, `capabilities` (string array), `tags` (string array),
+    `license`, `icon_url`, `contact`, plus two free-form maps `metadata` and
+    `settings`.  Hosts ignore unknown keys so older plugins continue working.
+  Older plugins emitted the numeric value while new ones produce the enum name
+  (e.g. `"DRIVER"`); hosts post‑0.0.1 parse either form transparently.
 - `plugin exec` → plugin reads JSON `{ connection, query }` from stdin and writes JSON `{ result, error }` to stdout.  `connection` may be a simple DSN string or a credential blob JSON; arbitrary extra query parameters (including `tls` settings for SSL) are allowed and appended by the host. `result` is now a structured object containing one of `sql`, `document`, or `kv` payloads; older plugins may still return a raw string which will be wrapped in a `kv` map by the host.
 - `plugin connection-tree` (or simply `plugin tree`) → plugin reads JSON `{ connection }` and returns `{ nodes: [...]}` describing a hierarchical browse structure.  Each node may include an `actions` array describing what the core should do when the user activates that node.
 - `plugin test-connection` → plugin reads JSON `{ connection }` from stdin and writes JSON `{ ok: bool, message: string }` to stdout.  The plugin must attempt to open and verify connectivity (e.g. `db.Open` + `db.Ping()` for SQL drivers) without persisting any state.  Plugins that cannot meaningfully probe connectivity should return `{ ok: true, message: "..." }`.  The host uses a **15-second** timeout for this command.

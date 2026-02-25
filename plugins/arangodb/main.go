@@ -27,6 +27,12 @@ func (a *arangoPlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoReques
 		Name:        "ArangoDB",
 		Version:     "0.1.0",
 		Description: "ArangoDB multi-model database driver",
+		Url:         "https://www.arangodb.com/",
+		Author:      "ArangoDB GmbH",
+		Capabilities: []string{"graph", "transactions"},
+		Tags:        []string{"nosql", "multi-model"},
+		License:     "Apache-2.0",
+		IconUrl:     "https://www.arangodb.com/wp-content/uploads/2019/03/arangodb-logo.png",
 	}, nil
 }
 

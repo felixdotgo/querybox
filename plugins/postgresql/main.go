@@ -25,6 +25,12 @@ func (m *postgresqlPlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRe
 		Name:        "PostgreSQL",
 		Version:     "0.1.0",
 		Description: "PostgreSQL database driver",
+		Url:         "https://www.postgresql.org/",
+		Author:      "PostgreSQL Global Development Group",
+		Capabilities: []string{"transactions", "json"},
+		Tags:        []string{"sql", "relational"},
+		License:     "PostgreSQL",
+		IconUrl:     "https://www.postgresql.org/media/img/about/press/elephant.png",
 	}, nil
 }
 

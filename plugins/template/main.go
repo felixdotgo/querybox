@@ -13,7 +13,14 @@ type templatePlugin struct {
 }
 
 func (t *templatePlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRequest) (*plugin.InfoResponse, error) {
-	return &plugin.InfoResponse{Name: "template", Version: "0.1.0", Description: "Template plugin (on-demand)"}, nil
+	return &plugin.InfoResponse{
+		Name:        "template",
+		Version:     "0.1.0",
+		Description: "Template plugin (on-demand)",
+		Url:         "https://example.com/template-plugin",
+		Author:      "Querybox Core Team",
+		Metadata:    map[string]string{"exampleKey": "exampleValue"},
+	}, nil
 }
 
 func (t *templatePlugin) Exec(ctx context.Context, req *plugin.ExecRequest) (*plugin.ExecResponse, error) {

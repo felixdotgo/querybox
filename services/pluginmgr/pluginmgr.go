@@ -21,14 +21,23 @@ import (
 
 // PluginInfo holds metadata that the UI can display for each plugin.
 type PluginInfo struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Path        string `json:"path"`
-	Running     bool   `json:"running"`        // always false in on-demand model
-	Type        int    `json:"type,omitempty"` // follows PluginV1.Type enum (DRIVER = 1)
-	Version     string `json:"version,omitempty"`
-	Description string `json:"description,omitempty"`
-	LastError   string `json:"lastError,omitempty"`
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`
+	Path        string            `json:"path"`
+	Running     bool              `json:"running"`        // always false in on-demand model
+	Type        int               `json:"type,omitempty"` // follows PluginV1.Type enum (DRIVER = 1)
+	Version     string            `json:"version,omitempty"`
+	Description string            `json:"description,omitempty"`
+	URL         string            `json:"url,omitempty"`
+	Author      string            `json:"author,omitempty"`
+	Capabilities []string         `json:"capabilities,omitempty"`
+	Tags        []string          `json:"tags,omitempty"`
+	License     string            `json:"license,omitempty"`
+	IconURL     string            `json:"icon_url,omitempty"`
+	Contact     string            `json:"contact,omitempty"`
+	Metadata    map[string]string `json:"metadata,omitempty"`
+	Settings    map[string]string `json:"settings,omitempty"`
+	LastError   string            `json:"lastError,omitempty"`
 }
 
 // Manager discovers executables under ./bin/plugins and invokes them on-demand.
@@ -209,15 +218,38 @@ func probeInfo(fullpath string) (PluginInfo, error) {
 	}
 
 	var resp struct {
-		Name        string `json:"name"`
-		Version     string `json:"version"`
-		Description string `json:"description"`
+		Name        string            `json:"name"`
+		Version     string            `json:"version"`
+		Description string            `json:"description"`
+		URL         string            `json:"url"`
+		Author      string            `json:"author"`
+		Capabilities []string         `json:"capabilities"`
+		Tags        []string          `json:"tags"`
+		License     string            `json:"license"`
+		IconURL     string            `json:"icon_url"`
+		Contact     string            `json:"contact"`
+		Metadata    map[string]string `json:"metadata"`
+		Settings    map[string]string `json:"settings"`
 	}
 	if b2, err2 := json.Marshal(raw); err2 == nil {
 		_ = json.Unmarshal(b2, &resp)
 	}
 
-	return PluginInfo{Name: resp.Name, Type: typ, Version: resp.Version, Description: resp.Description}, nil
+	return PluginInfo{
+		Name:        resp.Name,
+		Type:        typ,
+		Version:     resp.Version,
+		Description: resp.Description,
+		URL:         resp.URL,
+		Author:      resp.Author,
+		Capabilities: resp.Capabilities,
+		Tags:        resp.Tags,
+		License:     resp.License,
+		IconURL:     resp.IconURL,
+		Contact:     resp.Contact,
+		Metadata:    resp.Metadata,
+		Settings:    resp.Settings,
+	}, nil
 }
 
 // ListPlugins returns the discovered plugins (does not start them).

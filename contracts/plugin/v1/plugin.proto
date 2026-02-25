@@ -50,6 +50,23 @@ message PluginV1 {
     string name = 2;
     string version = 3;
     string description = 4;
+
+    // Optional fields for richer metadata.  Older clients will ignore these
+    // without issue; plugins may populate any subset.
+    string url = 5;            // homepage, docs, repo, etc.
+    string author = 6;         // maintainer or organization name
+
+    // Free-form maps for extensibility.  Both are string to
+    // string for simplicity; plugins can embed JSON in values if needed.
+    map<string,string> metadata = 7; // arbitrary plugin-specific info
+    map<string,string> settings = 8; // hints the core can use (defaults, etc.)
+
+    // Common use‑cases that a core might care about.
+    repeated string capabilities = 9; // e.g. "transactions","ssl"
+    repeated string tags = 10;        // categories/statistics
+    string license = 11;             // SPDX identifier or text
+    string icon_url = 12;            // link to a small icon
+    string contact = 13;             // maintainer email/URL
   }
 
   message ExecRequest {
