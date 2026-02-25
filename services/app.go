@@ -42,7 +42,7 @@ func (a *App) NewConnectionsWindow() *application.WebviewWindow {
 			TitleBar:                application.MacTitleBarHiddenInset,
 		},
 
-		CloseButtonState: application.ButtonHidden,
+		CloseButtonState: application.ButtonDisabled,
 	})
 
 	// Intercept the window close event to hide the window instead of closing it.
@@ -147,7 +147,7 @@ func (a *App) NewPluginsWindow() *application.WebviewWindow {
 			TitleBar:                application.MacTitleBarHiddenInset,
 		},
 
-		CloseButtonState: application.ButtonHidden,
+		CloseButtonState: application.ButtonDisabled,
 	})
 
 	// Intercept the close event and hide instead of destroying.
