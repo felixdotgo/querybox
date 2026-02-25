@@ -36,7 +36,8 @@ function resetAuthState() {
 
 const drivers = computed(() => {
   // PluginInfo.type follows PluginV1.Type enum where DRIVER = 1
-  return (plugins.value || []).filter(p => p && p.type === 1)
+  // always return a sorted list so the UI is predictable
+  return sortPlugins((plugins.value || []).filter(p => p && p.type === 1))
 })
 
 const filteredDrivers = computed(() => {
@@ -88,6 +89,7 @@ const canConnect = computed(() => {
 
 async function load() {
   try {
+    pluginFilter.value = '' // clear any previous search text
     const [plist] = await Promise.all([ListPlugins()])
     plugins.value = sortPlugins(plist || [])
 
@@ -156,6 +158,7 @@ function clearForm() {
   selectedDriver.value = null
   statusText.value = ''
   testResult.value = null
+  pluginFilter.value = ''
 }
 
 async function testConnection() {
@@ -244,6 +247,16 @@ onMounted(async () => {
           <h3 class="mb-2 font-bold">
             Connection Type
           </h3>
+          <!-- simple filter box for long lists -->
+          <div class="mb-2">
+            <n-input
+              v-model:value="pluginFilter"
+              placeholder="filter drivers"
+              size="small"
+              clearable
+              class="w-full"
+            />
+          </div>
           <ul class="list-none p-0 m-0 flex flex-col gap-1.5">
             <li v-if="drivers.length === 0" class="opacity-70">
               No drivers available
