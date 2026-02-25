@@ -12,9 +12,25 @@
 | [Wails v3](https://v3alpha.wails.io/getting-started/installation/) | v3 alpha | Desktop framework |
 | [Task](https://taskfile.dev/installation/) | latest | Build automation |
 | [Node.js](https://nodejs.org/) | 18+ | Frontend tooling |
-| [protoc](https://grpc.io/docs/protoc-installation/) + [protoc-gen-go](https://pkg.go.dev/google.golang.org/protobuf/cmd/protoc-gen-go) | libprotoc 29.6 / protoc-gen-go v1.36.10 | gRPC code generation (only if modifying `.proto` files) |
+| [protoc](https://grpc.io/docs/protoc-installation/) + [protoc-gen-go](https://pkg.go.dev/google.golang.org/protobuf/cmd/protoc-gen-go) + [protoc-gen-go-grpc](https://pkg.go.dev/google.golang.org/grpc/cmd/protoc-gen-go-grpc) | libprotoc 29.6 / protoc-gen-go v1.36.10 / protoc-gen-go-grpc v1.6.1 | gRPC code generation (only if modifying `.proto` files) |
 
 ## Getting Started
+
+### Install dependencies
+
+```bash
+# Install Task (build tool)
+go install github.com/go-task/task/v3/cmd/task@latest
+# or using npm
+npm install -g taskfile
+# Install Wails CLI
+go install github.com/wailsapp/wails/v3/cmd/wails@latest
+# Install protoc-gen-go (only needed if modifying .proto files)
+go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.10
+# Install protoc-gen-go-grpc (only needed if modifying .proto files)
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.1
+# Install protoc (see https://grpc.io/docs/protoc-installation/)=
+```
 
 ### Clone the repository
 
