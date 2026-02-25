@@ -10,6 +10,9 @@ func (a *App) NewAppMenu() *application.Menu {
 	// Required on macOS: app name menu (About, Hide, Quit, etc.)
 	menu.AddRole(application.AppMenu)
 
+	// Edit menu — required for Cmd+C/V/X/A to work in text inputs on macOS.
+	menu.AddRole(application.EditMenu)
+
 	// File
 	fileMenu := menu.AddSubmenu("File")
 	fileMenu.Add("New Connection").OnClick(func(ctx *application.Context) {
