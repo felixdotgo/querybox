@@ -22,6 +22,8 @@ import {
   // tree / navigation
   LayersOutline,
   LibraryOutline,
+  Pin,
+  PinOutline,
   RefreshOutline,
   ServerOutline,
   TrashOutline,
@@ -39,6 +41,8 @@ export {
 
   LayersOutline, // driver group node
   LibraryOutline, // node_type === "database"
+  Pin, // pinned column indicator (filled)
+  PinOutline, // pin column button (outline)
   RefreshOutline, // "Refresh" action on connection row
   ServerOutline, // connection node
   TrashOutline, // "Delete" action on connection row
