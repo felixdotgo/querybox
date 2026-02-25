@@ -1,4 +1,4 @@
-import { Ref } from "vue"
+import type { Ref } from 'vue'
 
 type NullableElementRef = Ref<HTMLElement | null>
 
@@ -26,14 +26,16 @@ export function createHorizontalResizer(opts: {
   function getBounds() {
     const rect = containerRef.value?.getBoundingClientRect()
     const computedMax = rect ? Math.max(200, rect.width - minOther) : Infinity
-    const max = typeof opts.max === "number" ? opts.max : computedMax
+    const max = typeof opts.max === 'number' ? opts.max : computedMax
     return { min, max }
   }
 
   function clamp() {
     const { min: lo, max: hi } = getBounds()
-    if (Number.isFinite(hi) && sizeRef.value > hi) sizeRef.value = Math.min(sizeRef.value, hi)
-    if (sizeRef.value < lo) sizeRef.value = lo
+    if (Number.isFinite(hi) && sizeRef.value > hi)
+      sizeRef.value = Math.min(sizeRef.value, hi)
+    if (sizeRef.value < lo)
+      sizeRef.value = lo
   }
 
   function start(ev: PointerEvent) {
@@ -41,7 +43,8 @@ export function createHorizontalResizer(opts: {
 
     moveHandler = (e: PointerEvent) => {
       const rect = containerRef.value?.getBoundingClientRect()
-      if (!rect) return
+      if (!rect)
+        return
       const { min: lo, max: hi } = getBounds()
       let newW = Math.round(e.clientX - rect.left)
       newW = Math.max(lo, Math.min(newW, hi))
@@ -49,30 +52,36 @@ export function createHorizontalResizer(opts: {
     }
 
     upHandler = (e: PointerEvent) => {
-      if (moveHandler) window.removeEventListener("pointermove", moveHandler)
-      if (upHandler) window.removeEventListener("pointerup", upHandler)
+      if (moveHandler)
+        window.removeEventListener('pointermove', moveHandler)
+      if (upHandler)
+        window.removeEventListener('pointerup', upHandler)
       moveHandler = null
       upHandler = null
       try {
         // release pointer capture when available
         e.target && (e.target as Element).releasePointerCapture?.(e.pointerId)
-      } catch (err) {
+      }
+      catch {
         /* ignore */
       }
     }
 
-    window.addEventListener("pointermove", moveHandler)
-    window.addEventListener("pointerup", upHandler)
+    window.addEventListener('pointermove', moveHandler)
+    window.addEventListener('pointerup', upHandler)
     try {
       ev.target && (ev.target as Element).setPointerCapture?.(ev.pointerId)
-    } catch (err) {
+    }
+    catch {
       /* ignore */
     }
   }
 
   function destroy() {
-    if (moveHandler) window.removeEventListener("pointermove", moveHandler)
-    if (upHandler) window.removeEventListener("pointerup", upHandler)
+    if (moveHandler)
+      window.removeEventListener('pointermove', moveHandler)
+    if (upHandler)
+      window.removeEventListener('pointerup', upHandler)
     moveHandler = null
     upHandler = null
   }
@@ -102,8 +111,10 @@ export function createVerticalResizer(opts: {
 
   function clamp() {
     const hi = Math.max(min, getMax())
-    if (sizeRef.value > hi) sizeRef.value = Math.min(sizeRef.value, hi)
-    if (sizeRef.value < min) sizeRef.value = min
+    if (sizeRef.value > hi)
+      sizeRef.value = Math.min(sizeRef.value, hi)
+    if (sizeRef.value < min)
+      sizeRef.value = min
   }
 
   function start(ev: PointerEvent) {
@@ -120,29 +131,35 @@ export function createVerticalResizer(opts: {
     }
 
     upHandler = (e: PointerEvent) => {
-      if (moveHandler) window.removeEventListener("pointermove", moveHandler)
-      if (upHandler) window.removeEventListener("pointerup", upHandler)
+      if (moveHandler)
+        window.removeEventListener('pointermove', moveHandler)
+      if (upHandler)
+        window.removeEventListener('pointerup', upHandler)
       moveHandler = null
       upHandler = null
       try {
         e.target && (e.target as Element).releasePointerCapture?.(e.pointerId)
-      } catch (err) {
+      }
+      catch {
         /* ignore */
       }
     }
 
-    window.addEventListener("pointermove", moveHandler)
-    window.addEventListener("pointerup", upHandler)
+    window.addEventListener('pointermove', moveHandler)
+    window.addEventListener('pointerup', upHandler)
     try {
       ev.target && (ev.target as Element).setPointerCapture?.(ev.pointerId)
-    } catch (err) {
+    }
+    catch {
       /* ignore */
     }
   }
 
   function destroy() {
-    if (moveHandler) window.removeEventListener("pointermove", moveHandler)
-    if (upHandler) window.removeEventListener("pointerup", upHandler)
+    if (moveHandler)
+      window.removeEventListener('pointermove', moveHandler)
+    if (upHandler)
+      window.removeEventListener('pointerup', upHandler)
     moveHandler = null
     upHandler = null
   }

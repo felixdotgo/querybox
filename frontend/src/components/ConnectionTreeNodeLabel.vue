@@ -1,7 +1,45 @@
+<script setup>
+import { computed } from 'vue'
+import { actionTypeFallbackIcon, actionTypeIconMap } from '@/lib/icons'
+
+const props = defineProps({
+  /** Display label for the tree node */
+  label: {
+    type: String,
+    required: true,
+  },
+  /**
+   * Array of ConnectionTreeAction objects ({ type, title, query, hidden }) as
+   * returned by the plugin's ConnectionTree response.
+   */
+  actions: {
+    type: Array,
+    default: () => [],
+  },
+})
+
+const emit = defineEmits(['action'])
+
+/** Actions that should appear as hover buttons (hidden ones fire on click). */
+const visibleActions = computed(() => props.actions.filter(a => !a.hidden))
+
+const DESTRUCTIVE_TYPES = new Set(['drop-database', 'drop-table'])
+
+function isDestructive(action) {
+  return DESTRUCTIVE_TYPES.has(action.type)
+}
+
+function iconFor(action) {
+  return actionTypeIconMap[action.type] ?? actionTypeFallbackIcon
+}
+</script>
+
 <template>
   <div class="flex items-center justify-between w-full group/tree-node pr-1">
     <!-- node label -->
-    <n-ellipsis class="flex-1 min-w-0 text-sm">{{ label }}</n-ellipsis>
+    <n-ellipsis class="flex-1 min-w-0 text-sm">
+      {{ label }}
+    </n-ellipsis>
 
     <!-- action buttons — revealed on hover via CSS group.
          Hidden actions (hidden: true) are excluded; they fire on node click. -->
@@ -33,39 +71,3 @@
     </div>
   </div>
 </template>
-
-<script setup>
-import { computed } from "vue"
-import { actionTypeIconMap, actionTypeFallbackIcon } from "@/lib/icons"
-
-const props = defineProps({
-  /** Display label for the tree node */
-  label: {
-    type: String,
-    required: true,
-  },
-  /**
-   * Array of ConnectionTreeAction objects ({ type, title, query, hidden }) as
-   * returned by the plugin's ConnectionTree response.
-   */
-  actions: {
-    type: Array,
-    default: () => [],
-  },
-})
-
-const emit = defineEmits(["action"])
-
-/** Actions that should appear as hover buttons (hidden ones fire on click). */
-const visibleActions = computed(() => props.actions.filter((a) => !a.hidden))
-
-const DESTRUCTIVE_TYPES = new Set(["drop-database", "drop-table"])
-
-function isDestructive(action) {
-  return DESTRUCTIVE_TYPES.has(action.type)
-}
-
-function iconFor(action) {
-  return actionTypeIconMap[action.type] ?? actionTypeFallbackIcon
-}
-</script>

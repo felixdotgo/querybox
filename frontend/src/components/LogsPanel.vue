@@ -1,13 +1,94 @@
+<script setup>
+import { computed, nextTick, ref, watch } from 'vue'
+import { ArrowDownOutline, TrashOutline } from '@/lib/icons'
+
+const props = defineProps({
+  logs: { type: Array, default: () => [] },
+})
+
+defineEmits(['clear'])
+
+const _allLevels = ['debug', 'info', 'warn', 'error']
+const activeLevels = ref(['debug', 'info', 'warn', 'error'])
+const autoScroll = ref(true)
+
+const scrollRef = ref(null)
+const bottomRef = ref(null)
+
+const filteredLogs = computed(() =>
+  props.logs.filter(e => activeLevels.value.includes((e.level ?? 'info').toLowerCase())),
+)
+
+function _toggleLevel(lvl) {
+  const idx = activeLevels.value.indexOf(lvl)
+  if (idx === -1) {
+    activeLevels.value.push(lvl)
+  }
+  else if (activeLevels.value.length > 1) {
+    // keep at least one level active
+    activeLevels.value.splice(idx, 1)
+  }
+}
+
+function onScroll(e) {
+  const el = e?.target
+  if (!el)
+    return
+  const { scrollTop, scrollHeight, clientHeight } = el
+  autoScroll.value = scrollHeight - scrollTop - clientHeight < 40
+}
+
+watch(
+  () => filteredLogs.value.length,
+  () => {
+    if (autoScroll.value) {
+      nextTick(() => bottomRef.value?.scrollIntoView({ behavior: 'smooth' }))
+    }
+  },
+)
+
+// Format an RFC3339/RFC3339Nano timestamp to HH:MM:SS.mmm
+function formatTime(ts) {
+  if (!ts)
+    return ''
+  try {
+    const normalized = ts.replace(/(\.\d{3})\d+/, '$1')
+    const d = new Date(normalized)
+    if (Number.isNaN(d.getTime()))
+      return ts
+    const hh = String(d.getHours()).padStart(2, '0')
+    const mm = String(d.getMinutes()).padStart(2, '0')
+    const ss = String(d.getSeconds()).padStart(2, '0')
+    const ms = String(d.getMilliseconds()).padStart(3, '0')
+    return `${hh}:${mm}:${ss}.${ms}`
+  }
+  catch {
+    return ts
+  }
+}
+
+// Maps a log level to a NaiveUI tag type
+function levelTagType(level) {
+  switch ((level ?? 'info').toLowerCase()) {
+    case 'error': return 'error'
+    case 'warn': return 'warning'
+    case 'debug': return 'info'
+    default: return 'success'
+  }
+}
+</script>
+
 <template>
   <div class="flex flex-col h-full font-mono text-xs select-text">
     <!-- Toolbar -->
     <div class="flex items-center gap-2 px-3 py-1.5 border-b border-gray-200 bg-gray-50 flex-shrink-0">
       <!-- Title + count -->
       <span class="font-semibold text-gray-500 uppercase tracking-widest text-[10px]">Logs</span>
-      <n-text depth="3" class="text-[10px]">{{ filteredLogs.length }} entries</n-text>
+      <n-text depth="3" class="text-[10px]">
+        {{ filteredLogs.length }} entries
+      </n-text>
 
       <div class="flex-1" />
-
 
       <!-- Auto-scroll toggle -->
       <n-button
@@ -68,12 +149,16 @@
                 size="small"
                 :bordered="false"
                 style="font-size:10px;padding:0 5px;font-weight:700;text-transform:uppercase;"
-              >{{ entry.level ?? 'info' }}</n-tag>
+              >
+                {{ entry.level ?? 'info' }}
+              </n-tag>
             </td>
 
             <!-- Source (optional) -->
             <td v-if="entry.source" class="pr-3 py-0.5 whitespace-nowrap align-top max-w-32 truncate">
-              <n-text depth="3" class="text-[10px]">{{ entry.source }}</n-text>
+              <n-text depth="3" class="text-[10px]">
+                {{ entry.source }}
+              </n-text>
             </td>
 
             <!-- Message -->
@@ -87,78 +172,3 @@
     </n-scrollbar>
   </div>
 </template>
-
-<script setup>
-import { ref, computed, watch, nextTick } from "vue"
-import { ArrowDownOutline, TrashOutline } from "@/lib/icons"
-
-const props = defineProps({
-  logs: { type: Array, default: () => [] },
-})
-
-defineEmits(["clear"])
-
-const allLevels = ["debug", "info", "warn", "error"]
-const activeLevels = ref(["debug", "info", "warn", "error"])
-const autoScroll = ref(true)
-
-const scrollRef = ref(null)
-const bottomRef = ref(null)
-
-const filteredLogs = computed(() =>
-  props.logs.filter((e) => activeLevels.value.includes((e.level ?? "info").toLowerCase()))
-)
-
-function toggleLevel(lvl) {
-  const idx = activeLevels.value.indexOf(lvl)
-  if (idx === -1) {
-    activeLevels.value.push(lvl)
-  } else if (activeLevels.value.length > 1) {
-    // keep at least one level active
-    activeLevels.value.splice(idx, 1)
-  }
-}
-
-function onScroll(e) {
-  const el = e?.target
-  if (!el) return
-  const { scrollTop, scrollHeight, clientHeight } = el
-  autoScroll.value = scrollHeight - scrollTop - clientHeight < 40
-}
-
-watch(
-  () => filteredLogs.value.length,
-  () => {
-    if (autoScroll.value) {
-      nextTick(() => bottomRef.value?.scrollIntoView({ behavior: "smooth" }))
-    }
-  }
-)
-
-// Format an RFC3339/RFC3339Nano timestamp to HH:MM:SS.mmm
-function formatTime(ts) {
-  if (!ts) return ""
-  try {
-    const normalized = ts.replace(/(\.\d{3})\d+/, "$1")
-    const d = new Date(normalized)
-    if (isNaN(d.getTime())) return ts
-    const hh = String(d.getHours()).padStart(2, "0")
-    const mm = String(d.getMinutes()).padStart(2, "0")
-    const ss = String(d.getSeconds()).padStart(2, "0")
-    const ms = String(d.getMilliseconds()).padStart(3, "0")
-    return `${hh}:${mm}:${ss}.${ms}`
-  } catch {
-    return ts
-  }
-}
-
-// Maps a log level to a NaiveUI tag type
-function levelTagType(level) {
-  switch ((level ?? "info").toLowerCase()) {
-    case "error": return "error"
-    case "warn":  return "warning"
-    case "debug": return "info"
-    default:      return "success"
-  }
-}
-</script>

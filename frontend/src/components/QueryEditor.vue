@@ -1,18 +1,6 @@
-<template>
-  <div class="h-full border border-gray-200">
-    <vue-monaco-editor
-      v-model:value="code"
-      :language="language"
-      :theme="theme"
-      :options="editorOptions"
-      @mount="handleMount"
-    />
-  </div>
-</template>
-
 <script setup>
-import { ref, watch, onUnmounted } from 'vue'
 import { VueMonacoEditor } from '@guolao/vue-monaco-editor'
+import { onUnmounted, ref, watch } from 'vue'
 import { useConnectionTree } from '@/composables/useConnectionTree'
 
 const props = defineProps({
@@ -46,22 +34,23 @@ const editorOptions = {
   scrollBeyondLastLine: false,
   wordWrap: 'on',
   fixedOverflowWidgets: true,
-  quickSuggestions: true,          // allow suggestions while typing
+  quickSuggestions: true, // allow suggestions while typing
   suggestOnTriggerCharacters: true,
 }
 
 // track schema for current connection
-// @ts-ignore: composable may lack typings
+// @ts-expect-error: composable may lack typings
 const { nodes: schemaNodesRef, load: loadSchema, getTableNames, getColumns } = useConnectionTree()
 
+let editorInstance = null
 let schemaNodes = []
 
 // simple keyword lists per driver (could be extended later)
 const keywordMap = {
-  pgsql: ['select','from','where','insert','update','delete','join','on','create','drop','alter'],
-  mysql: ['select','from','where','insert','update','delete','join','on','create','drop','alter'],
-  sql: ['select','from','where','insert','update','delete','join','on','create','drop','alter'],
-  sqlite: ['select','from','where','insert','update','delete','join','on','create','drop','alter'],
+  pgsql: ['select', 'from', 'where', 'insert', 'update', 'delete', 'join', 'on', 'create', 'drop', 'alter'],
+  mysql: ['select', 'from', 'where', 'insert', 'update', 'delete', 'join', 'on', 'create', 'drop', 'alter'],
+  sql: ['select', 'from', 'where', 'insert', 'update', 'delete', 'join', 'on', 'create', 'drop', 'alter'],
+  sqlite: ['select', 'from', 'where', 'insert', 'update', 'delete', 'join', 'on', 'create', 'drop', 'alter'],
 }
 
 // watch the incoming connection from either context or explicit prop
@@ -79,12 +68,10 @@ watch(
       editorInstance.trigger('auto', 'editor.action.triggerSuggest', {})
     }
   },
-  { immediate: true }
+  { immediate: true },
 )
 
-let editorInstance = null
-
-const handleMount = (editor, monaco) => {
+function handleMount(editor, monaco) {
   editorInstance = editor
   editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
     emit('execute')
@@ -100,7 +87,8 @@ const handleMount = (editor, monaco) => {
   // register completion provider; we'll recreate when language or schema changes
   let provider = null
   const registerProvider = () => {
-    if (provider) provider.dispose()
+    if (provider)
+      provider.dispose()
     console.log('registering provider for language', props.language)
     provider = monaco.languages.registerCompletionItemProvider(props.language, {
       // we'll manually trigger suggest on each keystroke instead of relying
@@ -114,14 +102,13 @@ const handleMount = (editor, monaco) => {
           position.lineNumber,
           wordInfo.startColumn,
           position.lineNumber,
-          wordInfo.endColumn
+          wordInfo.endColumn,
         )
         // debug current schema
         if (schemaNodes && schemaNodes.length) {
-          console.log('completion provider invoked, schemaNodes count', schemaNodes.length,
-                        'first labels', schemaNodes.slice(0,5).map(n=>n.label),
-                        'sample structure', JSON.stringify(schemaNodes.slice(0,3), null, 2))
-        } else {
+          console.log('completion provider invoked, schemaNodes count', schemaNodes.length, 'first labels', schemaNodes.slice(0, 5).map(n => n.label), 'sample structure', JSON.stringify(schemaNodes.slice(0, 3), null, 2))
+        }
+        else {
           console.log('completion provider invoked, schemaNodes empty')
         }
         console.log('completion prefix word:', prefix, 'range', range)
@@ -138,7 +125,7 @@ const handleMount = (editor, monaco) => {
         // add all table/collection/view names from cache directly
         const tableNames = getTableNames()
         if (tableNames.length) {
-          console.log('adding table names for suggestions', tableNames.slice(0,20))
+          console.log('adding table names for suggestions', tableNames.slice(0, 20))
           tableNames.forEach((t) => {
             suggestions.push({
               label: t,
@@ -161,7 +148,8 @@ const handleMount = (editor, monaco) => {
                 range,
               })
             }
-            if (Array.isArray(n.children)) gatherNames(n.children)
+            if (Array.isArray(n.children))
+              gatherNames(n.children)
           })
         }
         gatherNames(schemaNodes)
@@ -185,11 +173,12 @@ const handleMount = (editor, monaco) => {
                 range,
               })
             })
-          } else {
+          }
+          else {
             // fallback to recursive traversal
             let current = schemaNodes
             for (const part of path) {
-              const found = current.find((n) => n.label === part)
+              const found = current.find(n => n.label === part)
               if (!found) {
                 current = []
                 break
@@ -207,9 +196,9 @@ const handleMount = (editor, monaco) => {
             })
           }
         }
-        console.log('suggestions generated', suggestions.map(s=>s.label).slice(0,20))
+        console.log('suggestions generated', suggestions.map(s => s.label).slice(0, 20))
         return { suggestions }
-      }
+      },
     })
   }
 
@@ -225,7 +214,7 @@ const handleMount = (editor, monaco) => {
         editor.trigger('auto', 'editor.action.triggerSuggest', {})
       }
     },
-    { immediate: true }
+    { immediate: true },
   )
 
   onUnmounted(() => {
@@ -233,3 +222,15 @@ const handleMount = (editor, monaco) => {
   })
 }
 </script>
+
+<template>
+  <div class="h-full border border-gray-200">
+    <VueMonacoEditor
+      v-model:value="code"
+      :language="language"
+      :theme="theme"
+      :options="editorOptions"
+      @mount="handleMount"
+    />
+  </div>
+</template>
