@@ -41,7 +41,7 @@ func (m *mysqlPlugin) AuthForms(ctx context.Context, _ *plugin.AuthFormsRequest)
 		Name: "Basic",
 		Fields: []*plugin.AuthField{
 			{Type: plugin.AuthFieldText, Name: "host", Label: "Host", Required: true, Placeholder: "127.0.0.1", Value: "127.0.0.1"},
-			{Type: pluginpb.PluginV1_AuthField_NUMBER, Name: "port", Label: "Port", Placeholder: "3306", Value: "3306"},
+			{Type: plugin.AuthFieldNumber, Name: "port", Label: "Port", Placeholder: "3306", Value: "3306"},
 			{Type: plugin.AuthFieldText, Name: "user", Label: "User", Value: "root"},
 			{Type: plugin.AuthFieldPassword, Name: "password", Label: "Password"},
 			{Type: plugin.AuthFieldText, Name: "database", Label: "Database name"},

@@ -117,7 +117,9 @@ export function ListPlugins() {
 }
 
 /**
- * Rescan triggers an immediate directory scan.
+ * Rescan clears the plugin registry and triggers a full re-probe of the
+ * plugins directory. This ensures that any metadata changes to existing
+ * plugins are picked up (e.g. after a plugin update).
  * @returns {$CancellablePromise<void>}
  */
 export function Rescan() {

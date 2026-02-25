@@ -8,7 +8,8 @@ import (
 )
 
 func TestProbeInfoDecoding(t *testing.T) {
-	// prepare a fake JSON as plugin binary would emit
+	// prepare a fake JSON as plugin binary would emit (camelCase keys are
+	// what protojson generates).
 	raw := map[string]interface{}{
 		"type": 1,
 		"name": "foo",
@@ -19,7 +20,7 @@ func TestProbeInfoDecoding(t *testing.T) {
 		"capabilities": []string{"transactions"},
 		"tags": []string{"sql"},
 		"license": "MIT",
-		"icon_url": "https://example.org/icon.png",
+		"iconUrl": "https://example.org/icon.png",
 		"contact": "support@example.org",
 		"metadata": map[string]string{"key": "val"},
 		"settings": map[string]string{"k2": "v2"},
@@ -44,11 +45,26 @@ func TestProbeInfoDecoding(t *testing.T) {
 		t.Fatalf("probeInfoFromRaw error: %v", err)
 	}
 
-	if res.Name != "foo" || res.URL != "https://example.org/foo" {
+	if res.Name != "foo" || res.URL != "https://example.org/foo" || res.Author != "Foo Corp" {
 		t.Errorf("bad basic fields: %+v", res)
+	}
+	if res.Type != int(pluginpb.PluginV1_DRIVER) {
+		t.Errorf("type not decoded: %d", res.Type)
 	}
 	if len(res.Capabilities) != 1 || res.Capabilities[0] != "transactions" {
 		t.Errorf("capabilities not preserved: %+v", res.Capabilities)
+	}
+	if len(res.Tags) != 1 || res.Tags[0] != "sql" {
+		t.Errorf("tags not preserved: %+v", res.Tags)
+	}
+	if res.License != "MIT" {
+		t.Errorf("license not preserved: %s", res.License)
+	}
+	if res.IconURL != "https://example.org/icon.png" {
+		t.Errorf("icon url not preserved: %s", res.IconURL)
+	}
+	if res.Contact != "support@example.org" {
+		t.Errorf("contact not preserved: %s", res.Contact)
 	}
 	if res.Metadata == nil || res.Metadata["key"] != "val" {
 		t.Errorf("metadata missing: %+v", res.Metadata)
@@ -57,7 +73,18 @@ func TestProbeInfoDecoding(t *testing.T) {
 
 // helper extracted from probeInfo so we can call without executing command
 func probeInfoFromRaw(raw map[string]interface{}) (PluginInfo, error) {
-	// copy logic from probeInfo
+	// copy logic from probeInfo, including normalization
+	// normalize camelCase keys like iconUrl -> icon_url
+	norm := make(map[string]interface{}, len(raw)+4)
+	for k, v := range raw {
+		norm[k] = v
+		switch k {
+		case "iconUrl":
+			norm["icon_url"] = v
+		}
+	}
+	raw = norm
+
 	// interpret the type field
 	typ := 0
 	if v, ok := raw["type"]; ok {

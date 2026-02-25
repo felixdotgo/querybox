@@ -18,6 +18,12 @@ Contract (CLI)
   - **optional** extras: `url`, `author`, `capabilities` (string array), `tags` (string array),
     `license`, `icon_url`, `contact`, plus two free-form maps `metadata` and
     `settings`.  Hosts ignore unknown keys so older plugins continue working.
+    The UI renders a fixed set of metadata rows (type, version, author, license,
+    URL, contact, path) and substitutes a `—` placeholder when a value is
+    absent; plugins need not fill every field.  When the response includes an
+    `icon_url`/`iconUrl` value, the UI will render the icon adjacent to the
+    plugin name.  See `plugins/template` for an example that demonstrates all
+    of them.
   Older plugins emitted the numeric value while new ones produce the enum name
   (e.g. `"DRIVER"`); hosts post‑0.0.1 parse either form transparently.
 - `plugin exec` → plugin reads JSON `{ connection, query }` from stdin and writes JSON `{ result, error }` to stdout.  `connection` may be a simple DSN string or a credential blob JSON; arbitrary extra query parameters (including `tls` settings for SSL) are allowed and appended by the host. `result` is now a structured object containing one of `sql`, `document`, or `kv` payloads; older plugins may still return a raw string which will be wrapped in a `kv` map by the host.

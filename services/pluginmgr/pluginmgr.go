@@ -149,10 +149,19 @@ func (m *Manager) scanOnce() {
 				if meta.Name != "" {
 					info.Name = meta.Name
 				}
-				info.Type = meta.Type
-				info.Version = meta.Version
-				info.Description = meta.Description
-				info.LastError = ""
+				info.Type         = meta.Type
+				info.Version      = meta.Version
+				info.Description  = meta.Description
+				info.URL          = meta.URL
+				info.Author       = meta.Author
+				info.Capabilities = meta.Capabilities
+				info.Tags         = meta.Tags
+				info.License      = meta.License
+				info.IconURL      = meta.IconURL
+				info.Contact      = meta.Contact
+				info.Metadata     = meta.Metadata
+				info.Settings     = meta.Settings
+				info.LastError    = ""
 			}
 			m.plugins[name] = info
 		}
@@ -398,8 +407,13 @@ func (m *Manager) ExecPlugin(name string, connection map[string]string, query st
 	return resp, nil
 }
 
-// Rescan triggers an immediate directory scan.
+// Rescan clears the plugin registry and triggers a full re-probe of the
+// plugins directory. This ensures that any metadata changes to existing
+// plugins are picked up (e.g. after a plugin update).
 func (m *Manager) Rescan() error {
+	m.mu.Lock()
+	m.plugins = make(map[string]PluginInfo)
+	m.mu.Unlock()
 	m.scanOnce()
 	return nil
 }

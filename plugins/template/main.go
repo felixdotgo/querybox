@@ -14,11 +14,17 @@ type templatePlugin struct {
 
 func (t *templatePlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRequest) (*plugin.InfoResponse, error) {
 	return &plugin.InfoResponse{
+		Type:        plugin.TypeDriver,
 		Name:        "template",
 		Version:     "0.1.0",
 		Description: "Template plugin (on-demand)",
 		Url:         "https://example.com/template-plugin",
 		Author:      "Querybox Core Team",
+		Capabilities: []string{"demo", "example"},
+		Tags:        []string{"template", "sample"},
+		License:     "MIT",
+		IconUrl:     "https://example.com/icon.png",
+		Contact:     "support@example.com",
 		Metadata:    map[string]string{"exampleKey": "exampleValue"},
 	}, nil
 }

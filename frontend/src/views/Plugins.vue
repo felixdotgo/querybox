@@ -80,7 +80,7 @@ function typeLabel(type) {
   <div class="h-screen flex flex-col bg-white font-mono text-sm">
     <!-- Top bar -->
     <div class="shrink-0 flex items-center justify-between px-4 py-2.5 border-b border-slate-200">
-      <span class="font-semibold text-slate-700">Plugins</span>
+      <span class="font-semibold text-slate-700">Installed Plugins</span>
       <n-button size="small" quaternary :loading="loading" @click="load">
         Refresh
       </n-button>
@@ -196,20 +196,6 @@ function typeLabel(type) {
               <span class="text-slate-400">Path</span>
               <span class="text-slate-500 font-mono break-all">{{ selected.path }}</span>
             </template>
-          </div>
-
-          <!-- Capabilities -->
-          <div v-if="selected.capabilities?.length" class="mt-5">
-            <div class="text-xs text-slate-400 mb-1.5">
-              Capabilities
-            </div>
-            <div class="flex flex-wrap gap-1.5">
-              <span
-                v-for="cap in selected.capabilities"
-                :key="cap"
-                class="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600"
-              >{{ cap }}</span>
-            </div>
           </div>
 
           <!-- Tags -->
