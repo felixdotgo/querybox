@@ -4,6 +4,7 @@ import (
 	"embed"
 	_ "embed"
 	"log"
+	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
@@ -70,9 +71,14 @@ func main() {
 	// The main window is the primary interface,
 	// while the connections window is used for managing database connections.
 	app.MainWindow = app.NewMainWindow()
-	app.ConnectionsWindow = app.NewConnectionsWindow()
-	// Plugins window starts hidden and will be shown on demand by the UI/menu.
-	app.PluginsWindow = app.NewPluginsWindow()
+
+	// Delay the creation of the connections and plugins windows to speed up the initial load time of the application.
+	// and avoid too many webview open same port and make the app cannot open.
+	go func() {
+		time.Sleep(time.Second * 1)
+		app.ConnectionsWindow = app.NewConnectionsWindow()
+		app.PluginsWindow = app.NewPluginsWindow()
+	}()
 
 	// Set the native application menu (macOS only).
 	if menu := app.NewAppMenu(); menu != nil {
