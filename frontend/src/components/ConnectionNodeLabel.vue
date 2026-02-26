@@ -17,6 +17,11 @@ defineProps({
     type: Boolean,
     default: false,
   },
+  /** Show a loading indicator on the connect button */
+  loading: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const emit = defineEmits(['connect', 'delete', 'dblclick'])
@@ -43,6 +48,7 @@ const emit = defineEmits(['connect', 'delete', 'dblclick'])
             size="tiny"
             type="primary"
             primary
+            :disabled="loading"
             @click.stop="emit('connect')"
           >
             <template #icon>

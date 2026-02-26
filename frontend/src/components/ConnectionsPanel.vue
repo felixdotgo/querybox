@@ -1,6 +1,6 @@
 <script setup>
 import { Events } from '@wailsio/runtime'
-import { NButton, NIcon, useDialog } from 'naive-ui'
+import { NButton, NIcon, NSpin, useDialog } from 'naive-ui'
 import { computed, h, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
@@ -58,6 +58,15 @@ const connections = ref([])
 
 // plugin capability cache keyed by plugin id (driver name)
 const pluginCaps = ref({})
+
+// track nodes that currently have an in-flight action/query
+// keyed by the node.key string.  the tree renderer uses this to show a
+// spinner in place of the normal icon so the user immediately sees that
+// something is happening when they click a leaf.
+const loadingNodes = ref({})
+
+// loading state for connect/reconnect buttons keyed by connection id
+const connecting = ref({})
 
 // load plugin capabilities once on init so we can attach them to
 // query contexts and enable Explain button visibility.
@@ -297,6 +306,7 @@ function renderLabel({ option }) {
     label: option.label,
     hasTree: !!connectionTrees[conn.id],
     isActive: props.activeConnectionId === conn.id,
+    loading: !!connecting.value[conn.id],
     onConnect() {
       if (connectionTrees[conn.id]) {
         delete connectionTrees[conn.id]
@@ -313,6 +323,13 @@ function renderLabel({ option }) {
 }
 
 function renderPrefix({ option }) {
+  // if an action/query is currently running for this node show a small
+  // spinner instead of the normal icon.  this provides instant feedback
+  // when the user clicks a leaf and keeps the tree from appearing unresponsive.
+  if (loadingNodes.value[option.key]) {
+    return h(NSpin, { size: 14 })
+  }
+
   // action nodes render their icon inside the button label; skip the prefix.
   if (option.node_type === 'action')
     return null
@@ -406,6 +423,15 @@ function onActionModalSubmit(modifiedQuery) {
 }
 
 async function runTreeAction(conn, action, node, extras = {}) {
+  // when any tree action is invoked we show a spinner on the originating
+  // node so the user gets immediate feedback.  the key may not exist for
+  // actions created programmatically (e.g. Refresh from workspace), so we
+  // compute it similarly to the tabKey logic and stash it separately.
+  const nodeKeyForSpinner = node && node.key ? node.key : null
+  if (nodeKeyForSpinner) {
+    loadingNodes.value[nodeKeyForSpinner] = true
+  }
+
   // ensure we know this plugin's capabilities before emitting context; if not
   // loaded yet then refresh the cache. this guards against a race where the
   // user runs a query immediately after opening a connection view.
@@ -526,6 +552,11 @@ async function runTreeAction(conn, action, node, extras = {}) {
     const context = { conn, action, node }
     emit('query-result', title, null, err?.message || String(err), tabKey, invocationVersion, context)
   }
+  finally {
+    if (nodeKeyForSpinner) {
+      delete loadingNodes.value[nodeKeyForSpinner]
+    }
+  }
 }
 
 async function checkConnection(conn) {
@@ -544,9 +575,18 @@ async function checkConnection(conn) {
 async function fetchTreeFor(conn) {
   if (!conn)
     return
-  await loadConnectionTree(conn)
-  if (!expandedKeys.value.includes(conn.id)) {
-    expandedKeys.value = [...expandedKeys.value, conn.id]
+  // show spinner on connect button (and optionally prefix icon)
+  connecting.value[conn.id] = true
+  loadingNodes.value[conn.id] = true
+  try {
+    await loadConnectionTree(conn)
+    if (!expandedKeys.value.includes(conn.id)) {
+      expandedKeys.value = [...expandedKeys.value, conn.id]
+    }
+  }
+  finally {
+    delete connecting.value[conn.id]
+    delete loadingNodes.value[conn.id]
   }
 }
 
@@ -582,6 +622,11 @@ const offConnectionDeleted = Events.On('connection:deleted', (event) => {
   if (selectedConnection.value?.id === id)
     selectedConnection.value = null
   expandedKeys.value = expandedKeys.value.filter(k => k !== id)
+  // remove any in-flight indicators for nodes belonging to the deleted connection
+  Object.keys(loadingNodes.value).forEach((k) => {
+    if (k.startsWith(`${id}:`))
+      delete loadingNodes.value[k]
+  })
 })
 
 onUnmounted(() => {
