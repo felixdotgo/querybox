@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/felixdotgo/querybox/services/credmanager"
@@ -42,14 +43,27 @@ func (s *ConnectionService) SetApp(app *application.App) {
 	s.app = app
 }
 
+// dataDir returns the directory where application data (e.g. the SQLite DB)
+// should be stored. On macOS this is ~/Library/Application Support/querybox,
+// which is the correct location for both dev runs and packaged .app bundles.
+// Falls back to a "data" directory relative to CWD if the config dir cannot
+// be determined.
+func dataDir() string {
+	if dir, err := os.UserConfigDir(); err == nil {
+		return filepath.Join(dir, "querybox")
+	}
+	return "data"
+}
+
 // NewConnectionService constructs a ConnectionService and initializes the
 // underlying SQLite database and credential manager. It performs the same
 // migrations and schema setup that existed previously in the manager.
 func NewConnectionService() *ConnectionService {
-	const dbPath = "data/connections.db"
-	if err := os.MkdirAll("data", 0o755); err != nil {
+	dir := dataDir()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return &ConnectionService{cred: credmanager.New()}
 	}
+	dbPath := filepath.Join(dir, "connections.db")
 
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
