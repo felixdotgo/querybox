@@ -135,7 +135,6 @@ const rowKeyFunction = row => row && row.key
       :row-key="rowKeyFunction"
       :scroll-x="scrollX"
       :max-height="tableHeight"
-      virtual-scroll
       :height-for-row="heightForRow"
       size="small"
       bordered

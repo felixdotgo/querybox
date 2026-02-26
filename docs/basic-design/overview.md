@@ -115,6 +115,13 @@
 - Inputs and forms should rely on `input-tw` (light background / dark text) and primary actions may use `btn-tw`.
 - Document any deliberate deviations from the default Tailwind palette in design docs and PR descriptions.
 
+#### Layout and Utility Guidelines
+- **Avoid using `flex` for full-width/height single-column containers.** Tailwind's `w-full` and `h-full` or natural block flow suffice when no sibling alignment is needed. Reserve `flex` for arrangements where children must be laid out horizontally or vertically in the same row/column (e.g. button groups, toolbar items, two‑column panels).
+- Avoid unnecessary wrappers; let content flow naturally with block layout when possible. Reserve `flex` for cases where you explicitly need to align or distribute child items (e.g. button groups, toolbars, two‑column panels with side-by-side children).
+- Components should expose minimal layout restraints; let parents control sizing. For example, `WorkspacePanel` no longer applies a `flex` wrapper – the internal `<n-tabs>` handles its own flexing.
+- When you do apply `flex`, accompany it with explicit utilities (`items-center`, `justify-between`, `gap-2`) to clarify intent and avoid accidental stretching.
+- Add layout rationale in component comments when deviating from these guidelines (e.g. two‑column resizer in `TwoColumnLayout.vue` still uses flex).
+
 #### Typography
 - **UI font**: [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) — free & open-source (Apache 2.0) monospace font used for **all** UI text and code/mono elements. Self-hosted as `public/JetBrainsMono-Regular.ttf` and `public/JetBrainsMono-Medium.ttf`.
 - A single font family is used for both UI and mono contexts, giving the app a unified developer-tool aesthetic.

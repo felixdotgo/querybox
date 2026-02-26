@@ -183,7 +183,8 @@ defineExpose({ openTab })
 </script>
 
 <template>
-  <div class="flex flex-col h-full overflow-hidden">
+  <!-- root no longer needs flex; internal tabs handle their own flex layout -->
+  <div class="h-full overflow-hidden">
     <n-tabs
       v-model:value="activeTabKey"
       type="card"
