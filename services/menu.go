@@ -24,6 +24,9 @@ func (a *App) NewAppMenu() *application.Menu {
 		a.CloseMainWindow()
 	})
 
+	// Edit menu — required for Cmd+C/V/X/A to work in text inputs on macOS.
+	menu.AddRole(application.EditMenu)
+
 	// View
 	viewMenu := menu.AddSubmenu("View")
 	viewMenu.Add("Toggle Fullscreen").
@@ -36,6 +39,12 @@ func (a *App) NewAppMenu() *application.Menu {
 		OnClick(func(ctx *application.Context) {
 			a.App.Event.Emit(EventMenuLogsToggled, nil)
 		})
+
+	// WindowMenu
+	menu.AddRole(application.WindowMenu)
+
+	// Help
+	menu.AddRole(application.HelpMenu)
 
 	return menu
 }
