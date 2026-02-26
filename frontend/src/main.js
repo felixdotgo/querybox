@@ -1,6 +1,6 @@
 import naive from 'naive-ui'
 import { createApp } from 'vue'
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHashHistory } from 'vue-router'
 import { ShowConnectionsWindow, ShowPluginsWindow } from '@/bindings/github.com/felixdotgo/querybox/services/app'
 import App from './App.vue'
 import Connections from './views/Connections.vue'
@@ -18,7 +18,7 @@ window.openConnectionsWindow = async function openConnectionsWindow() {
   }
   catch {
     // binding not available — fall back to route change
-    window.location.href = '/connections'
+    window.location.href = '/#/connections'
   }
 }
 window.openPluginsWindow = async function openPluginsWindow() {
@@ -26,7 +26,7 @@ window.openPluginsWindow = async function openPluginsWindow() {
     await ShowPluginsWindow()
   }
   catch {
-    window.location.href = '/plugins'
+    window.location.href = '/#/plugins'
   }
 }
 
@@ -37,7 +37,7 @@ const routes = [
 ]
 
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+  history: createWebHashHistory(import.meta.env.BASE_URL),
   routes,
 })
 

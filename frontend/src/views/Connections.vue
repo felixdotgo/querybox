@@ -225,6 +225,13 @@ async function saveConnection() {
 onMounted(async () => {
   await load()
 
+  // Re-load plugin list once the backend's async initial scan completes.
+  // The plugin manager scans executables asynchronously at startup to avoid
+  // blocking Wails window initialisation; this event fires when it's done.
+  Events.On('plugins:ready', async () => {
+    await load()
+  })
+
   // Clear form when window is closed (hidden)
   Events.On('connections-window:closed', async () => {
     clearForm()
