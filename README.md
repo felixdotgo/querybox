@@ -95,7 +95,7 @@ Binaries are placed in `bin/plugins/` (Windows builds get `.exe`) and picked up 
 
 4. The running app will discover the new plugin automatically (no restart needed).
 
-See [docs/plugins.md](docs/plugins.md) for the full plugin contract and examples.
+See [docs/features/02-plugin-system.md](docs/features/02-plugin-system.md) for the full plugin contract and examples.
 
 ## Project Structure
 
@@ -118,7 +118,13 @@ See [docs/plugins.md](docs/plugins.md) for the full plugin contract and examples
 
 ## Documentation
 
-- [Plugin Development Guide](docs/plugins.md)
-- [Basic Design Overview](docs/basic-design/overview.md)
-- [Architecture](docs/detailed-design/architecture.md)
-- [Data Model](docs/detailed-design/data-model.md)
+See [docs/README.md](docs/README.md) for the full reading order. Quick links:
+
+## Third-Party Licenses
+
+| Component | License | Notes |
+|-----------|---------|-------|
+| [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) | [Apache 2.0](frontend/public/LICENSE-JetBrainsMono) | Font used in the UI |
+
+## License
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
