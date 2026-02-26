@@ -141,10 +141,15 @@ tasks:
     cmds:
       - mkdir -p "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/MacOS"
       - mkdir -p "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Resources"
+      - mkdir -p "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/MacOS/bin/plugins"
       - cp build/darwin/icons.icns "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Resources"
       - |
         if [ -f build/darwin/Assets.car ]; then
           cp build/darwin/Assets.car "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Resources"
+        fi
+      - |
+        if [ -d "{{.BIN_DIR}}/plugins" ]; then
+          cp -r "{{.BIN_DIR}}/plugins/." "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/MacOS/bin/plugins/"
         fi
       - cp "{{.BIN_DIR}}/{{.APP_NAME}}" "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/MacOS"
       - cp build/darwin/Info.plist "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents"

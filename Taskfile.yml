@@ -21,6 +21,8 @@ tasks:
 
   package:
     summary: Packages a production build of the application
+    deps:
+      - task: build:plugins
     cmds:
       - task: "{{OS}}:package"
 
