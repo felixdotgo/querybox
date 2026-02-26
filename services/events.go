@@ -24,6 +24,10 @@ const (
 
 	// EventConnectionsWindowClosed is emitted when the connections window is hidden.
 	EventConnectionsWindowClosed = "connections-window:closed"
+
+	// EventPluginsReady is emitted by the plugin manager once the initial async
+	// scan has completed and ListPlugins() returns a populated result.
+	EventPluginsReady = "plugins:ready"
 )
 
 // LogLevel represents the severity of a log entry.

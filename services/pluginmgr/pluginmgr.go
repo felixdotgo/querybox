@@ -49,14 +49,16 @@ type Manager struct {
 	mu      sync.Mutex
 	plugins map[string]PluginInfo
 
-	stopCh chan struct{}
-	app    *application.App
+	stopCh     chan struct{}
+	app        *application.App
+	appReadyCh chan struct{} // closed by SetApp once the Wails app is available
 }
 
 // SetApp injects the Wails application reference so the Manager can emit
 // log events to the frontend. Call this after application.New returns.
 func (m *Manager) SetApp(app *application.App) {
 	m.app = app
+	close(m.appReadyCh)
 }
 
 // emitLog is a nil-safe helper that emits an app:log event on the Wails app.
@@ -93,19 +95,59 @@ type execRequest struct {
 // Using it here allows json.Unmarshal to correctly populate the nested
 // ExecResult field.
 
+// defaultPluginsDir returns the plugins directory to use.
+// It tries the directory next to the running executable first (correct for
+// packaged .app bundles where macOS sets CWD to "/"). If that path does not
+// exist yet, it falls back to CWD-relative "bin/plugins" which is the correct
+// location when running via `wails3 dev` from the project root.
+func defaultPluginsDir() string {
+	if exe, err := os.Executable(); err == nil {
+		if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+			exe = resolved
+		}
+		dir := filepath.Join(filepath.Dir(exe), "bin", "plugins")
+		if _, err := os.Stat(dir); err == nil {
+			return dir
+		}
+	}
+	return filepath.Join(".", "bin", "plugins")
+}
+
 // New creates a Manager and starts a background scanner for the plugins folder.
 func New() *Manager {
 	m := &Manager{
-		Dir:          filepath.Join(".", "bin", "plugins"),
+		Dir:          defaultPluginsDir(),
 		scanInterval: 2 * time.Second,
 		plugins:      make(map[string]PluginInfo),
 		stopCh:       make(chan struct{}),
+		appReadyCh:   make(chan struct{}),
 	}
 	_ = os.MkdirAll(m.Dir, 0o755)
-	// Perform an initial synchronous scan so callers (UI) get immediate results on first ListPlugins()
-	m.scanOnce()
+	// Run the initial scan asynchronously so we don't block application startup.
+	// Probing each plugin binary can take up to 2 seconds (timeout), and with
+	// several plugins this adds up before Wails even initialises its windows.
+	// emitPluginsReady fires a "plugins:ready" event once the scan completes so
+	// the frontend can reload its plugin list without polling.
+	go func() {
+		m.scanOnce()
+		m.emitPluginsReady()
+	}()
 	go m.run()
 	return m
+}
+
+// emitPluginsReady emits the EventPluginsReady event to inform the frontend
+// that the initial plugin scan has completed and ListPlugins() is populated.
+// It waits for SetApp() to provide the Wails app reference before emitting.
+func (m *Manager) emitPluginsReady() {
+	select {
+	case <-m.appReadyCh:
+		// app is ready, emit the event
+	case <-time.After(10 * time.Second):
+		// give up if SetApp is never called (e.g. in tests)
+		return
+	}
+	m.app.Event.Emit(services.EventPluginsReady, nil)
 }
 
 func (m *Manager) run() {

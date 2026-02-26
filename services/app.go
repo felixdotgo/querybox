@@ -26,7 +26,7 @@ func (a *App) NewConnectionsWindow() *application.WebviewWindow {
 		// Required options
 		Name:  "connections",
 		Title: "Connections",
-		URL:   "/connections",
+		URL:   "/#/connections",
 
 		// Optional options
 		Frameless:     false,
@@ -133,7 +133,7 @@ func (a *App) NewPluginsWindow() *application.WebviewWindow {
 	w := a.App.Window.NewWithOptions(application.WebviewWindowOptions{
 		Name:  "plugins",
 		Title: "Plugins",
-		URL:   "/plugins",
+		URL:   "/#/plugins",
 
 		Frameless:     false,
 		DisableResize: true,
