@@ -177,7 +177,16 @@ func (m *Manager) scanOnce() {
 	if err != nil {
 		return
 	}
+
 	found := map[string]struct{}{}
+	type candidate struct {
+		name string
+		full string
+	}
+	var toProbe []candidate
+
+	// identify plugins that need probing, holding mutex only briefly
+	m.mu.Lock()
 	for _, f := range files {
 		if f.IsDir() {
 			continue
@@ -188,42 +197,57 @@ func (m *Manager) scanOnce() {
 			continue
 		}
 		found[name] = struct{}{}
-		m.mu.Lock()
 		existing, exists := m.plugins[name]
-		// Probe if: never seen before, or previous probe failed (LastError set).
-		// Healthy entries (LastError == "") are not re-probed to avoid overhead.
 		if !exists || existing.LastError != "" {
-			// probe metadata
+			toProbe = append(toProbe, candidate{name: name, full: full})
+		}
+	}
+	m.mu.Unlock()
+
+	// probe metadata concurrently
+	type result struct {
+		name string
+		info PluginInfo
+	}
+	resCh := make(chan result, len(toProbe))
+	var wg sync.WaitGroup
+	for _, cand := range toProbe {
+		wg.Add(1)
+		go func(name, full string) {
+			defer wg.Done()
 			info := PluginInfo{ID: name, Name: name, Path: full, Running: false}
-			meta, err := probeInfo(full)
+			meta, err := probeInfoFunc(full)
 			if err != nil {
 				info.LastError = err.Error()
 			} else {
-				// Use descriptive name if available, otherwise fallback to filename.
 				if meta.Name != "" {
 					info.Name = meta.Name
 				}
-				info.Type         = meta.Type
-				info.Version      = meta.Version
-				info.Description  = meta.Description
-				info.URL          = meta.URL
-				info.Author       = meta.Author
+				info.Type = meta.Type
+				info.Version = meta.Version
+				info.Description = meta.Description
+				info.URL = meta.URL
+				info.Author = meta.Author
 				info.Capabilities = meta.Capabilities
-				info.Tags         = meta.Tags
-				info.License      = meta.License
-				info.IconURL      = meta.IconURL
-				info.Contact      = meta.Contact
-				info.Metadata     = meta.Metadata
-				info.Settings     = meta.Settings
-				info.LastError    = ""
+				info.Tags = meta.Tags
+				info.License = meta.License
+				info.IconURL = meta.IconURL
+				info.Contact = meta.Contact
+				info.Metadata = meta.Metadata
+				info.Settings = meta.Settings
+				info.LastError = ""
 			}
-			m.plugins[name] = info
-		}
-		m.mu.Unlock()
+			resCh <- result{name: name, info: info}
+		}(cand.name, cand.full)
 	}
+	wg.Wait()
+	close(resCh)
 
-	// remove entries no longer present
+	// update map and prune missing entries
 	m.mu.Lock()
+	for r := range resCh {
+		m.plugins[r.name] = r.info
+	}
 	for name := range m.plugins {
 		if _, ok := found[name]; !ok {
 			delete(m.plugins, name)
@@ -251,6 +275,11 @@ func isExecutable(path string) bool {
 
 // probeInfo executes `binary info` and decodes the JSON InfoResponse. If the
 // plugin doesn't implement `info` the call will error and we return that error.
+//
+// For testability we expose a variable pointing at the real implementation;
+// tests may override probeInfoFunc to avoid spawning real binaries.
+var probeInfoFunc = probeInfo
+
 func probeInfo(fullpath string) (PluginInfo, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

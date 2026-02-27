@@ -2,7 +2,11 @@ package pluginmgr
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
 )
@@ -99,6 +103,62 @@ func TestExecTreeActionForwardsOptions(t *testing.T) {
 	_, err := m.ExecTreeAction("nonexistent", nil, "SELECT 1", map[string]string{"explain-query": "yes"})
 	if err == nil {
 		t.Errorf("expected error for missing plugin")
+	}
+}
+
+func TestScanOnceConcurrent(t *testing.T) {
+	dir, err := os.MkdirTemp("", "pmgrscan")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	// create two dummy executable files
+	for _, name := range []string{"p1", "p2"} {
+		path := filepath.Join(dir, name)
+		if err := os.WriteFile(path, []byte(""), 0o755); err != nil {
+			t.Fatalf("write dummy plugin %s: %v", name, err)
+		}
+	}
+
+	// instrumentation to ensure probes run in parallel
+	var active, maxActive int32
+	orig := probeInfoFunc
+	probeInfoFunc = func(fullpath string) (PluginInfo, error) {
+		curr := atomic.AddInt32(&active, 1)
+		if curr > atomic.LoadInt32(&maxActive) {
+			atomic.StoreInt32(&maxActive, curr)
+		}
+		// delay so there is opportunity for overlap
+		time.Sleep(25 * time.Millisecond)
+		atomic.AddInt32(&active, -1)
+		return PluginInfo{ID: filepath.Base(fullpath), Name: filepath.Base(fullpath)}, nil
+	}
+	defer func() { probeInfoFunc = orig }()
+
+	m := &Manager{
+		Dir:        dir,
+		plugins:    make(map[string]PluginInfo),
+		stopCh:     make(chan struct{}),
+		appReadyCh: make(chan struct{}),
+	}
+
+	m.scanOnce()
+	if len(m.plugins) != 2 {
+		t.Fatalf("expected 2 plugins, got %d", len(m.plugins))
+	}
+	if atomic.LoadInt32(&maxActive) < 2 {
+		t.Errorf("probe did not execute concurrently, maxActive=%d", maxActive)
+	}
+
+	// deleting one file should prune the registry
+	os.Remove(filepath.Join(dir, "p1"))
+	m.scanOnce()
+	if len(m.plugins) != 1 {
+		t.Fatalf("expected 1 plugin after removal, got %d", len(m.plugins))
+	}
+	if _, ok := m.plugins["p2"]; !ok {
+		t.Errorf("remaining plugin should be p2")
 	}
 }
 
