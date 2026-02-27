@@ -2,14 +2,8 @@
 import { ref } from 'vue'
 
 defineProps({
-  leftWidth: {
-    type: Number,
-    default: 300,
-  },
-  minLeftWidth: {
-    type: Number,
-    default: 200,
-  },
+  leftWidth: { type: Number, default: 120 },
+  minLeftWidth: { type: Number, default: 120 },
 })
 
 defineEmits(['dragstart'])

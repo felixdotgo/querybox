@@ -12,12 +12,15 @@ import {
   // actions
   AddCircleOutline,
   ArrowDownOutline,
+  CashOutline,
   ChevronDownOutline,
   CodeSlashOutline,
   DocumentOutline,
   EyeOutline,
   FlashOutline,
   GridOutline,
+  SearchOutline,
+  TimeOutline,
 
   // tree / navigation
   LayersOutline,
@@ -32,19 +35,22 @@ import {
 export {
   AddCircleOutline, // new connection toolbar button
   ArrowDownOutline, // log panel auto-scroll toggle
+  CashOutline, // cost / dollar
   ChevronDownOutline, // footer collapse toggle (rotate -90deg when collapsed)
   CodeSlashOutline, // node_type === "column"
   DocumentOutline, // unknown / generic fallback
   EyeOutline, // "select" action on tree nodes
-  FlashOutline, // "Connect" action on connection row
+  FlashOutline, // "Connect" action / execution time (bolt)
   GridOutline, // node_type === "table"
+  SearchOutline, // filter input prefix
+  TimeOutline, // planning time (clock)
 
   LayersOutline, // driver group node
   LibraryOutline, // node_type === "database"
   Pin, // pinned column indicator (filled)
   PinOutline, // pin column button (outline)
   RefreshOutline, // "Refresh" action on connection row
-  ServerOutline, // connection node
+  ServerOutline, // connection node / rows (databases)
   TrashOutline, // "Delete" action on connection row
 }
 

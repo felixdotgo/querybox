@@ -25,6 +25,7 @@ import {
   AddCircleOutline,
   nodeTypeFallbackIcon,
   nodeTypeIconMap,
+  SearchOutline,
   ServerOutline,
 } from '@/lib/icons'
 
@@ -655,11 +656,11 @@ defineExpose({
     <!-- small toolbar -->
     <div class="flex items-center justify-between gap-2">
       <div class="flex items-center gap-2">
-        <span class="text-lg font-semibold m-0">Connections</span>
+        <span class="text-sm font-semibold m-0">Connections</span>
       </div>
       <div class="flex">
         <NButton
-          size="small"
+          size="tiny"
           type="primary"
           title="New connection"
           @click="openConnections"
@@ -674,12 +675,16 @@ defineExpose({
     <n-input
       v-model:value="filter"
       size="small"
-      placeholder="Filter"
-    />
+      placeholder="Search connections..."
+    >
+      <template #prefix>
+        <NIcon><SearchOutline /></NIcon>
+      </template>
+    </n-input>
 
     <div
       ref="treeScrollRef"
-      class="flex-1 overflow-auto mt-2 px-1 min-h-0 transition-shadow duration-150"
+      class="flex-1 overflow-y-auto mt-2 px-1 min-h-0 transition-shadow duration-150 scroll-container"
       :class="{ 'shadow-[inset_0_6px_6px_-6px_rgba(0,0,0,0.12)]': isScrolled }"
       @scroll.passive="isScrolled = $event.target.scrollTop > 0"
     >
@@ -694,6 +699,7 @@ defineExpose({
         :node-props="getNodeProps"
         :render-label="renderLabel"
         :render-prefix="renderPrefix"
+        :indent="12"
         @update:selected-keys="handleSelect"
       />
       <div
@@ -725,3 +731,19 @@ defineExpose({
     />
   </div>
 </template>
+
+<style scoped>
+.scroll-container::-webkit-scrollbar {
+  width: 4px;
+}
+.scroll-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scroll-container::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 9999px;
+}
+.scroll-container:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.15);
+}
+</style>
