@@ -19,7 +19,14 @@ export function CloseConnectionsWindow() {
 }
 
 /**
- * CloseMainWindow closes the main application window.
+ * CloseMainWindow closes the main application window and initiates
+ * a full application shutdown.  Historically the UI called this method when
+ * the user selected Quit from the menu or pressed the window close button.
+ * Merely closing the webview did not terminate the Go process if there were
+ * other hidden windows or background services running, which led to the
+ * issue where the app would remain alive in the background.  We now call
+ * a.App.Quit() as well, which causes app.Run() to return and services to be
+ * torn down.
  * @returns {$CancellablePromise<void>}
  */
 export function CloseMainWindow() {
@@ -109,6 +116,16 @@ export function OpenFileDialog() {
  */
 export function OpenURL(url) {
     return $Call.ByID(2167090686, url);
+}
+
+/**
+ * Quit requests that the entire application shutdown.  In addition to closing
+ * the main window (which happens automatically), this causes app.Run() to
+ * return and triggers Shutdown on any bound services.
+ * @returns {$CancellablePromise<void>}
+ */
+export function Quit() {
+    return $Call.ByID(2422379594);
 }
 
 /**

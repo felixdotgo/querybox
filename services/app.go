@@ -86,6 +86,17 @@ func (a *App) NewMainWindow() *application.WebviewWindow {
 		},
 	})
 
+	// When the main window is closed we want the whole application to quit.
+	// Closing the window alone is not sufficient on Windows/ Linux; the
+	// process will continue running if there are other hidden windows or
+	// background goroutines.  Attach an event listener so that a call to
+	// CloseMainWindow or a user click of the close button triggers the
+	// application shutdown.
+	w.OnWindowEvent(events.Common.WindowClosing, func(e *application.WindowEvent) {
+		// no need to cancel; we allow the window to close and then quit the app
+		a.App.Quit()
+	})
+
 	return w
 }
 
@@ -103,10 +114,20 @@ func (a *App) MinimiseMainWindow() {
 	}
 }
 
-// CloseMainWindow closes the main application window.
+// CloseMainWindow closes the main application window and initiates
+// a full application shutdown.  Historically the UI called this method when
+// the user selected Quit from the menu or pressed the window close button.
+// Merely closing the webview did not terminate the Go process if there were
+// other hidden windows or background services running, which led to the
+// issue where the app would remain alive in the background.  We now call
+// a.App.Quit() as well, which causes app.Run() to return and services to be
+// torn down.
 func (a *App) CloseMainWindow() {
 	if a.MainWindow != nil {
 		a.MainWindow.Close()
+	}
+	if a.App != nil {
+		a.App.Quit()
 	}
 }
 
@@ -114,6 +135,15 @@ func (a *App) CloseMainWindow() {
 func (a *App) ToggleFullScreenMainWindow() {
 	if a.MainWindow != nil {
 		a.MainWindow.ToggleFullscreen()
+	}
+}
+
+// Quit requests that the entire application shutdown.  In addition to closing
+// the main window (which happens automatically), this causes app.Run() to
+// return and triggers Shutdown on any bound services.
+func (a *App) Quit() {
+	if a.App != nil {
+		a.App.Quit()
 	}
 }
 

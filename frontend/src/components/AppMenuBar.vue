@@ -7,6 +7,7 @@ import {
   ShowConnectionsWindow,
   ShowPluginsWindow,
   ToggleFullScreenMainWindow,
+  // If a Quit binding is added in the future we could call that here too.
 } from '@/bindings/github.com/felixdotgo/querybox/services/app'
 
 const emit = defineEmits(['toggle-logs'])

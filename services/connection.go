@@ -116,6 +116,15 @@ func NewConnectionService() *ConnectionService {
 
 func (s *ConnectionService) closeable() bool { return s.db != nil }
 
+// Shutdown releases resources held by the service. It is invoked by Wails when
+// the application is quitting.
+func (s *ConnectionService) Shutdown() {
+	if s.db != nil {
+		_ = s.db.Close()
+		s.db = nil
+	}
+}
+
 // hasColumn reports whether the `connections` table contains a column named
 // `col`.
 func (s *ConnectionService) hasColumn(col string) (bool, error) {

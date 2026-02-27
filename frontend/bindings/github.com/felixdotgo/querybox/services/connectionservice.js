@@ -95,6 +95,15 @@ export function SetApp(app) {
     return $Call.ByID(1095751446, app);
 }
 
+/**
+ * Shutdown releases resources held by the service. It is invoked by Wails when
+ * the application is quitting.
+ * @returns {$CancellablePromise<void>}
+ */
+export function Shutdown() {
+    return $Call.ByID(2018664523);
+}
+
 // Private type creation functions
 const $$createType0 = $models.Connection.createFrom;
 const $$createType1 = $Create.Array($$createType0);

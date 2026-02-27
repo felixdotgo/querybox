@@ -21,7 +21,10 @@ func (a *App) NewAppMenu() *application.Menu {
 	})
 	fileMenu.AddSeparator()
 	fileMenu.Add("Quit QueryBox").SetAccelerator("CmdOrCtrl+Q").OnClick(func(ctx *application.Context) {
-		a.CloseMainWindow()
+		// explicitly quit the application; CloseMainWindow already does this but
+		// calling Quit makes the intention clear and avoids any race conditions
+		// if the window has already been closed for some other reason.
+		a.App.Quit()
 	})
 
 	// Edit menu — required for Cmd+C/V/X/A to work in text inputs on macOS.
