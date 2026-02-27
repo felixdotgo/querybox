@@ -39,7 +39,7 @@ const emit = defineEmits(['connect', 'delete', 'dblclick'])
 
     <!-- action buttons — revealed on hover via CSS group -->
     <div
-      class="flex items-center gap-0.5 opacity-0 group-hover/conn:opacity-100 transition-opacity flex-shrink-0 ml-1"
+      class="flex items-center gap-0.5 hidden group-hover/conn:flex flex-shrink-0 ml-1"
     >
       <!-- Connect / Refresh -->
       <n-tooltip :delay="600">
