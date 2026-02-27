@@ -8,7 +8,13 @@ task build:plugins
 # or: scripts/build-plugins.sh
 
 # 2. Verify plugins are in place
+# listing the current plugin directory
+
 ls bin/plugins/
+# if you have per-user plugins they live under the OS config path, e.g.
+#   $XDG_CONFIG_HOME/querybox/plugins  (Linux)
+#   %APPDATA%\querybox\plugins      (Windows)
+#   ~/Library/Application Support/querybox/plugins (macOS)
 
 # 3. Start the app with hot-reload
 wails3 dev
@@ -40,9 +46,10 @@ Cross-platform builds are documented in `build/*/Taskfile.yml`.
 ## Common Issues
 
 ### Plugin not discovered
-1. Confirm binary is under `bin/plugins/` and is executable (`chmod +x` on Unix).
-2. Trigger `Rescan()` from the UI or restart; background scan runs every 2 seconds.
-3. Check `PluginInfo.LastError` in UI — captures `plugin info` probe failures.
+1. Confirm binary is under `bin/plugins/` (or the per-user plugins path above) and is executable (`chmod +x` on Unix).
+2. Plugins are scanned **once at startup**. Restart the app to pick up newly added or removed binaries.
+3. Alternatively, use the **Rescan** button in the Plugins window to re-probe without a full restart.
+4. Check `PluginInfo.LastError` in the Plugins window — captures `plugin info` probe failures.
 
 ### Credential not found
 1. Check which tier is active: OS keyring → `data/credentials.db` → in-memory map.

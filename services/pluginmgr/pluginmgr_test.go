@@ -1,15 +1,40 @@
 package pluginmgr
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
 )
+
+func TestUserPluginsDirBehavior(t *testing.T) {
+	orig := userPluginDirFunc
+	defer func() { userPluginDirFunc = orig }()
+
+	userPluginDirFunc = func() (string, error) {
+		return "/home/testuser/.config", nil
+	}
+	p, err := userPluginsDir()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.HasSuffix(p, filepath.Join("querybox", "plugins")) {
+		t.Errorf("path wrong: %s", p)
+	}
+
+	// failure case
+	userPluginDirFunc = func() (string, error) { return "", fmt.Errorf("fail") }
+	if p, err := userPluginsDir(); err == nil {
+		t.Errorf("expected error, got path %s", p)
+	}
+}
 
 func TestProbeInfoDecoding(t *testing.T) {
 	// prepare a fake JSON as plugin binary would emit (camelCase keys are
@@ -136,12 +161,13 @@ func TestScanOnceConcurrent(t *testing.T) {
 	}
 	defer func() { probeInfoFunc = orig }()
 
+	// construct a manager that scans only our temp directory
 	m := &Manager{
-		Dir:        dir,
 		plugins:    make(map[string]PluginInfo),
-		stopCh:     make(chan struct{}),
 		appReadyCh: make(chan struct{}),
 	}
+	m.dirs = []string{dir}
+	m.Dir = dir // maintain backwards-compatible field for binding
 
 	m.scanOnce()
 	if len(m.plugins) != 2 {
@@ -161,6 +187,157 @@ func TestScanOnceConcurrent(t *testing.T) {
 		t.Errorf("remaining plugin should be p2")
 	}
 }
+
+// TestPopulateUserDir verifies New() copies bundled binaries into the
+// user directory on every invocation, overwriting existing files.
+func TestPopulateUserDir(t *testing.T) {
+	user, err := os.MkdirTemp("", "userplugins")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(user)
+	bundle, err := os.MkdirTemp("", "bundleplugins")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(bundle)
+
+	fname := "bundled"
+	initial := []byte("first")
+	later := []byte("second")
+
+	// create a dummy plugin file in bundle
+	if err := os.WriteFile(filepath.Join(bundle, fname), initial, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	origUser := userPluginDirFunc
+	defer func() { userPluginDirFunc = origUser }()
+	userPluginDirFunc = func() (string, error) { return user, nil }
+
+	// first run copies initial content
+	_ = New()
+	if _, err := os.ReadFile(filepath.Join(user, fname)); err != nil {
+		t.Fatalf("expected file copied to user dir: %v", err)
+	}
+	if !isExecutable(filepath.Join(user, fname)) {
+		t.Errorf("copied file should be executable")
+	}
+
+	// modify bundle and run again -> user file should reflect new bytes
+	if err := os.WriteFile(filepath.Join(bundle, fname), later, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	_ = New()
+	got, err := os.ReadFile(filepath.Join(user, fname))
+	if err != nil {
+		t.Fatalf("failed to read user copy: %v", err)
+	}
+	if !bytes.Equal(got, later) {
+		t.Errorf("expected overwrite with later content, got %s", string(got))
+	}
+	if !isExecutable(filepath.Join(user, fname)) {
+		t.Errorf("overwritten file should remain executable")
+	}
+}
+
+// TestFallbackToBundle ensures that if the user copy cannot be probed the
+// manager will still load metadata from the bundled executable.
+func TestFallbackToBundle(t *testing.T) {
+	user, err := os.MkdirTemp("", "userplugins")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(user)
+	bundle, err := os.MkdirTemp("", "bundleplugins")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(bundle)
+
+	// both directories contain a plugin binary named "dup"
+	if err := os.WriteFile(filepath.Join(user, "dup"), []byte(""), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(bundle, "dup"), []byte(""), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// make probeInfoFunc fail when given the user path but succeed for bundle
+	orig := probeInfoFunc
+	defer func() { probeInfoFunc = orig }()
+	probeInfoFunc = func(fullpath string) (PluginInfo, error) {
+		if strings.HasPrefix(fullpath, user) {
+			return PluginInfo{}, fmt.Errorf("user path broken")
+		}
+		// simulate a valid driver response
+		return PluginInfo{ID: "dup", Name: "dup", Type: int(pluginpb.PluginV1_DRIVER)}, nil
+	}
+
+	m := &Manager{
+		plugins:    make(map[string]PluginInfo),
+		appReadyCh: make(chan struct{}),
+	}
+	m.dirs = []string{user, bundle}
+	m.Dir = user
+
+	m.scanOnce()
+	info, ok := m.plugins["dup"]
+	if !ok {
+		t.Fatal("dup not discovered")
+	}
+	if info.Path != filepath.Join(bundle, "dup") {
+		t.Errorf("expected bundle path used, got %s", info.Path)
+	}
+	if info.Type != int(pluginpb.PluginV1_DRIVER) {
+		t.Errorf("expected driver type, got %d", info.Type)
+	}
+}
+
+// TestUserDirPrecedence ensures that a plugin placed in the first (user)
+// directory takes precedence over an identically named executable in the
+// fallback/bundled directory.
+func TestUserDirPrecedence(t *testing.T) {
+	user, err := os.MkdirTemp("", "userplugins")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(user)
+	bundle, err := os.MkdirTemp("", "bundleplugins")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(bundle)
+
+	// create plugin with same name in both locations
+	if err := os.WriteFile(filepath.Join(user, "dup"), []byte(""), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(bundle, "dup"), []byte(""), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	m := &Manager{
+		plugins:    make(map[string]PluginInfo),
+		appReadyCh: make(chan struct{}),
+	}
+	m.dirs = []string{user, bundle}
+	m.Dir = user
+
+	m.scanOnce()
+	// we should discover only one plugin and its path should point to user dir
+	if len(m.plugins) != 1 {
+		t.Fatalf("expected 1 plugin, got %d", len(m.plugins))
+	}
+	info, ok := m.plugins["dup"]
+	if !ok {
+		t.Fatal("plugin dup missing after scan")
+	}
+	if !strings.HasPrefix(info.Path, user) {
+		t.Errorf("expected user dir to win, got path %s", info.Path)
+	}
+}
+
 
 // helper extracted from probeInfo so we can call without executing command
 func probeInfoFromRaw(raw map[string]interface{}) (PluginInfo, error) {

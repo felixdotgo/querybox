@@ -108,7 +108,21 @@ If a plugin advertises `"explain-query"` in its `capabilities` array, the host r
 
 ## Plugin Discovery
 
-PluginManager scans `bin/plugins/` every 2 seconds. For each new executable: probes `plugin info` (2s timeout), stores result in the in-memory registry. `Rescan()` triggers an immediate synchronous scan.
+At runtime the host looks in two locations for plugins. The first path is a
+user-writable directory under the operating system's config area (`$XDG_CONFIG_HOME/querybox/plugins` on Linux, `%APPDATA%\querybox\plugins` on Windows, `~/Library/Application Support/querybox/plugins` on macOS). Each startup the application copies whatever binaries exist in the bundled `bin/plugins` directory into this user folder, overwriting any existing files; this keeps the user directory in sync with the shipped bundle while still allowing extra drivers to be added. The user directory takes precedence over the bundle when names conflict.
+
+The second path is the traditional `bin/plugins` directory next to the
+executable (inside `.app` bundles, installers, or a `wails3 dev` working
+directory). This fallback keeps the built-in drivers available even when the
+user folder is populated later.
+
+PluginManager scans the configured directories **once at startup**. For each
+executable found it probes `plugin info` (2s timeout) and caches the result
+in memory for the lifetime of the process. There is no background re-scan;
+adding, removing, or replacing a plugin binary requires **restarting the
+application** to take effect. `Rescan()` (exposed as a button in the Plugins
+window) triggers an immediate synchronous re-probe if a manual refresh is
+needed without a full restart.
 
 ---
 

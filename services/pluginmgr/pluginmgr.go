@@ -45,16 +45,33 @@ type PluginInfo struct {
 	LastError   string            `json:"lastError,omitempty"`
 }
 
-// Manager discovers executables under ./bin/plugins and invokes them on-demand.
-// It does NOT manage long-running plugin processes.
+// Manager discovers executables under one or more plugin directories and
+// invokes them on-demand. By default the first scan location is a per-user
+// configuration directory (writable by the current user); if that path is
+// unavailable the bundled `bin/plugins` directory next to the executable is
+// used instead. Plugins found in an earlier directory mask identical names in
+// later directories. The Manager does NOT manage long-running plugin processes.
 type Manager struct {
-	Dir          string
-	scanInterval time.Duration
+    // Dir is the directory that should be treated as the canonical plugin
+    // location; it is kept for backwards compatibility and exported bindings.
+    // In practice this will equal the first element of dirs (usually the
+    // per-user config directory when available).
+    Dir string
+
+    // dirs holds the ordered list of directories that will be scanned when
+    // looking for plugins. The first entry has precedence in the event of
+    // name collisions. The slice may contain one or two elements depending on
+    // whether a user directory could be computed.
+    dirs []string
+
+    // fallbackDir holds the bundled path, primarily for tests and logging.
+    // It is equal to bundledPluginsDir() and may be empty if the user dir
+    // took precedence and the bundled path is not present.
+    fallbackDir string
 
 	mu      sync.Mutex
 	plugins map[string]PluginInfo
 
-	stopCh     chan struct{}
 	app        *application.App
 	appReadyCh chan struct{} // closed by SetApp once the Wails app is available
 }
@@ -100,12 +117,27 @@ type execRequest struct {
 // Using it here allows json.Unmarshal to correctly populate the nested
 // ExecResult field.
 
-// defaultPluginsDir returns the plugins directory to use.
-// It tries the directory next to the running executable first (correct for
-// packaged .app bundles where macOS sets CWD to "/"). If that path does not
-// exist yet, it falls back to CWD-relative "bin/plugins" which is the correct
-// location when running via `wails3 dev` from the project root.
-func defaultPluginsDir() string {
+// userPluginDirFunc is a test hook that returns the base configuration
+// directory for the current user. In production this is os.UserConfigDir.
+// Tests override it to control the value without hitting the real filesystem.
+var userPluginDirFunc = os.UserConfigDir
+
+// userPluginsDir returns a location under the per-user config area where
+// plugins may be stored. It mirrors services.dataDir() behaviour but is
+// specific to the plugin subsystem. When UserConfigDir fails or returns an
+// empty string we return an empty path.
+func userPluginsDir() (string, error) {
+    if dir, err := userPluginDirFunc(); err == nil && dir != "" {
+        return filepath.Join(dir, "querybox", "plugins"), nil
+    }
+    return "", fmt.Errorf("user config dir unavailable")
+}
+
+// bundledPluginsDir returns the location of the built-in plugins that were
+// shipped alongside the executable. This is essentially the old
+// defaultPluginsDir implementation. It may point inside an .app bundle on
+// macOS or simply ./bin/plugins when running in development.
+func bundledPluginsDir() string {
 	if exe, err := os.Executable(); err == nil {
 		if resolved, err := filepath.EvalSymlinks(exe); err == nil {
 			exe = resolved
@@ -118,17 +150,52 @@ func defaultPluginsDir() string {
 	return filepath.Join(".", "bin", "plugins")
 }
 
-// New creates a Manager and starts a background scanner for the plugins folder.
+// New creates a Manager, performs a single plugin scan at startup, and
+// emits "plugins:ready" when done. Plugins are not re-scanned at runtime;
+// the user must restart the application to pick up added or removed plugins.
+// It prefers a writable per-user directory but will fall back to the bundled
+// location beside the executable. The returned Manager populates Dir, dirs,
+// and fallbackDir accordingly.
 func New() *Manager {
-	m := &Manager{
-		Dir:          defaultPluginsDir(),
-		scanInterval: 2 * time.Second,
-		plugins:      make(map[string]PluginInfo),
-		stopCh:       make(chan struct{}),
-		appReadyCh:   make(chan struct{}),
-	}
-	_ = os.MkdirAll(m.Dir, 0o755)
-	// Run the initial scan asynchronously so we don't block application startup.
+    userDir, err := userPluginsDir()
+    bundle := bundledPluginsDir()
+
+    m := &Manager{
+        plugins:    make(map[string]PluginInfo),
+        appReadyCh: make(chan struct{}),
+        fallbackDir: bundle,
+    }
+
+    if err == nil && userDir != "" {
+        // if the user directory exists or can be created, use it as primary
+        // and copy bundled plugins into it every run. This keeps the user
+        // directory in sync with whatever shipped in the bundle; bundle files
+        // will replace any existing copies.
+        if err2 := os.MkdirAll(userDir, 0o755); err2 == nil {
+            populateUserDir(userDir, bundle)
+        }
+        m.dirs = append(m.dirs, userDir)
+        m.Dir = userDir
+    }
+
+    if bundle != "" {
+        // always include bundle location as fallback so that built-in plugins
+        // remain usable even if the user directory is populated later.
+        m.dirs = append(m.dirs, bundle)
+        if m.Dir == "" {
+            // if no user dir, make bundle the canonical Dir
+            m.Dir = bundle
+        }
+    }
+
+    // ensure we at least have something to scan
+    if m.Dir == "" {
+        // last resort: use old behaviour
+        m.Dir = bundle
+        m.dirs = []string{bundle}
+        _ = os.MkdirAll(m.Dir, 0o755)
+    }
+
 	// Probing each plugin binary can take up to 2 seconds (timeout), and with
 	// several plugins this adds up before Wails even initialises its windows.
 	// emitPluginsReady fires a "plugins:ready" event once the scan completes so
@@ -137,8 +204,43 @@ func New() *Manager {
 		m.scanOnce()
 		m.emitPluginsReady()
 	}()
-	go m.run()
 	return m
+}
+
+// populateUserDir copies executable files from the bundled directory into the
+// user directory every time New() is called. Existing files will be overwritten
+// with the bundle version, ensuring that the on-disk listing mirrors what the
+// application shipped with. If the bundle path is empty or unreadable the
+// function does nothing.
+func populateUserDir(userDir, bundle string) {
+	if bundle == "" || userDir == "" {
+		return
+	}
+	entries, err := os.ReadDir(bundle)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		src := filepath.Join(bundle, e.Name())
+		dst := filepath.Join(userDir, e.Name())
+		info, err := os.Stat(src)
+		if err != nil || !isExecutable(src) {
+			continue
+		}
+		// read and write bytes; then explicitly chmod to ensure mode isn't
+		// stripped by the process umask (common issue on Unix).
+		if b, err := os.ReadFile(src); err == nil {
+			tmp := dst + ".tmp"
+			if werr := os.WriteFile(tmp, b, info.Mode()); werr == nil {
+				_ = os.Chmod(tmp, info.Mode())
+				// rename into place; on Windows this will replace existing file only
+				_ = os.Rename(tmp, dst)
+			}
+		}
+	}
 }
 
 // emitPluginsReady emits the EventPluginsReady event to inform the frontend
@@ -155,56 +257,50 @@ func (m *Manager) emitPluginsReady() {
 	m.app.Event.Emit(services.EventPluginsReady, nil)
 }
 
-func (m *Manager) run() {
-	ticker := time.NewTicker(m.scanInterval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ticker.C:
-			m.scanOnce()
-		case <-m.stopCh:
-			return
-		}
-	}
-}
-
 // scanOnce updates the in-memory plugin registry by inspecting the folder. For
 // newly discovered executables, it will attempt to probe `plugin info` for
 // metadata. Failures are recorded in PluginInfo.LastError but do not prevent
 // discovery.
 func (m *Manager) scanOnce() {
-	files, err := os.ReadDir(m.Dir)
-	if err != nil {
-		return
-	}
-
+	// iterate through each configured directory in order; user directory
+	// entries mask any identically named binaries in a later directory.
 	found := map[string]struct{}{}
 	type candidate struct {
-		name string
-		full string
+		name   string
+		full   string
+		dirIdx int // index in m.dirs where this candidate came from
 	}
 	var toProbe []candidate
 
-	// identify plugins that need probing, holding mutex only briefly
 	m.mu.Lock()
-	for _, f := range files {
-		if f.IsDir() {
-			continue
+	for idx, dir := range m.dirs {
+		files, err := os.ReadDir(dir)
+		if err != nil {
+			continue // missing/ unreadable dirs are simply skipped
 		}
-		name := f.Name()
-		full := filepath.Join(m.Dir, name)
-		if !isExecutable(full) {
-			continue
-		}
-		found[name] = struct{}{}
-		existing, exists := m.plugins[name]
-		if !exists || existing.LastError != "" {
-			toProbe = append(toProbe, candidate{name: name, full: full})
+		for _, f := range files {
+			if f.IsDir() {
+				continue
+			}
+			name := f.Name()
+			if _, seen := found[name]; seen {
+				// already discovered in a higher‑precedence directory
+				continue
+			}
+			full := filepath.Join(dir, name)
+			if !isExecutable(full) {
+				continue
+			}
+			found[name] = struct{}{}
+			existing, exists := m.plugins[name]
+			if !exists || existing.LastError != "" {
+				toProbe = append(toProbe, candidate{name: name, full: full, dirIdx: idx})
+			}
 		}
 	}
 	m.mu.Unlock()
 
-	// probe metadata concurrently
+	// probe metadata concurrently (same as before)
 	type result struct {
 		name string
 		info PluginInfo
@@ -213,10 +309,21 @@ func (m *Manager) scanOnce() {
 	var wg sync.WaitGroup
 	for _, cand := range toProbe {
 		wg.Add(1)
-		go func(name, full string) {
+		go func(c candidate) {
 			defer wg.Done()
-			info := PluginInfo{ID: name, Name: name, Path: full, Running: false}
-			meta, err := probeInfoFunc(full)
+			info := PluginInfo{ID: c.name, Name: c.name, Path: c.full, Running: false}
+			meta, err := probeInfoFunc(c.full)
+			if err != nil && c.dirIdx == 0 && len(m.dirs) > 1 {
+				// primary directory probe failed; try fallback bundle entry if present
+				alt := filepath.Join(m.dirs[len(m.dirs)-1], c.name)
+				if alt != c.full && isExecutable(alt) {
+					if meta2, err2 := probeInfoFunc(alt); err2 == nil {
+						meta = meta2
+						err = nil
+						info.Path = alt // keep bundle path since user copy is bad
+					}
+				}
+			}
 			if err != nil {
 				info.LastError = err.Error()
 			} else {
@@ -237,8 +344,8 @@ func (m *Manager) scanOnce() {
 				info.Settings = meta.Settings
 				info.LastError = ""
 			}
-			resCh <- result{name: name, info: info}
-		}(cand.name, cand.full)
+			resCh <- result{name: c.name, info: info}
+		}(cand)
 	}
 	wg.Wait()
 	close(resCh)
@@ -715,7 +822,6 @@ func (m *Manager) DisablePlugin(name string) error {
 	return fmt.Errorf("DisablePlugin: enable/disable not supported for on-demand plugins")
 }
 
-// Shutdown stops background scanning.
-func (m *Manager) Shutdown() {
-	close(m.stopCh)
-}
+// Shutdown is a no-op; there is no background scanner to stop.
+// It is kept so Wails can still call the lifecycle method without error.
+func (m *Manager) Shutdown() {}

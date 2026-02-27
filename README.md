@@ -58,8 +58,7 @@ The production executable is placed in `bin/`.
 
 ### Build Plugins
 
-Plugins are standalone executables that live in `bin/plugins/` (on Windows the files will have `.exe` suffix).
-The app discovers them automatically at runtime.
+Plugins are standalone executables that normally live in `bin/plugins/` (on Windows the files will have a `.exe` suffix). At startup the app copies whatever lives in the bundled `bin/plugins` into the per-user config directory (`%APPDATA%\querybox\plugins`, `$XDG_CONFIG_HOME/querybox/plugins`, etc.), overwriting existing copies. The host then scans both locations, with the user directory taking precedence; this allows the bundle to be updated while still letting users add or override drivers.
 
 ```bash
 # Build all plugins at once

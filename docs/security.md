@@ -23,7 +23,7 @@
 | stderr capture | Captured for debugging; must not contain secrets |
 | Trust model | Plugins run with the same OS privileges as the host app |
 | Sandboxing | None (future enhancement) |
-| Plugin directory | `bin/plugins/` — user-controlled; no code signing enforced |
+| Plugin directory | per-user config path (`.../querybox/plugins`) and `bin/plugins/` — user-controlled; no code signing enforced |
 
 ---
 
