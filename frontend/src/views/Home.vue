@@ -39,7 +39,7 @@ function clearLogs() {
 const horizontalResizer = createHorizontalResizer({
   containerRef,
   sizeRef: leftWidth,
-  min: 400,
+  min: 250,
   minOther: 200,
 })
 
@@ -102,10 +102,10 @@ function resizeHandler() {
 }
 
 onMounted(() => {
-  // initialize left column to 1/5 of container but at least 400px
+  // initialize left column to 1/5 of container but at least 250px
   const rect = containerRef.value?.getBoundingClientRect()
   const cw = rect?.width ?? window.innerWidth
-  leftWidth.value = Math.max(Math.floor(cw * 0.2), 400)
+  leftWidth.value = Math.max(Math.floor(cw * 0.2), 250)
 
   // default footer height
   footerHeight.value = 176

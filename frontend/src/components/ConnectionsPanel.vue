@@ -613,25 +613,42 @@ loadPluginCaps()
 
 // Backend domain events — frontend only listens, never emits these topics.
 
-// connection:created → prepend the new connection (avoids a full re-fetch).
-const offConnectionCreated = Events.On('connection:created', (event) => {
+// connection:created → refresh the list rather than mutating directly.
+// This ensures we correctly show a brand‑new connection even if the ID was
+// reused after a delete or if the event payload was malformed. It also keeps
+// the local cache in sync with the backend.
+const offConnectionCreated = Events.On('connection:created', async (event) => {
   const conn = (event?.data ?? event)?.connection
   if (!conn)
     return
-  connections.value = [conn, ...connections.value]
+  try {
+    await loadConnections()
+    // if a search filter was active the newly-added connection may have been
+    // hidden; reset the filter so it is visible immediately.
+    filter.value = ''
+  }
+  catch (err) {
+    console.error('connection:created handler loadConnections', err)
+  }
 })
 
-// connection:deleted → reactively remove from local state.
-const offConnectionDeleted = Events.On('connection:deleted', (event) => {
+// connection:deleted → reload list as well to guard against edge cases where
+// a new connection with the same ID gets created immediately after deletion.
+const offConnectionDeleted = Events.On('connection:deleted', async (event) => {
   const id = (event?.data ?? event)?.id
   if (!id)
     return
-  connections.value = connections.value.filter(c => c.id !== id)
+  try {
+    await loadConnections()
+  }
+  catch (err) {
+    console.error('connection:deleted handler loadConnections', err)
+  }
+  // additional cleanup for tree cache/state
   delete connectionTrees[id]
   if (selectedConnection.value?.id === id)
     selectedConnection.value = null
   expandedKeys.value = expandedKeys.value.filter(k => k !== id)
-  // remove any in-flight indicators for nodes belonging to the deleted connection
   Object.keys(loadingNodes.value).forEach((k) => {
     if (k.startsWith(`${id}:`))
       delete loadingNodes.value[k]
