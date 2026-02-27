@@ -7,6 +7,11 @@
 import { Create as $Create } from "@wailsio/runtime";
 
 /**
+ * On Windows the helper hideWindow (implemented in platform-specific files)
+ * will configure subprocesses so they do not show a console window. This
+ * keeps the application from flashing plugin binaries during background
+ * scans or executions.
+ * 
  * PluginInfo holds metadata that the UI can display for each plugin.
  */
 export class PluginInfo {

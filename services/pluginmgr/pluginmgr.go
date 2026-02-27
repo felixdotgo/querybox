@@ -19,6 +19,11 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
+// On Windows the helper hideWindow (implemented in platform-specific files)
+// will configure subprocesses so they do not show a console window. This
+// keeps the application from flashing plugin binaries during background
+// scans or executions.
+//
 // PluginInfo holds metadata that the UI can display for each plugin.
 type PluginInfo struct {
 	ID          string            `json:"id"`
@@ -250,6 +255,7 @@ func probeInfo(fullpath string) (PluginInfo, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, fullpath, "info")
+	hideWindow(cmd)
 	out, err := cmd.Output()
 	if err != nil {
 		return PluginInfo{}, fmt.Errorf("probe info failed: %w", err)
@@ -362,6 +368,7 @@ func (m *Manager) ExecPlugin(name string, connection map[string]string, query st
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, full, "exec")
+	hideWindow(cmd)
 	cmd.Env = append(os.Environ(), "QUERYBOX_PLUGIN_NAME="+name)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -496,6 +503,7 @@ func (m *Manager) GetConnectionTree(name string, connection map[string]string) (
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, full, "connection-tree")
+	hideWindow(cmd)
 	cmd.Env = append(os.Environ(), "QUERYBOX_PLUGIN_NAME="+name)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -578,6 +586,7 @@ func (m *Manager) TestConnection(name string, connection map[string]string) (*pl
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, full, "test-connection")
+	hideWindow(cmd)
 	cmd.Env = append(os.Environ(), "QUERYBOX_PLUGIN_NAME="+name)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -643,6 +652,7 @@ func (m *Manager) GetPluginAuthForms(name string) (map[string]*plugin.AuthForm, 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, full, "authforms")
+	hideWindow(cmd)
 	out, err := cmd.Output()
 	if err != nil {
 		// treat as not implemented gracefully
