@@ -1,6 +1,17 @@
 <script setup>
 import { ref } from 'vue'
 
+defineProps({
+  leftWidth: {
+    type: Number,
+    default: 300,
+  },
+  minLeftWidth: {
+    type: Number,
+    default: 200,
+  },
+})
+
 defineEmits(['dragstart'])
 
 // expose container element ref so parent can use it for resizing logic

@@ -128,7 +128,7 @@ const rowKeyFunction = row => row && row.key
 </script>
 
 <template>
-  <div ref="wrapperRef" class="h-full w-full">
+  <div ref="wrapperRef" class="h-full w-full pb-10">
     <n-data-table
       :columns="tableColumns"
       :data="tableData"
