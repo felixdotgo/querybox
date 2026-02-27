@@ -138,11 +138,11 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="container-fluid p-0 flex flex-col h-screen bg-white">
+  <div class="flex flex-col h-screen bg-white">
     <AppMenuBar v-if="!isMac" ref="menuBarRef" @toggle-logs="toggleFooter" />
 
     <!-- Content: two-column resizable layout -->
-    <main class="flex-1 min-h-0">
+    <main class="flex-1 min-h-0 overflow-hidden">
       <TwoColumnLayout
         ref="layoutRef"
         :left-width="leftWidth"

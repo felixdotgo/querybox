@@ -187,9 +187,9 @@ defineExpose({ openTab })
     <n-tabs
       v-model:value="activeTabKey"
       type="card"
-      class="flex flex-col h-full"
-      :tab-bar-style="{ position: 'sticky', top: 0, zIndex: 10, flexShrink: 0 }"
-      :pane-style="{ display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: '1 1 0', minHeight: 0, padding: 0 }"
+      class="h-full"
+      :tab-bar-style="{ position: 'sticky', top: 0, zIndex: 10 }"
+      :pane-style="{ height: 'calc(100% - 41px)', overflow: 'hidden', padding: 0 }"
       @close="handleTabClose"
     >
       <n-tab-pane
@@ -201,11 +201,11 @@ defineExpose({ openTab })
         closable
       >
         <template #default>
-          <div v-if="tab.result || tab.error" class="flex flex-col h-full overflow-hidden">
+          <div v-if="tab.result || tab.error" class="h-full overflow-hidden">
             <!-- Query Editor Area -->
             <div
               v-if="tab.context"
-              class="border-b border-gray-200 flex flex-col bg-slate-50 shrink-0 relative h-48 pb-10"
+              class="border-b border-gray-200 bg-slate-50 relative h-48 pb-10"
             >
               <QueryEditor
                 v-model="tab.query"
@@ -248,8 +248,8 @@ defineExpose({ openTab })
               v-model:value="tab.innerTab"
               type="line"
               animated
-              class="flex-1"
-              pane-class="flex-1 overflow-hidden"
+              :style="tab.context ? { height: 'calc(100% - 12rem)' } : { height: '100%' }"
+              :pane-style="{ height: '100%', overflow: 'hidden', padding: 0 }"
               nav-wrapper-style="{paddingLeft:'0.5rem'}"
             >
               <template #prefix>
@@ -257,7 +257,7 @@ defineExpose({ openTab })
               </template>
               <n-tab-pane name="result" tab="Result">
                 <template #default>
-                  <ResultViewer v-if="tab.result" :result="tab.result" class="h-full" />
+                  <ResultViewer v-if="tab.result" :result="tab.result" class="pb-10" />
                   <pre
                     v-else-if="tab.error"
                     class="whitespace-pre-wrap p-4 text-red-600 bg-red-50 flex-1 overflow-auto font-mono text-sm"
@@ -271,7 +271,7 @@ defineExpose({ openTab })
               </n-tab-pane>
               <n-tab-pane v-if="tab.explainResult || tab.explainError" name="explain" tab="Explain">
                 <template #default>
-                  <ResultViewer v-if="tab.explainResult" :result="tab.explainResult" class="h-full" />
+                  <ResultViewer v-if="tab.explainResult" :result="tab.explainResult" class="pb-10" />
                   <pre
                     v-else-if="tab.explainError"
                     class="whitespace-pre-wrap p-4 text-red-600 bg-red-50 flex-1 overflow-auto font-mono text-sm"
