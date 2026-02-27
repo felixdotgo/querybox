@@ -44,12 +44,31 @@ func (s *ConnectionService) SetApp(app *application.App) {
 }
 
 // dataDir returns the directory where application data (e.g. the SQLite DB)
-// should be stored. On macOS this is ~/Library/Application Support/querybox,
-// which is the correct location for both dev runs and packaged .app bundles.
-// Falls back to a "data" directory relative to CWD if the config dir cannot
-// be determined.
+// should be stored.  Its behaviour is intentionally simple so callers can
+// reason about backups, migrations, and runtime diagnostics.  The path is
+// built from whatever `os.UserConfigDir()` reports, joined with the fixed
+// subdirectory `querybox`.
+//
+// Platform specifics:
+//   * macOS   → ~/Library/Application Support/querybox (same for dev runs or
+//                bundled .app).
+//   * Windows → %APPDATA%\querybox (e.g. C:\Users\You\AppData\Roaming\querybox).
+//   * Linux   → ${XDG_CONFIG_HOME:-$HOME/.config}/querybox.  This is also the
+//                directory used when running an AppImage; the host session
+//                determines $XDG_CONFIG_HOME.
+//
+// If `os.UserConfigDir()` returns an error (which can happen in headless
+// containers or when $HOME is unset) we fall back to a simple relative
+// "data" directory beneath the current working directory.  That behaviour is
+// exercised by unit tests and makes the binary behave sensibly when run from
+// a build agent or inside a temporary folder.
+//
+// The helper is unexported, but its behaviour is recorded in tests so you can
+// grep for `dataDir` when you need to know where production data lands.
+var userConfigDirFunc = os.UserConfigDir
+
 func dataDir() string {
-	if dir, err := os.UserConfigDir(); err == nil {
+	if dir, err := userConfigDirFunc(); err == nil {
 		return filepath.Join(dir, "querybox")
 	}
 	return "data"
