@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -59,6 +60,13 @@ func (r *redisPlugin) AuthForms(ctx context.Context, _ *plugin.AuthFormsRequest)
 // buildClient constructs a go-redis client from the connection map.
 // Supports both a raw URL and basic host/port/password/db fields via
 // credential_blob JSON (form: "basic" or "url").
+// buildClient constructs a go-redis client from the connection map.
+// Supports both a raw URL and basic host/port/password/db fields via
+// credential_blob JSON (form: "basic" or "url").  The TLS checkbox in the
+// auth form sets a boolean that we translate into a minimal TLSConfig so the
+// library will negotiate over TLS.  InsecureSkipVerify is set because we
+// don't collect CA data; users who need full validation should instead use a
+// rediss:// URL with appropriate certs baked in.
 func buildClient(connection map[string]string) (*redis.Client, error) {
 	// Direct URL key (legacy path).
 	if u, ok := connection["url"]; ok && u != "" {
@@ -110,6 +118,9 @@ func buildClient(connection map[string]string) (*redis.Client, error) {
 		Addr:     fmt.Sprintf("%s:%s", host, port),
 		Password: payload.Values["password"],
 		DB:       dbIndex,
+	}
+	if payload.Values["tls"] == "true" {
+		opts.TLSConfig = &tls.Config{InsecureSkipVerify: true}
 	}
 	return redis.NewClient(opts), nil
 }
@@ -323,6 +334,32 @@ func parseKeyspaceInfo(info string) map[int]string {
 // populated.  Databases that contain keys show a SCAN-based preview of the
 // first 50 keys as children.  Key nodes carry a type-appropriate read action
 // so the result is always rendered as a key-value payload.
+// helper inspects the connection map and returns the explicitly requested
+// Redis logical database index as well as a flag indicating whether the user
+// actually provided one.  This lets the connection tree show either a single
+// db or the full range depending on what was supplied.
+func getRedisExplicitDB(connection map[string]string) (int, bool) {
+	if idxStr, ok := connection["db"]; ok && idxStr != "" {
+		if n, err := strconv.Atoi(idxStr); err == nil {
+			return n, true
+		}
+	}
+	if blob, ok := connection["credential_blob"]; ok && blob != "" {
+		var payload struct {
+			Form   string            `json:"form"`
+			Values map[string]string `json:"values"`
+		}
+		if err := json.Unmarshal([]byte(blob), &payload); err == nil {
+			if idxStr := payload.Values["db"]; idxStr != "" {
+				if n, err := strconv.Atoi(idxStr); err == nil {
+					return n, true
+				}
+			}
+		}
+	}
+	return 0, false
+}
+
 func (r *redisPlugin) ConnectionTree(ctx context.Context, req *plugin.ConnectionTreeRequest) (*plugin.ConnectionTreeResponse, error) {
 	client, err := buildClient(req.Connection)
 	if err != nil {
@@ -336,10 +373,17 @@ func (r *redisPlugin) ConnectionTree(ctx context.Context, req *plugin.Connection
 
 	var nodes []*plugin.ConnectionTreeNode
 
-	// Redis supports 16 logical databases by default (configurable via
-	// databases directive in redis.conf, but 16 is the standard default).
+	// Determine which logical databases to iterate.  if the user explicitly
+	// asked for one we only show that single index, otherwise iterate the
+	// standard 0..15 range.
+	dbFilter, explicit := getRedisExplicitDB(req.Connection)
 	const totalDatabases = 16
-	for dbIdx := 0; dbIdx < totalDatabases; dbIdx++ {
+	start, end := 0, totalDatabases
+	if explicit {
+		start, end = dbFilter, dbFilter+1
+	}
+
+	for dbIdx := start; dbIdx < end; dbIdx++ {
 		dbLabel := fmt.Sprintf("db%d", dbIdx)
 		if count, ok := keyCounts[dbIdx]; ok {
 			dbLabel = fmt.Sprintf("db%d (%s keys)", dbIdx, count)

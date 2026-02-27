@@ -11,7 +11,7 @@ import (
 	"github.com/felixdotgo/querybox/pkg/plugin"
 	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
 
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/go-sql-driver/mysql"
 )
 
 // mysqlPlugin implements the protobuf PluginServiceServer interface for a simple MySQL executor.
@@ -46,7 +46,7 @@ func (m *mysqlPlugin) AuthForms(ctx context.Context, _ *plugin.AuthFormsRequest)
 			{Type: plugin.AuthFieldPassword, Name: "password", Label: "Password"},
 			{Type: plugin.AuthFieldText, Name: "database", Label: "Database name"},
 			// allow users to specify extra params such as tls=skip-verify
-			{Type: plugin.AuthFieldSelect, Name: "tls", Label: "TLS mode (e.g. skip-verify)", Options: []string{"skip-verify", "true", "false"}, Value: "skip-verify"},
+			{Type: plugin.AuthFieldSelect, Name: "tls", Label: "TLS mode (e.g. skip-verify)", Options: []string{"skip-verify", "true", "false", "preferred"}, Value: "skip-verify"},
 			{Type: plugin.AuthFieldText, Name: "params", Label: "Extra params", Placeholder: "charset=utf8&parseTime=true"},
 		},
 	}
@@ -127,6 +127,21 @@ func buildDSN(connection map[string]string) (string, error) {
 		}
 	}
 	return dsn, nil
+}
+
+// getDatabaseFromConn returns the database name the connection will use, or
+// an empty string if none was provided explicitly.  This is used by
+// ConnectionTree to decide whether to restrict the returned node list.
+func getDatabaseFromConn(connection map[string]string) string {
+	dsn, _ := buildDSN(connection)
+	if dsn == "" {
+		return ""
+	}
+	cfg, err := mysql.ParseDSN(dsn)
+	if err != nil {
+		return ""
+	}
+	return cfg.DBName
 }
 
 func (m *mysqlPlugin) Exec(ctx context.Context, req *plugin.ExecRequest) (*plugin.ExecResponse, error) {
@@ -210,6 +225,9 @@ func (m *mysqlPlugin) ConnectionTree(ctx context.Context, req *plugin.Connection
 	}
 	defer db.Close()
 
+	// if the user supplied a database explicitly we only show that one
+	filterDB := getDatabaseFromConn(req.Connection)
+
 	rows, err := db.Query("SHOW DATABASES")
 	if err != nil {
 		return &plugin.ConnectionTreeResponse{}, nil
@@ -220,6 +238,9 @@ func (m *mysqlPlugin) ConnectionTree(ctx context.Context, req *plugin.Connection
 	for rows.Next() {
 		var dbname string
 		if err := rows.Scan(&dbname); err != nil {
+			continue
+		}
+		if filterDB != "" && dbname != filterDB {
 			continue
 		}
 		// For each database expose a child list of tables.  Clicking a table

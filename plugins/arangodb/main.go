@@ -358,6 +358,28 @@ func (a *arangoPlugin) Exec(ctx context.Context, req *plugin.ExecRequest) (*plug
 // DDL actions are exposed at the server (create database), database (drop
 // database, create collection) and collection (drop collection) levels.
 // The query templates use the DDL meta-commands intercepted by Exec.
+// explicitDatabase checks the raw connection map to see if the user
+// explicitly supplied a database name.  parseConnParams always populates a
+// default value ("_system"), so we cannot rely on its result alone for this
+// policy decision.
+func explicitDatabase(conn map[string]string) string {
+	if db, ok := conn["database"]; ok && db != "" {
+		return db
+	}
+	if blob, ok := conn["credential_blob"]; ok && blob != "" {
+		var payload struct {
+			Form   string            `json:"form"`
+			Values map[string]string `json:"values"`
+		}
+		if err := json.Unmarshal([]byte(blob), &payload); err == nil {
+			if db := payload.Values["database"]; db != "" {
+				return db
+			}
+		}
+	}
+	return ""
+}
+
 func (a *arangoPlugin) ConnectionTree(ctx context.Context, req *plugin.ConnectionTreeRequest) (*plugin.ConnectionTreeResponse, error) {
 	p, err := parseConnParams(req.Connection)
 	if err != nil {
@@ -367,6 +389,12 @@ func (a *arangoPlugin) ConnectionTree(ctx context.Context, req *plugin.Connectio
 	client, err := buildClient(p)
 	if err != nil {
 		return &plugin.ConnectionTreeResponse{}, nil
+	}
+
+	// if the user requested a particular database explicitly, just build a
+	// tree for that database rather than enumerating all accessible ones.
+	if db := explicitDatabase(req.Connection); db != "" {
+		return a.singleDatabaseTree(ctx, client, db), nil
 	}
 
 	// List all accessible databases.
