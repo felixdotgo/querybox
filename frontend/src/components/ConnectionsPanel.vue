@@ -141,6 +141,14 @@ function tagWithConnId(nodes, connId) {
       node_type: nodeType,
       children: n.children ? tagWithConnId(n.children, connId) : n.children,
     }
+  }).sort((a, b) => {
+    const aIsAction = a.node_type === 'action'
+    const bIsAction = b.node_type === 'action'
+    if (aIsAction && !bIsAction)
+      return -1
+    if (!aIsAction && bIsAction)
+      return 1
+    return (a.label ?? '').localeCompare(b.label ?? '')
   })
 }
 
