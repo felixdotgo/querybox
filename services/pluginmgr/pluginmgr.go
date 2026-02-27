@@ -184,7 +184,10 @@ func (m *Manager) scanOnce() {
 		}
 		found[name] = struct{}{}
 		m.mu.Lock()
-		if _, ok := m.plugins[name]; !ok {
+		existing, exists := m.plugins[name]
+		// Probe if: never seen before, or previous probe failed (LastError set).
+		// Healthy entries (LastError == "") are not re-probed to avoid overhead.
+		if !exists || existing.LastError != "" {
 			// probe metadata
 			info := PluginInfo{ID: name, Name: name, Path: full, Running: false}
 			meta, err := probeInfo(full)
@@ -244,7 +247,7 @@ func isExecutable(path string) bool {
 // probeInfo executes `binary info` and decodes the JSON InfoResponse. If the
 // plugin doesn't implement `info` the call will error and we return that error.
 func probeInfo(fullpath string) (PluginInfo, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, fullpath, "info")
 	out, err := cmd.Output()
