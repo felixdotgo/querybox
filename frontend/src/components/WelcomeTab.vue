@@ -1,90 +1,69 @@
 <script setup>
-import { Flash, Grid, Layers, Server, Terminal } from '@/lib/icons'
+import { Flash, Layers, Server, Terminal } from '@/lib/icons'
 </script>
 
 <template>
-  <div class="h-full overflow-auto flex items-start justify-center bg-white p-8 pt-14">
-    <div class="w-full max-w-xl">
+  <div class="h-full flex flex-col items-center justify-center bg-slate-50">
+    <div class="w-full max-w-xs flex flex-col items-center gap-8">
       <!-- Header -->
-      <div class="mb-10 text-center">
-        <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-600 mb-5 shadow">
-          <n-icon :size="30" color="white">
+      <div class="flex flex-col items-center gap-2">
+        <div class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-[#18a058]">
+          <n-icon :size="22" color="white">
             <Terminal />
           </n-icon>
         </div>
-        <h1 class="text-2xl font-bold text-gray-800 tracking-tight">
-          QueryBox
-        </h1>
-      </div>
-
-      <!-- Get started -->
-      <div class="mb-8">
-        <p class="text-[11px] font-semibold uppercase tracking-widest text-gray-400 mb-3">
-          Get started
-        </p>
-        <div class="rounded-xl border border-gray-100 overflow-hidden divide-y divide-gray-100 shadow-sm">
-          <div class="flex items-start gap-3.5 px-4 py-3.5 bg-gray-50">
-            <n-icon :size="18" class="mt-0.5 text-blue-500 flex-shrink-0">
-              <Server />
-            </n-icon>
-            <div>
-              <p class="text-sm font-medium text-gray-700">
-                Add a connection
-              </p>
-              <p class="text-xs text-gray-400 mt-0.5">
-                Click <span class="font-semibold text-gray-500">+</span> in the Connections panel on the left to configure a new database connection.
-              </p>
-            </div>
-          </div>
-          <div class="flex items-start gap-3.5 px-4 py-3.5">
-            <n-icon :size="18" class="mt-0.5 text-indigo-500 flex-shrink-0">
-              <Layers />
-            </n-icon>
-            <div>
-              <p class="text-sm font-medium text-gray-700">
-                Browse your schema
-              </p>
-              <p class="text-xs text-gray-400 mt-0.5">
-                Expand the connection tree to explore databases, schemas, tables and columns.
-              </p>
-            </div>
-          </div>
-          <div class="flex items-start gap-3.5 px-4 py-3.5 bg-gray-50">
-            <n-icon :size="18" class="mt-0.5 text-green-500 flex-shrink-0">
-              <Flash />
-            </n-icon>
-            <div>
-              <p class="text-sm font-medium text-gray-700">
-                Run a query
-              </p>
-              <p class="text-xs text-gray-400 mt-0.5">
-                Click a table action or open a query tab. Press
-                <kbd class="inline-flex items-center px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200 text-[10px] font-mono text-gray-600 mx-0.5">Ctrl</kbd>+<kbd class="inline-flex items-center px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200 text-[10px] font-mono text-gray-600 mx-0.5">Enter</kbd>
-                to execute.
-              </p>
-            </div>
-          </div>
+        <div class="text-center">
+          <h1 class="text-base font-semibold text-slate-800 tracking-tight">
+            QueryBox
+          </h1>
+          <p class="text-[11px] text-slate-400 mt-0.5">
+            Universal database client
+          </p>
         </div>
       </div>
 
-      <!-- Supported backends -->
-      <div>
-        <p class="text-[11px] font-semibold uppercase tracking-widest text-gray-400 mb-3">
-          Supported databases
-        </p>
-        <div class="flex flex-wrap gap-2">
-          <n-tag
-            v-for="db in ['PostgreSQL', 'MySQL', 'SQLite', 'Redis', 'ArangoDB']"
-            :key="db"
-            size="small"
-            :bordered="false"
-            class="!bg-gray-100 !text-gray-600"
-          >
-            <template #icon>
-              <n-icon><Grid /></n-icon>
-            </template>
-            {{ db }}
-          </n-tag>
+      <!-- Steps -->
+      <div class="w-full flex flex-col gap-3">
+        <div class="flex items-start gap-3">
+          <n-icon :size="14" class="mt-0.5 flex-shrink-0 text-[#18a058]">
+            <Server />
+          </n-icon>
+          <div>
+            <p class="text-xs font-medium text-slate-700">
+              Add a connection
+            </p>
+            <p class="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+              Click <span class="font-semibold text-slate-500">+</span> in the Connections panel to configure a database.
+            </p>
+          </div>
+        </div>
+        <div class="flex items-start gap-3">
+          <n-icon :size="14" class="mt-0.5 flex-shrink-0 text-[#18a058]">
+            <Layers />
+          </n-icon>
+          <div>
+            <p class="text-xs font-medium text-slate-700">
+              Browse your schema
+            </p>
+            <p class="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+              Expand the tree to explore databases, tables and columns.
+            </p>
+          </div>
+        </div>
+        <div class="flex items-start gap-3">
+          <n-icon :size="14" class="mt-0.5 flex-shrink-0 text-[#18a058]">
+            <Flash />
+          </n-icon>
+          <div>
+            <p class="text-xs font-medium text-slate-700">
+              Run a query
+            </p>
+            <p class="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+              Open a query tab and press
+              <kbd class="inline-flex items-center px-1 py-px rounded bg-slate-100 border border-slate-300 text-[10px] font-mono text-slate-500 mx-0.5">Ctrl</kbd>+<kbd class="inline-flex items-center px-1 py-px rounded bg-slate-100 border border-slate-300 text-[10px] font-mono text-slate-500 mx-0.5">Enter</kbd>
+              to execute.
+            </p>
+          </div>
         </div>
       </div>
     </div>
