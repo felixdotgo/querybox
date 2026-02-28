@@ -1,8 +1,9 @@
 <script setup>
 import { NButton, NIcon } from 'naive-ui'
-import { ref, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import QueryEditor from '@/components/QueryEditor.vue'
 import ResultViewer from '@/components/ResultViewer.vue'
+import WelcomeTab from '@/components/WelcomeTab.vue'
 import { Analytics, Play, Refresh } from '@/lib/icons'
 
 const props = defineProps({
@@ -12,6 +13,11 @@ const emit = defineEmits(['tab-closed', 'active-connection-changed', 'refresh-ta
 
 const tabs = ref([])
 const activeTabKey = ref('')
+
+onMounted(() => {
+  tabs.value = [{ key: '__welcome__', title: 'Welcome', type: 'welcome' }]
+  activeTabKey.value = '__welcome__'
+})
 
 function supportsExplain(tab) {
   return !!(tab && tab.context && Array.isArray(tab.context.capabilities) && tab.context.capabilities.includes('explain-query'))
@@ -201,7 +207,8 @@ defineExpose({ openTab })
         closable
       >
         <template #default>
-          <div v-if="tab.result || tab.error" class="h-full overflow-hidden">
+          <WelcomeTab v-if="tab.type === 'welcome'" />
+          <div v-else-if="tab.result || tab.error" class="h-full overflow-hidden">
             <!-- Query Editor Area -->
             <div
               v-if="tab.context"
@@ -287,7 +294,7 @@ defineExpose({ openTab })
               </n-tab-pane>
             </n-tabs>
           </div>
-          <div v-else class="text-gray-500 p-4">
+          <div v-else-if="tab.type !== 'welcome'" class="text-gray-500 p-4">
             No Results
           </div>
         </template>
