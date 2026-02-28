@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
-import { ArrowDownOutline, TrashOutline } from '@/lib/icons'
+import { ArrowDown, Terminal, Trash } from '@/lib/icons'
 
 const props = defineProps({
   logs: { type: Array, default: () => [] },
@@ -83,7 +83,10 @@ function levelTagType(level) {
     <!-- Toolbar -->
     <div class="flex items-center gap-2 px-3 py-1.5 border-b border-gray-200 bg-gray-50 flex-shrink-0">
       <!-- Title + count -->
-      <span class="font-semibold text-gray-500 uppercase tracking-widest text-[10px]">Logs</span>
+      <span class="font-semibold text-gray-500 uppercase tracking-widest text-[10px] flex items-center gap-1">
+        <n-icon :size="11"><Terminal /></n-icon>
+        Logs
+      </span>
       <n-text depth="3" class="text-[10px]">
         {{ filteredLogs.length }} entries
       </n-text>
@@ -99,7 +102,7 @@ function levelTagType(level) {
         @click="autoScroll = !autoScroll"
       >
         <template #icon>
-          <n-icon><ArrowDownOutline /></n-icon>
+          <n-icon><ArrowDown /></n-icon>
         </template>
         Auto-scroll
       </n-button>
@@ -115,7 +118,7 @@ function levelTagType(level) {
         @click="$emit('clear')"
       >
         <template #icon>
-          <n-icon><TrashOutline /></n-icon>
+          <n-icon><Trash /></n-icon>
         </template>
         Clear
       </n-button>

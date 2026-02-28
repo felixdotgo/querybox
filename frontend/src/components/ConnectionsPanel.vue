@@ -22,11 +22,11 @@ import ConnectionNodeLabel from '@/components/ConnectionNodeLabel.vue'
 import ConnectionTreeNodeLabel from '@/components/ConnectionTreeNodeLabel.vue'
 import { useConnectionTree } from '@/composables/useConnectionTree'
 import {
-  AddCircleOutline,
+  AddCircle,
   nodeTypeFallbackIcon,
   nodeTypeIconMap,
-  SearchOutline,
-  ServerOutline,
+  Search,
+  Server,
 } from '@/lib/icons'
 
 const props = defineProps({
@@ -346,7 +346,7 @@ function renderPrefix({ option }) {
   let icon
   const conn = connections.value.find(c => c.id === option.key)
   if (conn) {
-    icon = ServerOutline
+    icon = Server
   }
   else {
     icon = nodeTypeIconMap[option.node_type] ?? nodeTypeFallbackIcon
@@ -683,7 +683,7 @@ defineExpose({
           @click="openConnections"
         >
           <template #icon>
-            <NIcon><AddCircleOutline /></NIcon>
+            <NIcon><AddCircle /></NIcon>
           </template>
         </NButton>
       </div>
@@ -695,7 +695,7 @@ defineExpose({
       placeholder="Search connections..."
     >
       <template #prefix>
-        <NIcon><SearchOutline /></NIcon>
+        <NIcon><Search /></NIcon>
       </template>
     </n-input>
 

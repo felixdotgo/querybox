@@ -9,49 +9,51 @@
  *  - Preferred sizes: 16 for toolbar / buttons, 14 for tree-node prefixes.
  */
 import {
-  // actions
-  AddCircleOutline,
-  ArrowDownOutline,
-  CashOutline,
-  ChevronDownOutline,
-  CodeSlashOutline,
-  DocumentOutline,
-  EyeOutline,
-  FlashOutline,
-  GridOutline,
-  SearchOutline,
-  TimeOutline,
-
+  // actions (filled variants aliased to keep existing export names unchanged)
+  AddCircle,
+  Analytics,
+  ArrowDown,
+  Cash,
+  ChevronDown,
+  CodeSlash,
+  Document,
+  Eye,
+  Flash,
+  Grid,
   // tree / navigation
-  LayersOutline,
-  LibraryOutline,
+  Layers,
+  Library,
   Pin,
-  PinOutline,
-  RefreshOutline,
-  ServerOutline,
-  TrashOutline,
+  Play,
+  Refresh,
+  Search,
+  Server,
+  Terminal,
+  Time,
+  Trash,
 } from '@vicons/ionicons5'
 
 export {
-  AddCircleOutline, // new connection toolbar button
-  ArrowDownOutline, // log panel auto-scroll toggle
-  CashOutline, // cost / dollar
-  ChevronDownOutline, // footer collapse toggle (rotate -90deg when collapsed)
-  CodeSlashOutline, // node_type === "column"
-  DocumentOutline, // unknown / generic fallback
-  EyeOutline, // "select" action on tree nodes
-  FlashOutline, // "Connect" action / execution time (bolt)
-  GridOutline, // node_type === "table"
-  SearchOutline, // filter input prefix
-  TimeOutline, // planning time (clock)
-
-  LayersOutline, // driver group node
-  LibraryOutline, // node_type === "database"
+  AddCircle, // new connection toolbar button
+  Analytics, // explain query button
+  ArrowDown, // log panel auto-scroll toggle
+  Cash, // cost / dollar
+  ChevronDown, // footer collapse toggle (rotate -90deg when collapsed)
+  CodeSlash, // node_type === "column"
+  Document, // unknown / generic fallback
+  Eye, // "select" action on tree nodes
+  Flash, // "Connect" action / execution time (bolt)
+  Grid, // node_type === "table"
+  Layers, // driver group node
+  Library, // node_type === "database"
   Pin, // pinned column indicator (filled)
-  PinOutline, // pin column button (outline)
-  RefreshOutline, // "Refresh" action on connection row
-  ServerOutline, // connection node / rows (databases)
-  TrashOutline, // "Delete" action on connection row
+  Play, // execute query button
+  Refresh, // "Refresh" action on connection row
+  Search, // filter input prefix
+  Server, // connection node / rows (databases)
+  Terminal, // logs panel header
+  Time, // planning time (clock)
+  Trash, // "Delete" action on connection row
 }
 
 /**
@@ -60,16 +62,16 @@ export {
  * @type {Record<string, object>}
  */
 export const nodeTypeIconMap = {
-  server: ServerOutline,
-  database: LibraryOutline,
-  schema: LayersOutline,
-  table: GridOutline,
-  column: CodeSlashOutline,
-  action: AddCircleOutline,
+  server: Server,
+  database: Library,
+  schema: Layers,
+  table: Grid,
+  column: CodeSlash,
+  action: AddCircle,
 }
 
 /** Used when a plugin node has no recognised node_type value. */
-export const nodeTypeFallbackIcon = DocumentOutline
+export const nodeTypeFallbackIcon = Document
 
 /**
  * Maps ConnectionTreeAction type strings (constants defined in pkg/plugin/plugin.go)
@@ -77,13 +79,13 @@ export const nodeTypeFallbackIcon = DocumentOutline
  * @type {Record<string, object>}
  */
 export const actionTypeIconMap = {
-  'select': EyeOutline,
-  'describe': CodeSlashOutline,
-  'create-database': AddCircleOutline,
-  'create-table': AddCircleOutline,
-  'drop-database': TrashOutline,
-  'drop-table': TrashOutline,
+  'select': Eye,
+  'describe': CodeSlash,
+  'create-database': AddCircle,
+  'create-table': AddCircle,
+  'drop-database': Trash,
+  'drop-table': Trash,
 }
 
 /** Used when an action has no recognised type value. */
-export const actionTypeFallbackIcon = FlashOutline
+export const actionTypeFallbackIcon = Flash

@@ -3,7 +3,7 @@ import { NButton, NIcon } from 'naive-ui'
 import { ref, watch } from 'vue'
 import QueryEditor from '@/components/QueryEditor.vue'
 import ResultViewer from '@/components/ResultViewer.vue'
-import { RefreshOutline } from '@/lib/icons'
+import { Analytics, Play, Refresh } from '@/lib/icons'
 
 const props = defineProps({
   selectedConnection: { type: Object, default: null },
@@ -225,7 +225,7 @@ defineExpose({ openTab })
                 >
                   <template #icon>
                     <NIcon :size="12">
-                      <RefreshOutline />
+                      <Play />
                     </NIcon>
                   </template>
                   Execute
@@ -239,6 +239,11 @@ defineExpose({ openTab })
                   class="pointer-events-auto"
                   @click="handleExplain(tab)"
                 >
+                  <template #icon>
+                    <NIcon :size="12">
+                      <Analytics />
+                    </NIcon>
+                  </template>
                   Explain
                 </NButton>
               </div>

@@ -11,7 +11,7 @@ import {
   createHorizontalResizer,
   createVerticalResizer,
 } from '@/composables/useResize'
-import { ChevronDownOutline } from '@/lib/icons'
+import { ChevronDown, Terminal } from '@/lib/icons'
 
 const isMac = navigator.userAgent.includes('Mac')
 const menuBarRef = ref(null)
@@ -191,7 +191,10 @@ onUnmounted(() => {
             :size="12"
             class="transition-transform" :class="[footerCollapsed ? '-rotate-90' : '']"
           >
-            <ChevronDownOutline />
+            <ChevronDown />
+          </n-icon>
+          <n-icon :size="12">
+            <Terminal />
           </n-icon>
           Logs
         </button>

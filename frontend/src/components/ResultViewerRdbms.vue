@@ -1,7 +1,7 @@
 <script setup>
 import { NIcon } from 'naive-ui'
 import { computed, h, onBeforeUnmount, onMounted, ref } from 'vue'
-import { Pin, PinOutline } from '@/lib/icons'
+import { Pin } from '@/lib/icons'
 
 const props = defineProps({
   // Already-unwrapped RDBMS payload: { columns: [...], rows: [...] }
@@ -57,7 +57,7 @@ const tableColumns = computed(() => {
                 togglePin(key)
               },
             },
-            [h(NIcon, { size: 12 }, { default: () => h(isPinned ? Pin : PinOutline) })],
+            [h(NIcon, { size: 12 }, { default: () => h(isPinned ? Pin : Pin) })],
           ),
         ]),
       key,

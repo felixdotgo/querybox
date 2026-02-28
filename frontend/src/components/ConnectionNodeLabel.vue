@@ -1,5 +1,5 @@
 <script setup>
-import { FlashOutline, RefreshOutline, TrashOutline } from '@/lib/icons'
+import { Flash, Refresh, Trash } from '@/lib/icons'
 
 defineProps({
   /** Display name of the connection */
@@ -52,7 +52,7 @@ const emit = defineEmits(['connect', 'delete', 'dblclick'])
             @click.stop="emit('connect')"
           >
             <template #icon>
-              <n-icon><component :is="hasTree ? RefreshOutline : FlashOutline" /></n-icon>
+              <n-icon><component :is="hasTree ? Refresh : Flash" /></n-icon>
             </template>
             {{ hasTree ? "Reconnect" : "Connect" }}
           </n-button>
@@ -70,7 +70,7 @@ const emit = defineEmits(['connect', 'delete', 'dblclick'])
             @click.stop="emit('delete')"
           >
             <template #icon>
-              <n-icon><TrashOutline /></n-icon>
+              <n-icon><Trash /></n-icon>
             </template>
           </n-button>
         </template>
