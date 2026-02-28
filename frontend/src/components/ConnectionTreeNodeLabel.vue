@@ -1,6 +1,7 @@
 <script setup>
-import { computed } from 'vue'
-import { actionTypeFallbackIcon, actionTypeIconMap } from '@/lib/icons'
+import { computed, h } from 'vue'
+import { NIcon } from 'naive-ui'
+import { EllipsisHorizontal, actionTypeFallbackIcon, actionTypeIconMap } from '@/lib/icons'
 
 const props = defineProps({
   /** Display label for the tree node */
@@ -20,17 +21,32 @@ const props = defineProps({
 
 const emit = defineEmits(['action'])
 
-/** Actions that should appear as hover buttons (hidden ones fire on click). */
+/** Actions that should appear in the dropdown (hidden ones fire on click). */
 const visibleActions = computed(() => props.actions.filter(a => !a.hidden))
 
-const DESTRUCTIVE_TYPES = new Set(['drop-database', 'drop-table'])
+const DESTRUCTIVE_TYPES = new Set(['drop-database', 'drop-table', 'drop-collection'])
 
-function isDestructive(action) {
-  return DESTRUCTIVE_TYPES.has(action.type)
+function renderIcon(icon) {
+  return () => h(NIcon, null, { default: () => h(icon) })
 }
 
-function iconFor(action) {
-  return actionTypeIconMap[action.type] ?? actionTypeFallbackIcon
+const menuOptions = computed(() => {
+  const items = []
+  visibleActions.value.forEach((action, i) => {
+    if (i > 0 && DESTRUCTIVE_TYPES.has(action.type) && !DESTRUCTIVE_TYPES.has(visibleActions.value[i - 1].type)) {
+      items.push({ type: 'divider', key: `divider-${i}` })
+    }
+    items.push({
+      key: i,
+      label: action.title || action.type,
+      icon: renderIcon(actionTypeIconMap[action.type] ?? actionTypeFallbackIcon),
+    })
+  })
+  return items
+})
+
+function handleMenuSelect(key) {
+  emit('action', visibleActions.value[key])
 }
 </script>
 
@@ -41,33 +57,28 @@ function iconFor(action) {
       {{ label }}
     </n-ellipsis>
 
-    <!-- action buttons — revealed on hover via CSS group.
+    <!-- three-dot context menu — revealed on hover via CSS group.
          Hidden actions (hidden: true) are excluded; they fire on node click. -->
     <div
       v-if="visibleActions.length > 0"
-      class="flex items-center gap-0.5 opacity-0 group-hover/tree-node:opacity-100 transition-opacity flex-shrink-0 ml-1"
+      class="opacity-0 group-hover/tree-node:opacity-100 transition-opacity flex-shrink-0 ml-1"
     >
-      <n-tooltip
-        v-for="action in visibleActions"
-        :key="action.type"
-        :delay="600"
+      <n-dropdown
+        trigger="click"
+        :options="menuOptions"
+        placement="bottom-end"
+        @select="handleMenuSelect"
       >
-        <template #trigger>
-          <n-button
-            size="tiny"
-            :type="isDestructive(action) ? 'error' : 'primary'"
-            :secondary="isDestructive(action)"
-            @click.stop="emit('action', action)"
-          >
-            <template #icon>
-              <n-icon>
-                <component :is="iconFor(action)" />
-              </n-icon>
-            </template>
-          </n-button>
-        </template>
-        {{ action.title || action.type }}
-      </n-tooltip>
+        <n-button
+          size="tiny"
+          quaternary
+          @click.stop
+        >
+          <template #icon>
+            <n-icon><EllipsisHorizontal /></n-icon>
+          </template>
+        </n-button>
+      </n-dropdown>
     </div>
   </div>
 </template>

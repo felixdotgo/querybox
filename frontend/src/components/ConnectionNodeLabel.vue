@@ -1,7 +1,9 @@
 <script setup>
-import { Flash, Refresh, Trash } from '@/lib/icons'
+import { NIcon } from 'naive-ui'
+import { computed, h } from 'vue'
+import { EllipsisHorizontal, Flash, Refresh, Trash } from '@/lib/icons'
 
-defineProps({
+const props = defineProps({
   /** Display name of the connection */
   label: {
     type: String,
@@ -25,6 +27,32 @@ defineProps({
 })
 
 const emit = defineEmits(['connect', 'delete', 'dblclick'])
+
+function renderIcon(icon) {
+  return () => h(NIcon, null, { default: () => h(icon) })
+}
+
+const menuOptions = computed(() => [
+  {
+    key: 'connect',
+    label: props.hasTree ? 'Reconnect' : 'Connect',
+    icon: renderIcon(props.hasTree ? Refresh : Flash),
+    disabled: props.loading,
+  },
+  { type: 'divider', key: 'divider-1' },
+  {
+    key: 'delete',
+    label: 'Remove connection',
+    icon: renderIcon(Trash),
+  },
+])
+
+function handleMenuSelect(key) {
+  if (key === 'connect')
+    emit('connect')
+  else if (key === 'delete')
+    emit('delete')
+}
 </script>
 
 <template>
@@ -37,45 +65,24 @@ const emit = defineEmits(['connect', 'delete', 'dblclick'])
       {{ label }}
     </n-ellipsis>
 
-    <!-- action buttons — revealed on hover via CSS group -->
-    <div
-      class="flex items-center gap-0.5 hidden group-hover/conn:flex flex-shrink-0 ml-1"
-    >
-      <!-- Connect / Refresh -->
-      <n-tooltip :delay="600">
-        <template #trigger>
-          <n-button
-            size="tiny"
-            type="primary"
-            primary
-            :disabled="loading"
-            @click.stop="emit('connect')"
-          >
-            <template #icon>
-              <n-icon><component :is="hasTree ? Refresh : Flash" /></n-icon>
-            </template>
-            {{ hasTree ? "Reconnect" : "Connect" }}
-          </n-button>
-        </template>
-        {{ hasTree ? "Reconnect" : "Connect" }}
-      </n-tooltip>
-      &nbsp;
-      <!-- Delete -->
-      <n-tooltip :delay="600">
-        <template #trigger>
-          <n-button
-            size="tiny"
-            secondary
-            type="error"
-            @click.stop="emit('delete')"
-          >
-            <template #icon>
-              <n-icon><Trash /></n-icon>
-            </template>
-          </n-button>
-        </template>
-        Remove connection
-      </n-tooltip>
+    <!-- three-dot context menu — revealed on hover via CSS group -->
+    <div class="hidden group-hover/conn:flex flex-shrink-0 ml-1">
+      <n-dropdown
+        trigger="click"
+        :options="menuOptions"
+        placement="bottom-end"
+        @select="handleMenuSelect"
+      >
+        <n-button
+          size="tiny"
+          quaternary
+          @click.stop
+        >
+          <template #icon>
+            <NIcon><EllipsisHorizontal /></NIcon>
+          </template>
+        </n-button>
+      </n-dropdown>
     </div>
   </div>
 </template>

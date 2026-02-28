@@ -17,6 +17,7 @@ import {
   ChevronDown,
   CodeSlash,
   Document,
+  EllipsisHorizontal,
   Eye,
   Flash,
   Grid,
@@ -41,6 +42,7 @@ export {
   ChevronDown, // footer collapse toggle (rotate -90deg when collapsed)
   CodeSlash, // node_type === "column"
   Document, // unknown / generic fallback
+  EllipsisHorizontal, // three-dot context menu trigger
   Eye, // "select" action on tree nodes
   Flash, // "Connect" action / execution time (bolt)
   Grid, // node_type === "table"
