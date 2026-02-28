@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 
 	driver "github.com/arangodb/go-driver"
 	driverHttp "github.com/arangodb/go-driver/http"
+	"github.com/felixdotgo/querybox/pkg/certs"
 	"github.com/felixdotgo/querybox/pkg/plugin"
 	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -127,11 +129,20 @@ func buildClient(p connParams) (driver.Client, error) {
 	var transport driver.Connection
 	var err error
 
-	// Use a custom http.Transport to allow skipping TLS verification in dev
-	// environments; production users should supply a valid certificate instead.
+	// Use a custom http.Transport.  If TLS is requested we populate
+	// TLSClientConfig.RootCAs with our embedded root bundle so that the
+	// connection will verify the server certificate.  In development we
+	// still allow the caller to disable verification by setting
+	// "tls" to false; production users should supply a valid cert.
+	var httpTrans = &http.Transport{}
+	if p.tls {
+		if pool, err2 := certs.RootCertPool(); err2 == nil {
+			httpTrans.TLSClientConfig = &tls.Config{RootCAs: pool}
+		}
+	}
 	transport, err = driverHttp.NewConnection(driverHttp.ConnectionConfig{
 		Endpoints: []string{endpoint},
-		Transport: &http.Transport{},
+		Transport: httpTrans,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create connection: %w", err)

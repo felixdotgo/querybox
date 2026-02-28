@@ -5,9 +5,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 
+	"github.com/felixdotgo/querybox/pkg/certs"
 	"github.com/felixdotgo/querybox/pkg/plugin"
 	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
 
@@ -54,11 +56,98 @@ func (m *postgresqlPlugin) AuthForms(ctx context.Context, _ *plugin.AuthFormsReq
 	return &plugin.AuthFormsResponse{Forms: map[string]*plugin.AuthForm{"basic": &basic}}, nil
 }
 
+// ensureSSLMode ensures that a DSN string has an explicit sslmode
+// directive when the caller asked for TLS disabled.  Two common DSN
+// forms exist: keyword/value pairs ("host=... sslmode=...") and URL form
+// ("postgres://user@host/db?sslmode=...").  The driver defaults to an
+// SSL mode which may not match our expectation; we prefer to explicitly
+// set `sslmode=disable` if no value is present.
+func ensureSSLMode(dsn string) string {
+	// ensure an sslmode parameter exists; default to disable if missing.
+	if !strings.Contains(dsn, "sslmode=") {
+		u, err := url.Parse(dsn)
+		if err == nil && (u.Scheme == "postgres" || u.Scheme == "postgresql") {
+			q := u.Query()
+			q.Set("sslmode", "disable")
+			u.RawQuery = q.Encode()
+			dsn = u.String()
+		} else if strings.ContainsAny(dsn, " \t") {
+			dsn = dsn + " sslmode=disable"
+		}
+	}
+
+	// if verification mode requested and missing root cert, attach our bundle
+	mode := ""
+	for _, part := range strings.Fields(dsn) {
+		if strings.HasPrefix(part, "sslmode=") {
+			mode = strings.TrimPrefix(part, "sslmode=")
+			break
+		}
+	}
+	// if not found via whitespace, try URL query
+	if mode == "" {
+		if u, err := url.Parse(dsn); err == nil {
+			mode = u.Query().Get("sslmode")
+		}
+	}
+	if mode == "verify-ca" || mode == "verify-full" {
+		if !strings.Contains(dsn, "sslrootcert=") {
+			if path, err := certs.RootCertPath(); err == nil {
+				if strings.ContainsAny(dsn, " \t") {
+					dsn = dsn + " sslrootcert=" + path
+				} else if u, err := url.Parse(dsn); err == nil {
+					q := u.Query()
+					q.Set("sslrootcert", path)
+					u.RawQuery = q.Encode()
+					dsn = u.String()
+				} else {
+					dsn = dsn + " sslrootcert=" + path
+				}
+			}
+		}
+	}
+	return dsn
+}
+
+// setSSLMode forces the supplied sslmode into the DSN, overwriting any existing
+// value.  It handles both URL and keyword‑style strings.
+func setSSLMode(dsn, mode string) string {
+    if mode == "" {
+        return dsn
+    }
+    if u, err := url.Parse(dsn); err == nil && (u.Scheme == "postgres" || u.Scheme == "postgresql") {
+        q := u.Query()
+        q.Del("sslmode")
+        q.Set("sslmode", mode)
+        u.RawQuery = q.Encode()
+        return u.String()
+    }
+    parts := strings.Fields(dsn)
+    var kept []string
+    for _, p := range parts {
+        if strings.HasPrefix(p, "sslmode=") {
+            continue
+        }
+        kept = append(kept, p)
+    }
+    if len(kept) > 0 {
+        return strings.Join(kept, " ") + " sslmode=" + mode
+    }
+    return dsn + " sslmode=" + mode
+}
+
 // buildConnString constructs a postgres keyword=value connection string from
 // the provided connection map.  Extra DSN parameters are appended as
 // space-separated key=value pairs as required by lib/pq; URL-encoded (&)
 // format is NOT used because it is invalid for the postgres DSN format.
 func buildConnString(connection map[string]string) (string, error) {
+	// honour explicit DSN value and still ensure sslmode defaults correctly
+	if dsn, ok := connection["dsn"]; ok && dsn != "" {
+		if tls, ok2 := connection["tls"]; ok2 && tls != "" {
+			dsn = setSSLMode(dsn, tls)
+		}
+		return ensureSSLMode(dsn), nil
+	}
 	dsn, ok := connection["dsn"]
 	if !ok || dsn == "" {
 		if blob, ok2 := connection["credential_blob"]; ok2 && blob != "" {
@@ -68,7 +157,7 @@ func buildConnString(connection map[string]string) (string, error) {
 			}
 			if err := json.Unmarshal([]byte(blob), &payload); err == nil {
 				if v, ok := payload.Values["dsn"]; ok && v != "" {
-					dsn = v
+					dsn = ensureSSLMode(v)
 				} else {
 					host := payload.Values["host"]
 					user := payload.Values["user"]
@@ -84,11 +173,26 @@ func buildConnString(connection map[string]string) (string, error) {
 					if sslmode == "" {
 						sslmode = "disable"
 					}
+
 					if host != "" {
-						dsn = fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-							host, port, user, pass, dbname, sslmode)
+						// build keyword-style DSN; omit dbname when blank.  Including
+						// an empty "dbname=" followed by a space could cause lib/pq to
+						// treat the next token (e.g. "sslmode=disable") as the
+						// database name, which is what was reported by users.
+						parts := []string{
+							"host=" + host,
+							"port=" + port,
+							"user=" + user,
+							"password=" + pass,
+						}
+						if dbname != "" {
+							parts = append(parts, "dbname="+dbname)
+						}
+						parts = append(parts, "sslmode="+sslmode)
+						dsn = strings.Join(parts, " ")
 					}
 				}
+
 				// Append extra postgres DSN params as space-separated key=value
 				// pairs.  The "tls", "params", and core credential fields are
 				// excluded here because they are handled above or parsed below.
@@ -134,6 +238,8 @@ func buildConnString(connection map[string]string) (string, error) {
 			}
 		}
 	}
+	// final normalisation
+	dsn = ensureSSLMode(dsn)
 	return dsn, nil
 }
 
@@ -346,6 +452,17 @@ ORDER BY c.relname`, schemaName)
 	return &plugin.ConnectionTreeResponse{Nodes: []*plugin.ConnectionTreeNode{createNode, dbNode}}, nil
 }
 
+// formatPingError wraps a ping failure with supplemental hints when the
+// underlying error indicates an SSL mis‑match.  It is public for testing.
+func formatPingError(err error) string {
+	msg := fmt.Sprintf("ping error: %v", err)
+	if err != nil && strings.Contains(err.Error(), "SSL is not enabled on the server") {
+		msg += " (hint: server has SSL disabled; set sslmode=disable or enable SSL on the server)"
+	}
+	return msg
+}
+
+
 // TestConnection opens a PostgreSQL connection and pings the server to verify
 // the supplied credentials are valid. Nothing is persisted.
 func (m *postgresqlPlugin) TestConnection(ctx context.Context, req *plugin.TestConnectionRequest) (*plugin.TestConnectionResponse, error) {
@@ -363,7 +480,7 @@ func (m *postgresqlPlugin) TestConnection(ctx context.Context, req *plugin.TestC
 	}
 	defer db.Close()
 	if err := db.Ping(); err != nil {
-		return &plugin.TestConnectionResponse{Ok: false, Message: fmt.Sprintf("ping error: %v", err)}, nil
+		return &plugin.TestConnectionResponse{Ok: false, Message: formatPingError(err)}, nil
 	}
 	return &plugin.TestConnectionResponse{Ok: true, Message: "Connection successful"}, nil
 }

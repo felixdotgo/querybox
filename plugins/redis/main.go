@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/felixdotgo/querybox/pkg/certs"
+
 	"github.com/felixdotgo/querybox/pkg/plugin"
 	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
 	"github.com/redis/go-redis/v9"
@@ -120,7 +122,8 @@ func buildClient(connection map[string]string) (*redis.Client, error) {
 		DB:       dbIndex,
 	}
 	if payload.Values["tls"] == "true" {
-		opts.TLSConfig = &tls.Config{InsecureSkipVerify: true}
+		pool, _ := certs.RootCertPool()
+		opts.TLSConfig = &tls.Config{RootCAs: pool}
 	}
 	return redis.NewClient(opts), nil
 }

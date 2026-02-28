@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
 
+	"github.com/felixdotgo/querybox/pkg/certs"
 	"github.com/felixdotgo/querybox/pkg/plugin"
 	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
 
@@ -64,69 +66,81 @@ func (m *mysqlPlugin) AuthForms(ctx context.Context, _ *plugin.AuthFormsRequest)
 // buildDSN constructs a mysql DSN from the provided connection map.  The
 // logic mirrors what Exec historically did so both execution and browsing can
 // reuse the same rules (dsn value or credential_blob JSON).
+func init() {
+    // register a TLS config using our embedded root certificates; callers
+    // can select it via tls=querybox in the DSN.
+    if pool, err := certs.RootCertPool(); err == nil {
+        mysql.RegisterTLSConfig("querybox", &tls.Config{RootCAs: pool})
+    }
+}
+
 func buildDSN(connection map[string]string) (string, error) {
-	// Accept either a full DSN under key "dsn" (legacy) or a credential blob
-	// JSON (recommended) stored under "credential_blob" containing: {"form":"basic","values": { ... }}
-	// Additionally we allow arbitrary extra parameters (including tls) which
-	// are appended as query parameters.  This lets callers configure SSL
-	// (tls=skip-verify, tls=true, etc) or other driver options.
-	dsn, ok := connection["dsn"]
-	if !ok || dsn == "" {
-		// try credential_blob
-		if blob, ok2 := connection["credential_blob"]; ok2 && blob != "" {
-			var payload struct {
-				Form   string            `json:"form"`
-				Values map[string]string `json:"values"`
-			}
-			if err := json.Unmarshal([]byte(blob), &payload); err == nil {
-				// if plugin stored a dsn inside values, prefer that
-				if v, ok := payload.Values["dsn"]; ok && v != "" {
-					dsn = v
-				} else {
-					// build a simple DSN from common keys
-					host := payload.Values["host"]
-					user := payload.Values["user"]
-					pass := payload.Values["password"]
-					port := payload.Values["port"]
-					dbname := payload.Values["database"]
-					if port == "" {
-						port = "3306"
-					}
-					if host != "" {
-						dsn = fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", user, pass, host, port, dbname)
-					}
-				}
-				// append any extra parameters as query string
-				if dsn != "" {
-					params := url.Values{}
-					for k, v := range payload.Values {
-						switch k {
-						case "host", "user", "password", "port", "database", "dsn":
-							// already handled above
-							continue
-						}
-						if v != "" {
-							params.Add(k, v)
-						}
-					}
-					if len(params) > 0 {
-						// ensure we always have a reasonable connection timeout so the
-						// plugin can't hang indefinitely (30s context is managed by
-						// caller).  driver accepts values like "5s".
-						if params.Get("timeout") == "" {
-							params.Set("timeout", "5s")
-						}
-						sep := "?"
-						if strings.Contains(dsn, "?") {
-							sep = "&"
-						}
-						dsn = dsn + sep + params.Encode()
-					}
-				}
-			}
-		}
-	}
-	return dsn, nil
+    // Accept either a full DSN under key "dsn" (legacy) or a credential blob
+    // JSON (recommended) stored under "credential_blob" containing: {"form":"basic","values": { ... }}
+    // Additionally we allow arbitrary extra parameters (including tls) which
+    // are appended as query parameters.  This lets callers configure SSL
+    // (tls=skip-verify, tls=true, etc) or other driver options.
+    dsn, ok := connection["dsn"]
+    if !ok || dsn == "" {
+        // try credential_blob
+        if blob, ok2 := connection["credential_blob"]; ok2 && blob != "" {
+            var payload struct {
+                Form   string            `json:"form"`
+                Values map[string]string `json:"values"`
+            }
+            if err := json.Unmarshal([]byte(blob), &payload); err == nil {
+                // if plugin stored a dsn inside values, prefer that
+                if v, ok := payload.Values["dsn"]; ok && v != "" {
+                    dsn = v
+                } else {
+                    // build a simple DSN from common keys
+                    host := payload.Values["host"]
+                    user := payload.Values["user"]
+                    pass := payload.Values["password"]
+                    port := payload.Values["port"]
+                    dbname := payload.Values["database"]
+                    if port == "" {
+                        port = "3306"
+                    }
+                    if host != "" {
+                        dsn = fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", user, pass, host, port, dbname)
+                    }
+                }
+                // append any extra parameters as query string
+                if dsn != "" {
+                    params := url.Values{}
+                    for k, v := range payload.Values {
+                        switch k {
+                        case "host", "user", "password", "port", "database", "dsn":
+                            // already handled above
+                            continue
+                        }
+                        if v != "" {
+                            params.Add(k, v)
+                        }
+                    }
+                    // convert generic tls flags to our registered config
+                    if t := params.Get("tls"); t == "true" || t == "preferred" {
+                        params.Set("tls", "querybox")
+                    }
+                    if len(params) > 0 {
+                        // ensure we always have a reasonable connection timeout so the
+                        // plugin can't hang indefinitely (30s context is managed by
+                        // caller).  driver accepts values like "5s".
+                        if params.Get("timeout") == "" {
+                            params.Set("timeout", "5s")
+                        }
+                        sep := "?"
+                        if strings.Contains(dsn, "?") {
+                            sep = "&"
+                        }
+                        dsn = dsn + sep + params.Encode()
+                    }
+                }
+            }
+        }
+    }
+    return dsn, nil
 }
 
 // getDatabaseFromConn returns the database name the connection will use, or

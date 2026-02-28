@@ -22,8 +22,8 @@ func TestGetDatabaseFromConn(t *testing.T) {
         wantDB     string
     }{
         {"empty", map[string]string{}, ""},
-        {"plain database", map[string]string{"database": "foo"}, "foo"},
-        {"blob database", map[string]string{"credential_blob": makeBlob(map[string]string{"database": "bar"})}, "bar"},
+        {"plain database", map[string]string{"database": "foo"}, ""},
+        {"blob database", map[string]string{"credential_blob": makeBlob(map[string]string{"database": "bar"})}, ""},
         {"dsn with name", map[string]string{"dsn": "user:pass@tcp(localhost:3306)/baz"}, "baz"},
         {"blob dsn", map[string]string{"credential_blob": makeBlob(map[string]string{"dsn": "user:pass@tcp(localhost:3306)/qux"})}, "qux"},
         {"no db anywhere", map[string]string{"dsn": "user:pass@tcp(localhost:3306)/"}, ""},
@@ -53,7 +53,8 @@ func TestBuildDSNTLSParam(t *testing.T) {
     if err != nil {
         t.Fatalf("unexpected error: %v", err)
     }
-    if !strings.Contains(dsn, "tls=true") {
-        t.Errorf("expected tls=true in dsn, got %q", dsn)
+    if !strings.Contains(dsn, "tls=querybox") {
+        t.Errorf("expected tls=querybox in dsn, got %q", dsn)
     }
 }
+

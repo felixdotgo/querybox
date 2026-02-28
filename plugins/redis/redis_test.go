@@ -66,5 +66,7 @@ func TestBuildClientTLS(t *testing.T) {
     }
     if cli.Options().TLSConfig == nil {
         t.Errorf("expected non-nil TLSConfig when tls=true")
+    } else if cli.Options().TLSConfig.RootCAs == nil {
+        t.Errorf("TLSConfig.RootCAs not populated")
     }
 }

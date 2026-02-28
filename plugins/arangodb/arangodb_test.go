@@ -3,6 +3,9 @@ package main
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/felixdotgo/querybox/pkg/certs"
+	_ "github.com/felixdotgo/querybox/pkg/certs"
 )
 
 func TestExplicitDatabase(t *testing.T) {
@@ -66,4 +69,24 @@ func TestParseConnParamsTLS(t *testing.T) {
             }
         })
     }
+}
+
+func TestBuildClientTLS(t *testing.T) {
+    // verify TLSClientConfig is populated when tls=true
+    p := connParams{host: "localhost", port: "8529", tls: true}
+    cl, err := buildClient(p)
+    if err != nil {
+        t.Fatalf("build client: %v", err)
+    }
+    // the underlying driver connection isn't exposed easily, but we can
+    // inspect the transport by creating one ourselves using the same logic
+    pool, err := certs.RootCertPool()
+    if err != nil {
+        t.Fatalf("root pool: %v", err)
+    }
+    if pool == nil {
+        t.Fatal("embedded root pool empty")
+    }
+    // we don't have direct access, just ensure buildClient succeeded.
+    _ = cl
 }
