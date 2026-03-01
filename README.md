@@ -23,13 +23,17 @@
 go install github.com/go-task/task/v3/cmd/task@latest
 # or using npm
 npm install -g taskfile
+
 # Install Wails CLI
-go install github.com/wailsapp/wails/v3/cmd/wails@latest
+go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+
 # Install protoc-gen-go (only needed if modifying .proto files)
 go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.10
+
 # Install protoc-gen-go-grpc (only needed if modifying .proto files)
 go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.1
-# Install protoc (see https://grpc.io/docs/protoc-installation/)=
+
+# Install protoc (see https://grpc.io/docs/protoc-installation/)
 ```
 
 ### Clone the repository
