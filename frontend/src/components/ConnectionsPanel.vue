@@ -197,10 +197,13 @@ function handleSelect(keys, options, meta) {
   const conn = connections.value.find(c => c.id === key)
   if (conn) {
     selectedConnection.value = conn
-    // do not automatically load the tree; user must hit the 'Connect'
-    // button now. this keeps connection selection lightweight and avoids
-    // surprise network calls on click.
+    // On single-click of a connection root, automatically load its tree
+    // (perform a connect). Remove cached tree so a fresh fetch occurs.
+    // Emits mirror the explicit connect flow so callers can react.
+    delete connectionTrees[conn.id]
+    fetchTreeFor(conn)
     emit('connection-selected', conn)
+    emit('connection-opened', conn)
     return
   }
 
@@ -472,6 +475,18 @@ async function runTreeAction(conn, action, node, extras = {}) {
       const params = {}
       if (cred)
         params.credential_blob = cred
+      // If the action originates from a tree node, the node.key is
+      // constructed as "<database>.<collection>" — forward the selected
+      // database to the plugin so queries run against the expected DB.
+      if (node && node.key && typeof node.key === 'string') {
+        let key = node.key
+        const prefix = `${conn.id}:`
+        if (key.startsWith(prefix)) key = key.slice(prefix.length)
+        const parts = key.split('.')
+        if (parts.length > 1) {
+          params.database = parts[0]
+        }
+      }
       const res = await ExecTreeAction(conn.driver_type, params, action.query || '', extras.options || (extras.explain ? { 'explain-query': 'yes' } : {}))
       if (res.error) {
         console.error('runTreeAction [hidden]', action.type, res.error)
@@ -494,6 +509,14 @@ async function runTreeAction(conn, action, node, extras = {}) {
     const params = {}
     if (cred)
       params.credential_blob = cred
+    // forward selected database from the node key when available
+    if (node && node.key && typeof node.key === 'string') {
+      let key = node.key
+      const prefix = `${conn.id}:`
+      if (key.startsWith(prefix)) key = key.slice(prefix.length)
+      const parts = key.split('.')
+      if (parts.length > 1) params.database = parts[0]
+    }
     let queryToRun = action.query || ''
     if (
       action.type === 'select'

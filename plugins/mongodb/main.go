@@ -681,9 +681,6 @@ func (m *mongoPlugin) Exec(ctx context.Context, req *plugin.ExecRequest) (*plugi
 	if dbname == "" {
 		dbname = getDatabaseName(req.Connection)
 	}
-	if dbname == "" {
-		dbname = "test"
-	}
 
 	return execMQL(ctx, client.Database(dbname), req.Query)
 }
