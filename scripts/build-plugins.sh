@@ -32,9 +32,10 @@ for d in "$PLUGINS_DIR"/*; do
     continue
   fi
 
-  # Build only if plugin contains a `main.go` file — use that file directly
+  # Ensure plugin is a Go module with package main; require at least one Go file.
   if [ -f "./plugins/$name/main.go" ]; then
-    build_target="./plugins/$name/main.go"
+    # build the whole package directory so helpers are included
+    build_target="./plugins/$name"
   else
     echo "- Skipping $name (no main.go)"
     continue
