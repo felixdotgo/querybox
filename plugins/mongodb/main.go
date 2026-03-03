@@ -379,6 +379,28 @@ func cursorToDocumentResponse(ctx context.Context, cursor *mongo.Cursor) (*plugi
 	}, nil
 }
 
+// buildFindOptions builds MongoDB find options from parsed MQL args.
+// Supported shell-style forms:
+//   db.collection.find({filter})
+//   db.collection.find({filter}, {projection})
+//   db.collection.findOne({filter}, {projection})
+func buildFindOptions(op string, args []string) (*options.FindOptions, error) {
+	findOpts := options.Find()
+	if op == "findOne" {
+		findOpts.SetLimit(1)
+	}
+
+	if len(args) > 1 && strings.TrimSpace(args[1]) != "" {
+		projection, err := parseBSONDoc(args[1])
+		if err != nil {
+			return nil, fmt.Errorf("projection parse error: %w", err)
+		}
+		findOpts.SetProjection(projection)
+	}
+
+	return findOpts, nil
+}
+
 // execMQL executes a MongoDB shell-style query or a raw JSON command against db.
 func execMQL(ctx context.Context, db *mongo.Database, query string) (*plugin.ExecResponse, error) {
 	query = strings.TrimSpace(query)
@@ -431,9 +453,9 @@ func execMQL(ctx context.Context, db *mongo.Database, query string) (*plugin.Exe
 					return &plugin.ExecResponse{Error: fmt.Sprintf("filter parse error: %v", err)}, nil
 				}
 			}
-			findOpts := options.Find()
-			if op == "findOne" {
-				findOpts.SetLimit(1)
+			findOpts, err := buildFindOptions(op, args)
+			if err != nil {
+				return &plugin.ExecResponse{Error: err.Error()}, nil
 			}
 			cursor, err := coll.Find(ctx, filter, findOpts)
 			if err != nil {

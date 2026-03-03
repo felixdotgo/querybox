@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 // helper: build a credential_blob with form="basic" and the given values.
@@ -275,4 +277,50 @@ func TestParseBSONArray(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBuildFindOptions(t *testing.T) {
+	t.Run("findOne sets limit", func(t *testing.T) {
+		opts, err := buildFindOptions("findOne", []string{`{"name":"Alice"}`})
+		if err != nil {
+			t.Fatalf("buildFindOptions returned error: %v", err)
+		}
+		if opts.Limit == nil || *opts.Limit != 1 {
+			t.Fatalf("expected findOne limit=1, got %+v", opts.Limit)
+		}
+	})
+
+	t.Run("find parses projection document", func(t *testing.T) {
+		opts, err := buildFindOptions("find", []string{`{"name":"Alice"}`, `{"name":1,"_id":0}`})
+		if err != nil {
+			t.Fatalf("buildFindOptions returned error: %v", err)
+		}
+
+		projDoc, ok := opts.Projection.(bson.D)
+		if !ok {
+			t.Fatalf("expected projection type bson.D, got %T", opts.Projection)
+		}
+
+		if len(projDoc) != 2 {
+			t.Fatalf("expected projection with 2 fields, got %d", len(projDoc))
+		}
+
+		m := projDoc.Map()
+		if m["name"] != int32(1) {
+			t.Fatalf("expected name=1 in projection, got %#v", m["name"])
+		}
+		if m["_id"] != int32(0) {
+			t.Fatalf("expected _id=0 in projection, got %#v", m["_id"])
+		}
+	})
+
+	t.Run("invalid projection returns error", func(t *testing.T) {
+		_, err := buildFindOptions("find", []string{`{}`, `{not-json}`})
+		if err == nil {
+			t.Fatalf("expected projection parse error, got nil")
+		}
+		if !strings.Contains(err.Error(), "projection parse error") {
+			t.Fatalf("expected projection parse error, got %v", err)
+		}
+	})
 }
