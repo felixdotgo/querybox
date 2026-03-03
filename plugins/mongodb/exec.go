@@ -18,7 +18,69 @@ import (
 //   db.collection.find({filter})
 //   db.collection.find({filter}, {projection})
 //   db.collection.findOne({filter}, {projection})
-func buildFindOptions(op string, args []string) (*options.FindOptions, error) {
+// applyChainToFindOptions mutates the options based on chained methods.
+func applyChainToFindOptions(opts *options.FindOptions, chain []chainOp) error {
+    for _, c := range chain {
+        switch strings.ToLower(c.Name) {
+        case "sort":
+            if c.Args == "" {
+                continue
+            }
+            doc, err := parseBSONDoc(c.Args)
+            if err != nil {
+                return fmt.Errorf("sort parse error (args %q): %w", c.Args, err)
+            }
+            opts.SetSort(doc)
+        case "limit":
+            if c.Args == "" {
+                continue
+            }
+            var v int64
+            _, err := fmt.Sscan(c.Args, &v)
+            if err != nil {
+                return fmt.Errorf("limit parse error: %w", err)
+            }
+            opts.SetLimit(v)
+        case "skip":
+            if c.Args == "" {
+                continue
+            }
+            var v int64
+            _, err := fmt.Sscan(c.Args, &v)
+            if err != nil {
+                return fmt.Errorf("skip parse error: %w", err)
+            }
+            opts.SetSkip(v)
+        case "batchsize":
+            if c.Args == "" {
+                continue
+            }
+            var v int32
+            _, err := fmt.Sscan(c.Args, &v)
+            if err != nil {
+                return fmt.Errorf("batchSize parse error: %w", err)
+            }
+            opts.SetBatchSize(v)
+        case "projection":
+            if c.Args == "" {
+                continue
+            }
+            doc, err := parseBSONDoc(c.Args)
+            if err != nil {
+                return fmt.Errorf("projection parse error: %w", err)
+            }
+            opts.SetProjection(doc)
+        default:
+            // other chained methods are ignored for now; they may be handled
+            // when additional functionality is added or fall back to raw JSON.
+        }
+    }
+    return nil
+}
+
+// buildFindOptions builds MongoDB find options from parsed MQL args and
+// applies any chained operations.
+func buildFindOptions(op string, args []string, chain []chainOp) (*options.FindOptions, error) {
     findOpts := options.Find()
     if op == "findOne" {
         findOpts.SetLimit(1)
@@ -32,14 +94,114 @@ func buildFindOptions(op string, args []string) (*options.FindOptions, error) {
         findOpts.SetProjection(projection)
     }
 
+    if err := applyChainToFindOptions(findOpts, chain); err != nil {
+        return nil, err
+    }
+
     return findOpts, nil
 }
 
 // execMQL executes a MongoDB shell-style query or a raw JSON command against db.
+// runRawCommand attempts to execute a collection operation that we
+// don't explicitly recognise.  It builds a simple command document where the
+// operation name is the primary key and the collection name (if provided) is
+// the value.  Additional arguments are merged when possible.
+// buildCommandDoc constructs the command document that will be sent to
+// `db.RunCommand` for an unrecognised operation.  The implementation mirrors
+// the logic previously embedded in runRawCommand, but without performing any
+// network calls; this makes it easier to unit‑test.
+func buildCommandDoc(target, op string, args []string) (bson.D, error) {
+    cmd := bson.D{{Key: op, Value: target}}
+    for _, a := range args {
+        if a == "" {
+            continue
+        }
+        var doc bson.D
+        if err := bson.UnmarshalExtJSON([]byte(a), false, &doc); err == nil {
+            cmd = append(cmd, doc...)
+            continue
+        }
+        var v interface{}
+        if err := bson.UnmarshalExtJSON([]byte(a), false, &v); err == nil {
+            cmd = append(cmd, bson.E{Key: fmt.Sprintf("arg%d", len(cmd)), Value: v})
+            continue
+        }
+        cmd = append(cmd, bson.E{Key: fmt.Sprintf("arg%d", len(cmd)), Value: a})
+    }
+    return cmd, nil
+}
+
+func runRawCommand(ctx context.Context, db *mongo.Database, target, op string, args []string) (*plugin.ExecResponse, error) {
+    cmd, err := buildCommandDoc(target, op, args)
+    if err != nil {
+        return &plugin.ExecResponse{Error: fmt.Sprintf("build command error: %v", err)}, nil
+    }
+
+    result := db.RunCommand(ctx, cmd)
+    if result.Err() != nil {
+        return &plugin.ExecResponse{Error: fmt.Sprintf("command error: %v", result.Err())}, nil
+    }
+    var raw bson.D
+    if err := result.Decode(&raw); err != nil {
+        return &plugin.ExecResponse{Error: fmt.Sprintf("decode error: %v", err)}, nil
+    }
+    s, err := bsonDocToStruct(raw)
+    if err != nil {
+        return &plugin.ExecResponse{Error: fmt.Sprintf("format error: %v", err)}, nil
+    }
+    return &plugin.ExecResponse{
+        Result: &plugin.ExecResult{
+            Payload: &pluginpb.PluginV1_ExecResult_Document{
+                Document: &plugin.DocumentResult{Documents: []*structpb.Struct{s}},
+            },
+        },
+    }, nil
+}
+
+func buildAggregateOptions(chain []chainOp) (*options.AggregateOptions, error) {
+    aggrOpts := options.Aggregate()
+    for _, c := range chain {
+        switch strings.ToLower(c.Name) {
+        case "allowdiskuse":
+            if c.Args == "" {
+                continue
+            }
+            var v bool
+            _, err := fmt.Sscan(c.Args, &v)
+            if err != nil {
+                return nil, fmt.Errorf("allowDiskUse parse error: %w", err)
+            }
+            aggrOpts.SetAllowDiskUse(v)
+        case "batchsize":
+            if c.Args == "" {
+                continue
+            }
+            var v int32
+            _, err := fmt.Sscan(c.Args, &v)
+            if err != nil {
+                return nil, fmt.Errorf("batchSize parse error: %w", err)
+            }
+            aggrOpts.SetBatchSize(v)
+        case "collation":
+            if c.Args == "" {
+                continue
+            }
+            col, err := parseBSONDoc(c.Args)
+            if err != nil {
+                return nil, fmt.Errorf("collation parse error: %w", err)
+            }
+            aggrOpts.SetCollation(&options.Collation{Locale: col.Map()["locale"].(string)})
+        default:
+            // ignore other chains for now
+        }
+    }
+    return aggrOpts, nil
+}
+
 func execMQL(ctx context.Context, db *mongo.Database, query string) (*plugin.ExecResponse, error) {
     query = strings.TrimSpace(query)
 
-    target, op, argsStr, ok := parseMQLCommand(query)
+    target, op, argsStr, chain, ok := parseMQLCommand(query)
     if ok {
         args := splitTopLevelArgs(argsStr)
 
@@ -87,7 +249,7 @@ func execMQL(ctx context.Context, db *mongo.Database, query string) (*plugin.Exe
                     return &plugin.ExecResponse{Error: fmt.Sprintf("filter parse error: %v", err)}, nil
                 }
             }
-            findOpts, err := buildFindOptions(op, args)
+            findOpts, err := buildFindOptions(op, args, chain)
             if err != nil {
                 return &plugin.ExecResponse{Error: err.Error()}, nil
             }
@@ -208,7 +370,8 @@ func execMQL(ctx context.Context, db *mongo.Database, query string) (*plugin.Exe
             if err != nil {
                 return &plugin.ExecResponse{Error: fmt.Sprintf("pipeline parse error: %v", err)}, nil
             }
-            cursor, err := coll.Aggregate(ctx, pipeline)
+            aggrOpts, _ := buildAggregateOptions(chain)
+            cursor, err := coll.Aggregate(ctx, pipeline, aggrOpts)
             if err != nil {
                 return &plugin.ExecResponse{Error: fmt.Sprintf("aggregate error: %v", err)}, nil
             }
@@ -285,7 +448,8 @@ func execMQL(ctx context.Context, db *mongo.Database, query string) (*plugin.Exe
             }), nil
         }
 
-        return &plugin.ExecResponse{Error: fmt.Sprintf("unknown operation: %s", op)}, nil
+        // unhandled op – try the generic command fallback before failing
+        return runRawCommand(ctx, db, target, op, args)
     }
 
     // Fall back to a raw JSON command document.

@@ -83,14 +83,22 @@ func splitTopLevelArgs(s string) []string {
     return args
 }
 
+// chainOp represents a single method call following the primary
+// collection operation (e.g. ".sort({a:1})" or ".limit(10)").
+type chainOp struct {
+    Name string
+    Args string
+}
+
 // parseMQLCommand parses a MongoDB shell-style query such as:
 //
-//	db.collection.find({...})
+//	db.collection.find({...}).sort({a:1}).limit(10)
 //	db.createCollection("name")
 //
-// It returns the target (collection name for collection ops, empty for db-level
-// ops), the operation name, the raw argument string, and an ok flag.
-func parseMQLCommand(query string) (target, op, argsStr string, ok bool) {
+// It returns the target (collection name for collection ops, empty for
+// db-level ops), the operation name, the raw argument string, any chained
+// operations, and an ok flag.
+func parseMQLCommand(query string) (target, op, argsStr string, chain []chainOp, ok bool) {
     query = strings.TrimSpace(query)
     if !strings.HasPrefix(query, "db.") {
         return
@@ -114,13 +122,16 @@ func parseMQLCommand(query string) (target, op, argsStr string, ok bool) {
         op = strings.TrimSpace(funcPart[lastDot+1:])
     }
 
-    // Extract the content inside the outermost parentheses (balanced).
+    // Extract argument string for the primary operation.
     inner := rest[parenIdx+1:]
     depth := 1
     strInner := false
     strInnerChar := rune(0)
     escInner := false
+    endIdx := -1
 
+    // scan until the matching closing parenthesis for the first call
+scanLoop:
     for i, r := range inner {
         if escInner {
             escInner = false
@@ -149,10 +160,82 @@ func parseMQLCommand(query string) (target, op, argsStr string, ok bool) {
             depth--
             if depth == 0 {
                 argsStr = strings.TrimSpace(inner[:i])
+                endIdx = i + 1 // position just after closing paren
                 ok = true
-                return
+                break scanLoop
             }
         }
+    }
+    if !ok {
+        return
+    }
+
+    // parse any chained method calls following the first invocation
+    rest = strings.TrimSpace(inner[endIdx:])
+    for len(rest) > 0 {
+        if !strings.HasPrefix(rest, ".") {
+            break
+        }
+        rest = rest[1:]
+        // method name up to next '('
+        nameEnd := strings.IndexAny(rest, "( ")
+        if nameEnd < 0 {
+            break
+        }
+        name := strings.TrimSpace(rest[:nameEnd])
+        rest = rest[nameEnd:]
+        // expect arguments in parentheses
+        if !strings.HasPrefix(rest, "(") {
+            break
+        }
+        // find matching closing parenthesis
+        depth = 1
+        strInner = false
+        strInnerChar = rune(0)
+        escInner = false
+        argStart := 1
+        argEnd := -1
+        for i := 1; i < len(rest); i++ {
+            r := rune(rest[i])
+            if escInner {
+                escInner = false
+                continue
+            }
+            if r == '\\' && strInner {
+                escInner = true
+                continue
+            }
+            if !strInner && (r == '"' || r == '\'') {
+                strInner = true
+                strInnerChar = r
+                continue
+            }
+            if strInner && r == strInnerChar {
+                strInner = false
+                continue
+            }
+            if strInner {
+                continue
+            }
+            switch r {
+            case '(', '[', '{':
+                depth++
+            case ')', ']', '}':
+                depth--
+                if depth == 0 {
+                    argEnd = i
+                    // break out of the outer for loop
+                    goto chainEnd
+                }
+            }
+        }
+    chainEnd:
+        if argEnd < 0 {
+            break
+        }
+        args := strings.TrimSpace(rest[argStart:argEnd])
+        chain = append(chain, chainOp{Name: name, Args: args})
+        rest = strings.TrimSpace(rest[argEnd+1:])
     }
     return
 }

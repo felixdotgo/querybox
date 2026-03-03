@@ -168,11 +168,18 @@ func TestParseMQLCommand(t *testing.T) {
 		wantTarget string
 		wantOp     string
 		wantArgs   string
+		wantChain  []chainOp
 		wantOk     bool
 	}{
 		{
 			query:      `db.users.find({})`,
 			wantTarget: "users", wantOp: "find", wantArgs: "{}", wantOk: true,
+		},
+		{
+			query:      `db.users.find({}).sort({"age":-1}).limit(5)`,
+			wantTarget: "users", wantOp: "find", wantArgs: "{}",
+			wantChain: []chainOp{{Name: "sort", Args: `{"age":-1}`}, {Name: "limit", Args: `5`}},
+			wantOk:    true,
 		},
 		{
 			query:      `db.users.findOne({"_id": 1})`,
@@ -197,18 +204,18 @@ func TestParseMQLCommand(t *testing.T) {
 			wantTarget: "", wantOp: "createCollection", wantArgs: `"events"`, wantOk: true,
 		},
 		{
-			query:   `{"ping": 1}`,
-			wantOk:  false, // raw command, not shell syntax
+			query:  `{"ping": 1}`,
+			wantOk: false, // raw command, not shell syntax
 		},
 		{
-			query:   `SELECT * FROM users`,
-			wantOk:  false, // SQL, not MQL
+			query:  `SELECT * FROM users`,
+			wantOk: false, // SQL, not MQL
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.query, func(t *testing.T) {
-			target, op, args, ok := parseMQLCommand(tt.query)
+			target, op, args, chain, ok := parseMQLCommand(tt.query)
 			if ok != tt.wantOk {
 				t.Fatalf("parseMQLCommand(%q): ok=%v, want %v", tt.query, ok, tt.wantOk)
 			}
@@ -224,11 +231,22 @@ func TestParseMQLCommand(t *testing.T) {
 			if args != tt.wantArgs {
 				t.Errorf("args: got %q, want %q", args, tt.wantArgs)
 			}
+			if len(chain) != len(tt.wantChain) {
+				t.Fatalf("chain length: got %v, want %v", chain, tt.wantChain)
+			}
+			for i := range chain {
+				if chain[i] != tt.wantChain[i] {
+					t.Errorf("chain[%d]: got %+v, want %+v", i, chain[i], tt.wantChain[i])
+				}
+			}
 		})
 	}
 }
 
+// helper tests for parseBSONDoc follow
+
 func TestParseBSONDoc(t *testing.T) {
+
 	tests := []struct {
 		name    string
 		input   string
@@ -281,7 +299,7 @@ func TestParseBSONArray(t *testing.T) {
 
 func TestBuildFindOptions(t *testing.T) {
 	t.Run("findOne sets limit", func(t *testing.T) {
-		opts, err := buildFindOptions("findOne", []string{`{"name":"Alice"}`})
+		opts, err := buildFindOptions("findOne", []string{`{"name":"Alice"}`}, nil)
 		if err != nil {
 			t.Fatalf("buildFindOptions returned error: %v", err)
 		}
@@ -291,7 +309,7 @@ func TestBuildFindOptions(t *testing.T) {
 	})
 
 	t.Run("find parses projection document", func(t *testing.T) {
-		opts, err := buildFindOptions("find", []string{`{"name":"Alice"}`, `{"name":1,"_id":0}`})
+		opts, err := buildFindOptions("find", []string{`{"name":"Alice"}`, `{"name":1,"_id":0}`}, nil)
 		if err != nil {
 			t.Fatalf("buildFindOptions returned error: %v", err)
 		}
@@ -315,7 +333,7 @@ func TestBuildFindOptions(t *testing.T) {
 	})
 
 	t.Run("invalid projection returns error", func(t *testing.T) {
-		_, err := buildFindOptions("find", []string{`{}`, `{not-json}`})
+		_, err := buildFindOptions("find", []string{`{}`, `{not-json}`}, nil)
 		if err == nil {
 			t.Fatalf("expected projection parse error, got nil")
 		}
@@ -323,4 +341,57 @@ func TestBuildFindOptions(t *testing.T) {
 			t.Fatalf("expected projection parse error, got %v", err)
 		}
 	})
+
+	// chain support
+	t.Run("apply sort & limit via chain", func(t *testing.T) {
+		opts, err := buildFindOptions("find", []string{`{}`}, []chainOp{{Name: "sort", Args: `{"age":-1}`}, {Name: "limit", Args: `3`}})
+		if err != nil {
+			t.Fatalf("buildFindOptions returned error: %v", err)
+		}
+		if opts.Sort == nil {
+			t.Fatalf("expected sort option set")
+		}
+		if opts.Limit == nil || *opts.Limit != 3 {
+			t.Fatalf("expected limit=3, got %+v", opts.Limit)
+		}
+	})
+
+	// raw command document builder tests
+	t.Run("buildCommandDoc simple", func(t *testing.T) {
+		doc, err := buildCommandDoc("users", "stats", nil)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		want := bson.D{{Key: "stats", Value: "users"}}
+		if !bsonEqual(doc, want) {
+			t.Errorf("got %v, want %v", doc, want)
+		}
+	})
+
+	t.Run("buildCommandDoc with options", func(t *testing.T) {
+		doc, err := buildCommandDoc("users", "find", []string{`{"limit":5}`, `{"sort":{"a":1}}`})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		// should merge fields
+		if len(doc) < 3 {
+			t.Errorf("doc too small: %v", doc)
+		}
+	})
 }
+
+// helper for comparing bson.D (order-insensitive)
+func bsonEqual(a, b bson.D) bool {
+	ma := a.Map()
+	mb := b.Map()
+	if len(ma) != len(mb) {
+		return false
+	}
+	for k, v := range ma {
+		if vb, ok := mb[k]; !ok || vb != v {
+			return false
+		}
+	}
+	return true
+}
+
