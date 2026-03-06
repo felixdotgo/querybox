@@ -21,6 +21,7 @@ import {
   Eye,
   Flash,
   Grid,
+  Key,
   // tree / navigation
   Layers,
   Library,
@@ -46,6 +47,7 @@ export {
   Eye, // "select" action on tree nodes
   Flash, // "Connect" action / execution time (bolt)
   Grid, // node_type === "table"
+  Key, // primary key indicator
   Layers, // driver group node
   Library, // node_type === "database"
   Pin, // pinned column indicator (filled)
@@ -56,6 +58,48 @@ export {
   Terminal, // logs panel header
   Time, // planning time (clock)
   Trash, // "Delete" action on connection row
+}
+
+// colours used to style datatype badges in result viewer headers
+// each value should be a CSS color or custom property
+export const dataTypeColorMap = {
+  int: 'var(--n-info-color, #3b82f6)',
+  float: 'var(--n-info-color, #3b82f6)',
+  double: 'var(--n-info-color, #3b82f6)',
+  decimal: 'var(--n-info-color, #3b82f6)',
+  numeric: 'var(--n-info-color, #3b82f6)',
+  real: 'var(--n-info-color, #3b82f6)',
+  bool: 'var(--n-success-color, #18a058)',
+  boolean: 'var(--n-success-color, #18a058)',
+  date: 'var(--n-warning-color, #f59e0b)',
+  time: 'var(--n-warning-color, #f59e0b)',
+  timestamp: 'var(--n-warning-color, #f59e0b)',
+  datetime: 'var(--n-warning-color, #f59e0b)',
+  char: 'var(--n-neutral-color, #6b7280)',
+  text: 'var(--n-neutral-color, #6b7280)',
+  clob: 'var(--n-neutral-color, #6b7280)',
+  blob: 'var(--n-neutral-color, #6b7280)',
+  binary: 'var(--n-neutral-color, #6b7280)',
+  varbinary: 'var(--n-neutral-color, #6b7280)',
+}
+
+/**
+ * Return a CSS color string appropriate for the given SQL type.
+ * Falls back to neutral if no mapping matches.
+ *
+ * @param {string} type
+ * @returns {string}
+ */
+export function getDataTypeColor(type) {
+  if (!type || typeof type !== 'string')
+    return dataTypeColorMap.text
+  const t = type.toLowerCase()
+  for (const key of Object.keys(dataTypeColorMap)) {
+    if (t.includes(key)) {
+      return dataTypeColorMap[key]
+    }
+  }
+  return dataTypeColorMap.text
 }
 
 /**

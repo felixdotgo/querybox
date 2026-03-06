@@ -1,7 +1,7 @@
 <script setup>
-import { NIcon } from 'naive-ui'
+import { NIcon, NTag } from 'naive-ui'
 import { computed, h, onBeforeUnmount, onMounted, ref } from 'vue'
-import { Pin } from '@/lib/icons'
+import { getDataTypeColor, Key, Pin } from '@/lib/icons'
 
 const props = defineProps({
   // Already-unwrapped RDBMS payload: { columns: [...], rows: [...] }
@@ -43,15 +43,21 @@ const tableColumns = computed(() => {
     // try to annotate with schema metadata if available
     let display = name
     let meta = null
+    let typeString = null
+    let typeColor = null
+    let keyIcon = null
     if (props.schema && Array.isArray(props.schema.columns)) {
       meta = props.schema.columns.find(x => x.name === name)
       if (meta) {
         display = name
         if (meta.type) {
-          display += ` (${meta.type})`
+          // strip parenthesized length/precision, e.g. varchar(14) -> varchar
+          const base = meta.type.replace(/\(.*\)$/, '').trim()
+          typeString = base
+          typeColor = getDataTypeColor(base)
         }
         if (meta.primary_key) {
-          display += ' **'
+          keyIcon = Key
         }
       }
     }
@@ -62,7 +68,29 @@ const tableColumns = computed(() => {
     colMap.set(key, {
       title: () =>
         h('div', { class: 'flex items-center gap-1 w-full' }, [
-          h('span', { class: 'flex-1 truncate' }, display),
+          h(
+            'span',
+            { class: 'flex-1 truncate flex items-center gap-1 ml-auto' },
+            [
+              h('span', {}, display),
+              typeString
+                ? h(
+                    NTag,
+                    {
+                      size: 'small',
+                      color: typeColor,
+                      round: true,
+                      class: 'datatype-badge',
+                      type: 'info',
+                    },
+                    { default: () => typeString },
+                  )
+                : null,
+              keyIcon
+                ? h(NIcon, { size: 12, class: 'primary-key-icon' }, { default: () => h(keyIcon) })
+                : null,
+            ],
+          ),
           h(
             'button',
             {
@@ -166,9 +194,6 @@ const rowKeyFunction = row => row && row.key
 </template>
 
 <style scoped>
-:deep(.n-data-table-td) {
-  border-right: 1px solid var(--n-border-color);
-}
 :deep(.n-data-table-resize-button) {
   right: -2.5px !important;
   opacity: 1 !important;
@@ -188,5 +213,10 @@ const rowKeyFunction = row => row && row.key
 }
 :deep(.pin-btn.is-pinned) {
   color: var(--n-loading-color, #18a058);
+}
+
+:deep(.primary-key-icon) {
+  color: var(--n-loading-color, #18a058); /* green for PK */
+  opacity: 0.85;
 }
 </style>
