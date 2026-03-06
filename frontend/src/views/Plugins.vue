@@ -2,12 +2,13 @@
 import { Events } from '@wailsio/runtime'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ClosePluginsWindow } from '@/bindings/github.com/felixdotgo/querybox/services/app'
-import { ListPlugins, Rescan } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
+import { Rescan } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
 import SafeZone from '@/components/SafeZone.vue'
+import { usePlugins } from '@/composables/usePlugins'
 
 const TYPE_LABELS = { 1: 'Driver', 2: 'Transformer', 3: 'Formatter' }
 
-const plugins = ref([])
+const { plugins, reload: reloadPlugins } = usePlugins()
 const filter = ref('')
 const loading = ref(false)
 const loadError = ref('')
@@ -32,10 +33,7 @@ async function load() {
   loadError.value = ''
   try {
     await Rescan()
-    const plist = await ListPlugins()
-    // JSON round-trip converts class instances to plain objects so Vue's
-    // reactivity proxy doesn't corrupt the VNode update cycle.
-    plugins.value = JSON.parse(JSON.stringify(sortPlugins(plist ?? [])))
+    await reloadPlugins()
     // keep selection in sync after reload
     if (selected.value) {
       selected.value = plugins.value.find(p => p.id === selected.value.id) ?? null
@@ -47,7 +45,6 @@ async function load() {
   catch (err) {
     console.error('load plugins:', err)
     loadError.value = err?.message ?? String(err)
-    plugins.value = []
   }
   finally {
     loading.value = false
@@ -74,19 +71,6 @@ function handleClose() {
 
 function typeLabel(type) {
   return TYPE_LABELS[type] || (type ? `Type ${type}` : '—')
-}
-
-// sort by name case-insensitively, fall back to id when name is empty
-function sortPlugins(list) {
-  return list.slice().sort((a, b) => {
-    const aName = (a.name || a.id || '').toLowerCase()
-    const bName = (b.name || b.id || '').toLowerCase()
-    if (aName < bName)
-      return -1
-    if (aName > bName)
-      return 1
-    return 0
-  })
 }
 </script>
 

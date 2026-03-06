@@ -74,6 +74,10 @@ type Manager struct {
 
 	app        *application.App
 	appReadyCh chan struct{} // closed by SetApp once the Wails app is available
+
+	// onPluginsReady, if non-nil, is invoked whenever a plugins:ready event is
+	// emitted. This is useful for tests that don't run a full Wails application.
+	onPluginsReady func()
 }
 
 // SetApp injects the Wails application reference so the Manager can emit
@@ -137,6 +141,12 @@ func userPluginsDir() (string, error) {
 // shipped alongside the executable. This is essentially the old
 // defaultPluginsDir implementation. It may point inside an .app bundle on
 // macOS or simply ./bin/plugins when running in development.
+// bundledPluginsDirFunc is a variable so tests can override where the
+// code looks for built-in plugins. Production code assigns the real
+// bundledPluginsDir implementation, but tests may substitute a temporary
+// directory.
+var bundledPluginsDirFunc = bundledPluginsDir
+
 func bundledPluginsDir() string {
 	if exe, err := os.Executable(); err == nil {
 		if resolved, err := filepath.EvalSymlinks(exe); err == nil {
@@ -158,7 +168,7 @@ func bundledPluginsDir() string {
 // and fallbackDir accordingly.
 func New() *Manager {
     userDir, err := userPluginsDir()
-    bundle := bundledPluginsDir()
+    bundle := bundledPluginsDirFunc()
 
     m := &Manager{
         plugins:    make(map[string]PluginInfo),
@@ -254,7 +264,14 @@ func (m *Manager) emitPluginsReady() {
 		// give up if SetApp is never called (e.g. in tests)
 		return
 	}
-	m.app.Event.Emit(services.EventPluginsReady, nil)
+	// notify any test hook before sending the Wails event
+	if m.onPluginsReady != nil {
+		m.onPluginsReady()
+	}
+	// emit if we have a real app reference (otherwise tests can skip it)
+	if m.app != nil {
+		m.app.Event.Emit(services.EventPluginsReady, nil)
+	}
 }
 
 // scanOnce updates the in-memory plugin registry by inspecting the folder. For
@@ -612,6 +629,10 @@ func (m *Manager) Rescan() error {
 	m.plugins = make(map[string]PluginInfo)
 	m.mu.Unlock()
 	m.scanOnce()
+	// after a manual rescan we also fire the ready event so listeners can
+	// reload without needing a restart.  The event is synchronous here but
+	// that's acceptable since Rescan is called from the UI with a spinner.
+	m.emitPluginsReady()
 	return nil
 }
 

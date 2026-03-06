@@ -6,15 +6,15 @@ import { CloseConnectionsWindow } from '@/bindings/github.com/felixdotgo/querybo
 import { CreateConnection } from '@/bindings/github.com/felixdotgo/querybox/services/connectionservice'
 import {
   GetPluginAuthForms,
-  ListPlugins,
   TestConnection,
 } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
 import AuthFormRenderer from '@/components/AuthFormRenderer.vue'
 import SafeZone from '@/components/SafeZone.vue'
+import { usePlugins } from '@/composables/usePlugins'
 
 const notification = useNotification()
 
-const plugins = ref([])
+const { plugins, reload: reloadPlugins } = usePlugins()
 const pluginFilter = ref('')
 const selectedDriver = ref(null)
 const statusText = ref('')
@@ -89,27 +89,17 @@ const canConnect = computed(() => {
   )
 })
 
-async function load() {
-  try {
-    pluginFilter.value = '' // clear any previous search text
-    const [plist] = await Promise.all([ListPlugins()])
-    plugins.value = sortPlugins(plist || [])
-
-    // Auto-select the first available driver by default when opening the
-    // Connections view and nothing is currently selected.
-    if (!selectedDriver.value) {
-      const firstDriver = (plugins.value || []).find(p => p && p.type === 1)
-      if (firstDriver) {
-        // use selectPlugin to initialize auth forms and defaults
-        await selectPlugin(firstDriver)
-      }
+// watch plugin list for changes and react accordingly
+watch(plugins, async (list) => {
+  // reset search filter so new drivers become visible
+  pluginFilter.value = ''
+  if (!selectedDriver.value) {
+    const firstDriver = (list || []).find(p => p && p.type === 1)
+    if (firstDriver) {
+      await selectPlugin(firstDriver)
     }
   }
-  catch (err) {
-    console.error('load:', err)
-    plugins.value = plugins.value || []
-  }
-}
+}, { immediate: true })
 
 async function selectPlugin(p) {
   selectedDriver.value = p
@@ -223,14 +213,8 @@ async function saveConnection() {
 }
 
 onMounted(async () => {
-  await load()
-
-  // Re-load plugin list once the backend's async initial scan completes.
-  // The plugin manager scans executables asynchronously at startup to avoid
-  // blocking Wails window initialisation; this event fires when it's done.
-  Events.On('plugins:ready', async () => {
-    await load()
-  })
+  // initial reload in case composable hasn't fetched yet (harmless duplicate)
+  await reloadPlugins()
 
   // Clear form when window is closed (hidden)
   Events.On('connections-window:closed', async () => {

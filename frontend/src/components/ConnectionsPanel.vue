@@ -15,12 +15,15 @@ import {
 import {
   ExecPlugin,
   ExecTreeAction,
-  ListPlugins,
 } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
 import ActionFormModal from '@/components/ActionFormModal.vue'
 import ConnectionNodeLabel from '@/components/ConnectionNodeLabel.vue'
 import ConnectionTreeNodeLabel from '@/components/ConnectionTreeNodeLabel.vue'
 import { useConnectionTree } from '@/composables/useConnectionTree'
+// plugin capability cache keyed by plugin id (driver name) derived
+// from the global plugin list.
+import { usePlugins } from '@/composables/usePlugins'
+
 import {
   AddCircle,
   nodeTypeFallbackIcon,
@@ -56,9 +59,16 @@ async function openConnections() {
 const treeScrollRef = ref(null)
 const isScrolled = ref(false)
 const connections = ref([])
-
-// plugin capability cache keyed by plugin id (driver name)
-const pluginCaps = ref({})
+const { plugins } = usePlugins()
+const pluginCaps = computed(() => {
+  const map = {}
+  for (const p of plugins.value || []) {
+    if (p && p.id) {
+      map[p.id] = p.capabilities || []
+    }
+  }
+  return map
+})
 
 // track nodes that currently have an in-flight action/query
 // keyed by the node.key string.  the tree renderer uses this to show a
@@ -69,23 +79,7 @@ const loadingNodes = ref({})
 // loading state for connect/reconnect buttons keyed by connection id
 const connecting = ref({})
 
-// load plugin capabilities once on init so we can attach them to
-// query contexts and enable Explain button visibility.
-async function loadPluginCaps() {
-  try {
-    const plist = await ListPlugins()
-    const map = {}
-    for (const p of plist || []) {
-      if (p && p.id) {
-        map[p.id] = p.capabilities || []
-      }
-    }
-    pluginCaps.value = map
-  }
-  catch (err) {
-    console.error('loadPluginCaps', err)
-  }
-}
+// pluginCaps is computed above; no async loader needed.
 const filter = ref('')
 // connectionTrees replaced by shared cache from composable
 const { cache: connectionTrees, load: loadConnectionTree } = useConnectionTree()
@@ -444,12 +438,6 @@ async function runTreeAction(conn, action, node, extras = {}) {
     loadingNodes.value[nodeKeyForSpinner] = true
   }
 
-  // ensure we know this plugin's capabilities before emitting context; if not
-  // loaded yet then refresh the cache. this guards against a race where the
-  // user runs a query immediately after opening a connection view.
-  if (conn && conn.driver_type && !pluginCaps.value[conn.driver_type]) {
-    await loadPluginCaps()
-  }
   // debug: see what capabilities we actually have for this driver
   console.debug('pluginCaps lookup', conn?.driver_type, pluginCaps.value[conn?.driver_type])
 
@@ -481,7 +469,8 @@ async function runTreeAction(conn, action, node, extras = {}) {
       if (node && node.key && typeof node.key === 'string') {
         let key = node.key
         const prefix = `${conn.id}:`
-        if (key.startsWith(prefix)) key = key.slice(prefix.length)
+        if (key.startsWith(prefix))
+          key = key.slice(prefix.length)
         const parts = key.split('.')
         if (parts.length > 1) {
           params.database = parts[0]
@@ -513,9 +502,11 @@ async function runTreeAction(conn, action, node, extras = {}) {
     if (node && node.key && typeof node.key === 'string') {
       let key = node.key
       const prefix = `${conn.id}:`
-      if (key.startsWith(prefix)) key = key.slice(prefix.length)
+      if (key.startsWith(prefix))
+        key = key.slice(prefix.length)
       const parts = key.split('.')
-      if (parts.length > 1) params.database = parts[0]
+      if (parts.length > 1)
+        params.database = parts[0]
     }
     let queryToRun = action.query || ''
     if (
@@ -632,7 +623,7 @@ watch(filter, (q) => {
 
 // initialize
 loadConnections()
-loadPluginCaps()
+// plugin list will populate automatically via composable
 
 // Backend domain events — frontend only listens, never emits these topics.
 

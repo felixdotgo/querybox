@@ -79,6 +79,15 @@ graph LR
 | `ExecTreeAction(name, conn, query, opts)` | Delegates to `ExecPlugin` with action query |
 | `TestConnection(name, conn)` | Run `plugin test-connection`, **15s** timeout → `TestConnectionResponse` |
 
+
+### Plugin events
+
+* `plugins:ready` – emitted by the backend when the initial asynchronous scan
+  of the plugin directories completes **and again after any explicit
+  `Rescan()` call**. Frontend consumers should listen for this topic or use a
+  shared composable (see `usePlugins`) so they reload the list reliably and
+  avoid races where the UI queries `ListPlugins()` before the scan finishes.
+
 ---
 
 ## Key Flows

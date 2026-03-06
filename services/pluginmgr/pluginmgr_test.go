@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -13,6 +14,16 @@ import (
 
 	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
 )
+
+// pluginName returns a filename appropriate for the current OS. On Windows
+// the manager only treats files with ".exe" extension as executable, so
+// tests must append that suffix accordingly.
+func pluginName(base string) string {
+	if runtime.GOOS == "windows" {
+		return base + ".exe"
+	}
+	return base
+}
 
 func TestUserPluginsDirBehavior(t *testing.T) {
 	orig := userPluginDirFunc
@@ -139,7 +150,8 @@ func TestScanOnceConcurrent(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	// create two dummy executable files
-	for _, name := range []string{"p1", "p2"} {
+	for _, base := range []string{"p1", "p2"} {
+		name := pluginName(base)
 		path := filepath.Join(dir, name)
 		if err := os.WriteFile(path, []byte(""), 0o755); err != nil {
 			t.Fatalf("write dummy plugin %s: %v", name, err)
@@ -178,18 +190,67 @@ func TestScanOnceConcurrent(t *testing.T) {
 	}
 
 	// deleting one file should prune the registry
-	os.Remove(filepath.Join(dir, "p1"))
+	os.Remove(filepath.Join(dir, pluginName("p1")))
 	m.scanOnce()
 	if len(m.plugins) != 1 {
 		t.Fatalf("expected 1 plugin after removal, got %d", len(m.plugins))
 	}
-	if _, ok := m.plugins["p2"]; !ok {
-		t.Errorf("remaining plugin should be p2")
+	if _, ok := m.plugins[pluginName("p2")]; !ok {
+		t.Errorf("remaining plugin should be %s", pluginName("p2"))
+	}
+}
+// TestPluginsReadyCallback ensures that the onPluginsReady hook is invoked
+// when the manager emits the ready event. By constructing a manager manually
+// we can set the hook before the notification is fired.
+func TestPluginsReadyCallback(t *testing.T) {
+	m := &Manager{
+		plugins:    make(map[string]PluginInfo),
+		appReadyCh: make(chan struct{}),
+	}
+	done := make(chan struct{})
+	m.onPluginsReady = func() { close(done) }
+
+	// run scan and emit in background
+	go func() {
+		m.scanOnce()
+		m.emitPluginsReady()
+	}()
+
+	close(m.appReadyCh)
+
+	select {
+	case <-done:
+		// good
+	case <-time.After(1 * time.Second):
+		t.Fatal("plugins ready callback was not invoked")
 	}
 }
 
-// TestPopulateUserDir verifies New() copies bundled binaries into the
-// user directory on every invocation, overwriting existing files.
+// TestRescanFiresPluginsReady ensures invoking Rescan also triggers the
+// ready notification.
+func TestRescanFiresPluginsReady(t *testing.T) {
+	m := &Manager{
+		plugins:    make(map[string]PluginInfo),
+		appReadyCh: make(chan struct{}),
+	}
+	done := make(chan struct{})
+	m.onPluginsReady = func() { close(done) }
+
+	close(m.appReadyCh)
+	if err := m.Rescan(); err != nil {
+		t.Fatalf("Rescan failed: %v", err)
+	}
+
+	select {
+	case <-done:
+		// good
+	case <-time.After(1 * time.Second):
+		t.Fatal("plugins ready callback not invoked after rescan")
+	}
+}
+// TestPopulateUserDir verifies the standalone populateUserDir helper. It
+// simulates the bundle and user filesystem paths directly, avoiding New() so
+// the behaviour is easy to control.
 func TestPopulateUserDir(t *testing.T) {
 	user, err := os.MkdirTemp("", "userplugins")
 	if err != nil {
@@ -202,7 +263,9 @@ func TestPopulateUserDir(t *testing.T) {
 	}
 	defer os.RemoveAll(bundle)
 
-	fname := "bundled"
+	userDir := filepath.Join(user, "querybox", "plugins")
+
+	fname := pluginName("bundled")
 	initial := []byte("first")
 	later := []byte("second")
 
@@ -210,33 +273,39 @@ func TestPopulateUserDir(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(bundle, fname), initial, 0o755); err != nil {
 		t.Fatal(err)
 	}
-
-	origUser := userPluginDirFunc
-	defer func() { userPluginDirFunc = origUser }()
-	userPluginDirFunc = func() (string, error) { return user, nil }
-
-	// first run copies initial content
-	_ = New()
-	if _, err := os.ReadFile(filepath.Join(user, fname)); err != nil {
-		t.Fatalf("expected file copied to user dir: %v", err)
+	// ensure the target user directory exists
+	if err := os.MkdirAll(userDir, 0o755); err != nil {
+		t.Fatalf("failed to create userDir: %v", err)
 	}
-	if !isExecutable(filepath.Join(user, fname)) {
+
+	// first copy
+	populateUserDir(userDir, bundle)
+	if data, err := os.ReadFile(filepath.Join(userDir, fname)); err != nil {
+		t.Fatalf("expected file copied to user dir: %v", err)
+	} else if !bytes.Equal(data, initial) {
+		t.Errorf("unexpected initial content: %s", string(data))
+	}
+
+	// ensure executable detection works
+	filePath := filepath.Join(userDir, fname)
+	if info, err := os.Stat(filePath); err == nil {
+		t.Logf("copied file mode: %v, ext: %s", info.Mode(), filepath.Ext(filePath))
+	}
+	if !isExecutable(filePath) {
 		t.Errorf("copied file should be executable")
 	}
 
-	// modify bundle and run again -> user file should reflect new bytes
+	// second copy with updated bundle
 	if err := os.WriteFile(filepath.Join(bundle, fname), later, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	_ = New()
-	got, err := os.ReadFile(filepath.Join(user, fname))
-	if err != nil {
+	populateUserDir(userDir, bundle)
+	if data, err := os.ReadFile(filepath.Join(userDir, fname)); err != nil {
 		t.Fatalf("failed to read user copy: %v", err)
+	} else if !bytes.Equal(data, later) {
+		t.Errorf("expected overwrite with later content, got %s", string(data))
 	}
-	if !bytes.Equal(got, later) {
-		t.Errorf("expected overwrite with later content, got %s", string(got))
-	}
-	if !isExecutable(filepath.Join(user, fname)) {
+	if !isExecutable(filePath) {
 		t.Errorf("overwritten file should remain executable")
 	}
 }
@@ -256,10 +325,10 @@ func TestFallbackToBundle(t *testing.T) {
 	defer os.RemoveAll(bundle)
 
 	// both directories contain a plugin binary named "dup"
-	if err := os.WriteFile(filepath.Join(user, "dup"), []byte(""), 0o755); err != nil {
+	if err := os.WriteFile(filepath.Join(user, pluginName("dup")), []byte(""), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(bundle, "dup"), []byte(""), 0o755); err != nil {
+	if err := os.WriteFile(filepath.Join(bundle, pluginName("dup")), []byte(""), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -271,7 +340,7 @@ func TestFallbackToBundle(t *testing.T) {
 			return PluginInfo{}, fmt.Errorf("user path broken")
 		}
 		// simulate a valid driver response
-		return PluginInfo{ID: "dup", Name: "dup", Type: int(pluginpb.PluginV1_DRIVER)}, nil
+		return PluginInfo{ID: pluginName("dup"), Name: "dup", Type: int(pluginpb.PluginV1_DRIVER)}, nil
 	}
 
 	m := &Manager{
@@ -282,11 +351,12 @@ func TestFallbackToBundle(t *testing.T) {
 	m.Dir = user
 
 	m.scanOnce()
-	info, ok := m.plugins["dup"]
+	id := pluginName("dup")
+	info, ok := m.plugins[id]
 	if !ok {
-		t.Fatal("dup not discovered")
+		t.Fatalf("%s not discovered", id)
 	}
-	if info.Path != filepath.Join(bundle, "dup") {
+	if info.Path != filepath.Join(bundle, id) {
 		t.Errorf("expected bundle path used, got %s", info.Path)
 	}
 	if info.Type != int(pluginpb.PluginV1_DRIVER) {
@@ -310,10 +380,10 @@ func TestUserDirPrecedence(t *testing.T) {
 	defer os.RemoveAll(bundle)
 
 	// create plugin with same name in both locations
-	if err := os.WriteFile(filepath.Join(user, "dup"), []byte(""), 0o755); err != nil {
+	if err := os.WriteFile(filepath.Join(user, pluginName("dup")), []byte(""), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(bundle, "dup"), []byte(""), 0o755); err != nil {
+	if err := os.WriteFile(filepath.Join(bundle, pluginName("dup")), []byte(""), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -329,9 +399,10 @@ func TestUserDirPrecedence(t *testing.T) {
 	if len(m.plugins) != 1 {
 		t.Fatalf("expected 1 plugin, got %d", len(m.plugins))
 	}
-	info, ok := m.plugins["dup"]
+	id := pluginName("dup")
+	info, ok := m.plugins[id]
 	if !ok {
-		t.Fatal("plugin dup missing after scan")
+		t.Fatalf("plugin %s missing after scan", id)
 	}
 	if !strings.HasPrefix(info.Path, user) {
 		t.Errorf("expected user dir to win, got path %s", info.Path)
