@@ -8,10 +8,10 @@
 
 | Tool | Version | Purpose |
 |------|---------|---------|
-| [Go](https://go.dev/dl/) | 1.24+ | Backend |
+| [Go](https://go.dev/dl/) | >=1.26.1 | Backend |
 | [Wails v3](https://v3alpha.wails.io/getting-started/installation/) | v3 alpha | Desktop framework |
 | [Task](https://taskfile.dev/installation/) | latest | Build automation |
-| [Node.js](https://nodejs.org/) | 18+ | Frontend tooling |
+| [Node.js](https://nodejs.org/) | >=24 | Frontend tooling |
 | [protoc](https://grpc.io/docs/protoc-installation/) + [protoc-gen-go](https://pkg.go.dev/google.golang.org/protobuf/cmd/protoc-gen-go) + [protoc-gen-go-grpc](https://pkg.go.dev/google.golang.org/grpc/cmd/protoc-gen-go-grpc) | libprotoc 29.6 / protoc-gen-go v1.36.10 / protoc-gen-go-grpc v1.6.1 | gRPC code generation (only if modifying `.proto` files) |
 
 ## Getting Started
