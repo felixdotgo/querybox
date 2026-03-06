@@ -19,6 +19,7 @@ Plugins are single-shot executables under `bin/plugins/`. The host spawns one su
 | `authforms` | — | Auth form definitions | 30s | ✓ |
 | `connection-tree` | `{connection}` | `{nodes: [...]}` | 30s | optional |
 | `test-connection` | `{connection}` | `{ok: bool, message: string}` | 15s | optional |
+| `describe-schema` | `{connection, database?, table?}` | `{tables: [{name, columns, indexes}]}` | 30s | optional |
 
 ### exec — result payloads
 
@@ -59,6 +60,8 @@ Hosts ignore unknown fields; older plugins emitting a numeric `type` are also ac
 ## Auth Forms
 
 `plugin authforms` returns structured form definitions. The host calls `GetPluginAuthForms(pluginName)` and renders one tab per form. On submit, the frontend serializes form values as JSON and calls `CreateConnection` with the credential string.
+
+The host method is intentionally permissive: if the named plugin cannot be found (e.g. during a dev-mode backend restart) or is not currently executable, `GetPluginAuthForms` returns `nil` rather than an error. Clients should treat a nil result as “no forms”; this is equivalent to the plugin not implementing the `authforms` command.
 
 Plugins that do not implement `authforms` fall back to a single DSN/credential text input.
 

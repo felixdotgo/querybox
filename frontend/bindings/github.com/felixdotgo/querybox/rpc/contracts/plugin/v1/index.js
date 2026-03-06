@@ -6,11 +6,15 @@ export {
     PluginV1_AuthField,
     PluginV1_AuthField_FieldType,
     PluginV1_AuthForm,
+    PluginV1_ColumnSchema,
     PluginV1_ConnectionTreeAction,
     PluginV1_ConnectionTreeNode,
     PluginV1_ConnectionTreeResponse,
+    PluginV1_DescribeSchemaResponse,
     PluginV1_ExecResponse,
     PluginV1_ExecResult,
+    PluginV1_IndexSchema,
     PluginV1_NodeType,
+    PluginV1_TableSchema,
     PluginV1_TestConnectionResponse
 } from "./models.js";

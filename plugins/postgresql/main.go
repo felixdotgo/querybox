@@ -243,6 +243,91 @@ func buildConnString(connection map[string]string) (string, error) {
 	return dsn, nil
 }
 
+func (m *postgresqlPlugin) DescribeSchema(ctx context.Context, req *plugin.DescribeSchemaRequest) (*plugin.DescribeSchemaResponse, error) {
+    dsn, err := buildConnString(req.Connection)
+    if err != nil {
+        return &plugin.DescribeSchemaResponse{}, nil
+    }
+    if dsn == "" {
+        return &plugin.DescribeSchemaResponse{}, nil
+    }
+    db, err := sql.Open("postgres", dsn)
+    if err != nil {
+        return &plugin.DescribeSchemaResponse{}, nil
+    }
+    defer db.Close()
+
+    resp := &plugin.DescribeSchemaResponse{}
+    query := "SELECT table_schema, table_name FROM information_schema.tables WHERE table_type='BASE TABLE' AND table_schema NOT IN ('pg_catalog','information_schema')"
+    args := []interface{}{}
+    if req.Database != "" {
+        query += " AND table_catalog = ?"
+        args = append(args, req.Database)
+    }
+    if req.Table != "" {
+        query += " AND table_name = ?"
+        args = append(args, req.Table)
+    }
+    rows, err := db.Query(query, args...)
+    if err != nil {
+        return resp, nil
+    }
+    defer rows.Close()
+    for rows.Next() {
+        var schema, tbl string
+        if rows.Scan(&schema, &tbl) != nil {
+            continue
+        }
+        ts := &plugin.TableSchema{Name: schema + "." + tbl}
+        // columns
+        colQ := `SELECT column_name, data_type, is_nullable, ordinal_position, column_default
+                 FROM information_schema.columns
+                 WHERE table_schema=$1 AND table_name=$2
+                 ORDER BY ordinal_position`
+        colRows, err := db.Query(colQ, schema, tbl)
+        if err == nil {
+            defer colRows.Close()
+            for colRows.Next() {
+                var name, dtype, isNull string
+                var pos int32
+                var def sql.NullString
+                if err := colRows.Scan(&name, &dtype, &isNull, &pos, &def); err != nil {
+                    continue
+                }
+                cs := &plugin.ColumnSchema{
+                    Name:       name,
+                    Type:       dtype,
+                    Nullable:   strings.EqualFold(isNull, "YES"),
+                    Ordinal:    pos,
+                }
+                if def.Valid {
+                    cs.Default = def.String
+                }
+                ts.Columns = append(ts.Columns, cs)
+            }
+        }
+        // indexes (basic names and uniqueness)
+        idxQ := `SELECT indexname, indexdef FROM pg_indexes WHERE schemaname=$1 AND tablename=$2`
+        idxRows, err := db.Query(idxQ, schema, tbl)
+        if err == nil {
+            defer idxRows.Close()
+            for idxRows.Next() {
+                var name, def string
+                if idxRows.Scan(&name, &def) != nil {
+                    continue
+                }
+                idx := &plugin.IndexSchema{Name: name}
+                if strings.Contains(def, "UNIQUE") {
+                    idx.Unique = true
+                }
+                ts.Indexes = append(ts.Indexes, idx)
+            }
+        }
+        resp.Tables = append(resp.Tables, ts)
+    }
+    return resp, nil
+}
+
 func (m *postgresqlPlugin) Exec(ctx context.Context, req *plugin.ExecRequest) (*plugin.ExecResponse, error) {
 	if req.Options != nil {
 		if v, ok := req.Options["explain-query"]; ok && v == "yes" {

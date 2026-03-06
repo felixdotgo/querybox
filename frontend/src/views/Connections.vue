@@ -124,7 +124,9 @@ async function selectPlugin(p) {
     }
   }
   catch (err) {
-    console.error('GetPluginAuthForms:', err)
+    // missing plugin during dev restart is normal; debug level avoids alarming
+    // the user while still allowing inspection if necessary.
+    console.debug('GetPluginAuthForms (ignored):', err)
   }
 }
 

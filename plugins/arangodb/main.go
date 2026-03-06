@@ -38,6 +38,11 @@ func (a *arangoPlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoReques
 	}, nil
 }
 
+func (a *arangoPlugin) DescribeSchema(ctx context.Context, req *plugin.DescribeSchemaRequest) (*plugin.DescribeSchemaResponse, error) {
+    // ArangoDB is schemaless; return an empty descriptor.
+    return &plugin.DescribeSchemaResponse{}, nil
+}
+
 func (a *arangoPlugin) AuthForms(ctx context.Context, _ *plugin.AuthFormsRequest) (*plugin.AuthFormsResponse, error) {
 	basic := plugin.AuthForm{
 		Key:  "basic",

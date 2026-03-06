@@ -718,6 +718,81 @@ func (m *Manager) ExecTreeAction(name string, connection map[string]string, acti
 	return m.ExecPlugin(name, connection, actionQuery, options)
 }
 
+// DescribeSchema asks the named plugin to provide schema metadata for the
+// given connection.  The optional database/table arguments may be empty;
+// plugins are free to ignore them.  A 30-second timeout prevents hangs.
+func (m *Manager) DescribeSchema(name string, connection map[string]string, database, table string) (*plugin.DescribeSchemaResponse, error) {
+	m.mu.Lock()
+	info, ok := m.plugins[name]
+	m.mu.Unlock()
+	if !ok {
+		m.emitLog(services.LogLevelError, fmt.Sprintf("DescribeSchema: plugin '%s' not found", name))
+		return nil, fmt.Errorf("DescribeSchema: plugin %s not found", name)
+	}
+	full := info.Path
+	if !isExecutable(full) {
+		m.emitLog(services.LogLevelError, fmt.Sprintf("DescribeSchema: plugin '%s' is not executable", name))
+		return nil, fmt.Errorf("DescribeSchema: plugin %s is not executable", name)
+	}
+	m.emitLog(services.LogLevelInfo, fmt.Sprintf("DescribeSchema: fetching schema (driver: %s)", name))
+
+	req := plugin.DescribeSchemaRequest{Connection: connection, Database: database, Table: table}
+	b, _ := json.Marshal(&req)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, full, "describe-schema")
+	hideWindow(cmd)
+	cmd.Env = append(os.Environ(), "QUERYBOX_PLUGIN_NAME="+name)
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		m.emitLog(services.LogLevelError, fmt.Sprintf("DescribeSchema: stdin pipe error for plugin '%s': %v", name, err))
+		return nil, fmt.Errorf("DescribeSchema: stdin pipe error: %w", err)
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		m.emitLog(services.LogLevelError, fmt.Sprintf("DescribeSchema: stdout pipe error for plugin '%s': %v", name, err))
+		return nil, fmt.Errorf("DescribeSchema: stdout pipe error: %w", err)
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		m.emitLog(services.LogLevelError, fmt.Sprintf("DescribeSchema: stderr pipe error for plugin '%s': %v", name, err))
+		return nil, fmt.Errorf("DescribeSchema: stderr pipe error: %w", err)
+	}
+
+	if err := cmd.Start(); err != nil {
+		m.emitLog(services.LogLevelError, fmt.Sprintf("DescribeSchema: failed to start plugin '%s': %v", name, err))
+		return nil, fmt.Errorf("DescribeSchema: start error: %w", err)
+	}
+
+	_, _ = stdin.Write(b)
+	_ = stdin.Close()
+
+	outB, _ := io.ReadAll(stdout)
+	errB, _ := io.ReadAll(stderr)
+
+	if err := cmd.Wait(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			m.emitLog(services.LogLevelError, fmt.Sprintf("DescribeSchema: plugin '%s' timed out after 30s", name))
+			return nil, fmt.Errorf("DescribeSchema: plugin timed out after 30s")
+		}
+		m.emitLog(services.LogLevelError, fmt.Sprintf("DescribeSchema: plugin '%s' exited with error: %v", name, err))
+		return nil, fmt.Errorf("DescribeSchema: plugin exited: %w - stderr: %s", err, string(errB))
+	}
+
+	resp := &plugin.DescribeSchemaResponse{}
+	if len(outB) == 0 {
+		m.emitLog(services.LogLevelInfo, fmt.Sprintf("DescribeSchema: (driver: %s) returned empty schema", name))
+		return resp, nil
+	}
+	if err := protojson.Unmarshal(outB, resp); err != nil {
+		m.emitLog(services.LogLevelError, fmt.Sprintf("DescribeSchema: invalid JSON from '%s': %v", name, err))
+		return nil, fmt.Errorf("DescribeSchema: invalid json: %w", err)
+	}
+	m.emitLog(services.LogLevelInfo, fmt.Sprintf("DescribeSchema: (driver: %s) returned %d tables", name, len(resp.Tables)))
+	return resp, nil
+}
+
 // TestConnection invokes the named plugin's `test-connection` command to verify
 // that the supplied connection parameters are valid. The plugin is expected to
 // open and ping the underlying data store without persisting anything.
@@ -795,15 +870,20 @@ func (m *Manager) TestConnection(name string, connection map[string]string) (*pl
 // plugin doesn't implement the command or returns no forms an empty map is
 // returned.
 func (m *Manager) GetPluginAuthForms(name string) (map[string]*plugin.AuthForm, error) {
+	// return nil,nil instead of an error when the plugin is temporarily
+	// unavailable.  The frontend treats a nil result as “no forms”, and
+	// this keeps dev‑mode HMR restarts from bubbling noisy binding errors.
 	m.mu.Lock()
 	info, ok := m.plugins[name]
 	m.mu.Unlock()
 	if !ok {
-		return nil, fmt.Errorf("GetPluginAuthForms: plugin %s not found", name)
+		m.emitLog(services.LogLevelDebug, fmt.Sprintf("GetPluginAuthForms: plugin '%s' not found (ignoring)", name))
+		return nil, nil
 	}
 	full := info.Path
 	if !isExecutable(full) {
-		return nil, fmt.Errorf("GetPluginAuthForms: plugin %s is not executable", name)
+		m.emitLog(services.LogLevelDebug, fmt.Sprintf("GetPluginAuthForms: plugin '%s' not executable (ignoring)", name))
+		return nil, nil
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)

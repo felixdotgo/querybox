@@ -158,6 +158,105 @@ func getDatabaseFromConn(connection map[string]string) string {
 	return cfg.DBName
 }
 
+func (m *mysqlPlugin) DescribeSchema(ctx context.Context, req *plugin.DescribeSchemaRequest) (*plugin.DescribeSchemaResponse, error) {
+    dsn, err := buildDSN(req.Connection)
+    if err != nil {
+        return &plugin.DescribeSchemaResponse{}, nil
+    }
+    db, err := sql.Open("mysql", dsn)
+    if err != nil {
+        return &plugin.DescribeSchemaResponse{}, nil
+    }
+    defer db.Close()
+
+    resp := &plugin.DescribeSchemaResponse{}
+
+    // fetch tables matching optional filters
+    query := "SELECT TABLE_SCHEMA, TABLE_NAME FROM information_schema.TABLES WHERE TABLE_TYPE='BASE TABLE'"
+    args := []interface{}{}
+    if req.Database != "" {
+        query += " AND TABLE_SCHEMA = ?"
+        args = append(args, req.Database)
+    }
+    if req.Table != "" {
+        query += " AND TABLE_NAME = ?"
+        args = append(args, req.Table)
+    }
+    rows, err := db.Query(query, args...)
+    if err != nil {
+        return resp, nil
+    }
+    defer rows.Close()
+
+    for rows.Next() {
+        var schema, tbl string
+        if rows.Scan(&schema, &tbl) != nil {
+            continue
+        }
+        ts := &plugin.TableSchema{Name: fmt.Sprintf("%s.%s", schema, tbl)}
+        // columns
+        colQ := `SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_KEY='PRI', ORDINAL_POSITION, COLUMN_DEFAULT
+                   FROM information_schema.COLUMNS
+                   WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION`
+        colRows, err := db.Query(colQ, schema, tbl)
+        if err == nil {
+            defer colRows.Close()
+            for colRows.Next() {
+                var name, ctype, isNull sql.NullString
+                var pk bool
+                var pos int32
+                var def sql.NullString
+                if err := colRows.Scan(&name, &ctype, &isNull, &pk, &pos, &def); err != nil {
+                    continue
+                }
+                cs := &plugin.ColumnSchema{
+                    Name:       name.String,
+                    Type:       ctype.String,
+                    Nullable:   strings.EqualFold(isNull.String, "YES"),
+                    PrimaryKey: pk,
+                    Ordinal:    pos,
+                }
+                if def.Valid {
+                    cs.Default = def.String
+                }
+                ts.Columns = append(ts.Columns, cs)
+            }
+        }
+        // indexes
+        idxQ := `SELECT INDEX_NAME, COLUMN_NAME, NON_UNIQUE, SEQ_IN_INDEX, INDEX_COMMENT, INDEX_TYPE
+                  FROM information_schema.STATISTICS
+                  WHERE TABLE_SCHEMA=? AND TABLE_NAME=? ORDER BY INDEX_NAME, SEQ_IN_INDEX`
+        idxRows, err := db.Query(idxQ, schema, tbl)
+        if err == nil {
+            defer idxRows.Close()
+            var current *plugin.IndexSchema
+            lastName := ""
+            for idxRows.Next() {
+                var idxName, colName string
+                var nonUnique int
+                var seq int
+                var comment, idxType string
+                if idxRows.Scan(&idxName, &colName, &nonUnique, &seq, &comment, &idxType) != nil {
+                    continue
+                }
+                if idxName != lastName {
+                    current = &plugin.IndexSchema{Name: idxName, Unique: nonUnique == 0}
+                    if idxName == "PRIMARY" {
+                        current.Primary = true
+                    }
+                    ts.Indexes = append(ts.Indexes, current)
+                    lastName = idxName
+                }
+                if current != nil {
+                    current.Columns = append(current.Columns, colName)
+                }
+            }
+        }
+        resp.Tables = append(resp.Tables, ts)
+    }
+    return resp, nil
+}
+
 func (m *mysqlPlugin) Exec(ctx context.Context, req *plugin.ExecRequest) (*plugin.ExecResponse, error) {
 	if req.Options != nil {
 		if v, ok := req.Options["explain-query"]; ok && v == "yes" {

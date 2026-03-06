@@ -28,6 +28,12 @@ service PluginService {
   // a given connection.  The frontend uses this to render a browsable tree.
   rpc ConnectionTree(PluginV1.ConnectionTreeRequest) returns (PluginV1.ConnectionTreeResponse);
 
+  // DescribeSchema returns metadata about objects (tables, collections,
+  // etc.) present in the connection.  The request may optionally specify
+  // a database and/or object name to filter the result set.  Plugins that
+  // cannot provide metadata should return an empty response.
+  rpc DescribeSchema(PluginV1.DescribeSchemaRequest) returns (PluginV1.DescribeSchemaResponse);
+
   // TestConnection verifies that the provided credentials can reach the data
   // store. Plugins MUST NOT persist any state; the call is fire-and-forget.
   // Plugins that cannot meaningfully test connectivity should return ok=true.
@@ -116,6 +122,44 @@ message PluginV1 {
   message SqlResult {
     repeated Column columns = 1;
     repeated Row rows = 2;
+  }
+
+  // DescribeSchemaRequest carries the connection information and optional
+  // filters used when querying for object metadata.
+  message DescribeSchemaRequest {
+    map<string,string> connection = 1;
+    string database = 2; // optional
+    string table = 3; // optional; plugin may interpret more broadly (collection, etc.)
+  }
+
+  // DescribeSchemaResponse returns one entry per object matching the request.
+  message DescribeSchemaResponse {
+    repeated TableSchema tables = 1;
+  }
+
+  // TableSchema represents the structure of a single table or collection.
+  message TableSchema {
+    string name = 1;
+    repeated ColumnSchema columns = 2;
+    repeated IndexSchema indexes = 3;
+  }
+
+  // ColumnSchema describes a column/field in a table.
+  message ColumnSchema {
+    string name = 1;
+    string type = 2;
+    bool nullable = 3;
+    bool primary_key = 4;
+    string default = 5;
+    int32 ordinal = 6;
+  }
+
+  // IndexSchema describes an index defined on a table.
+  message IndexSchema {
+    string name = 1;
+    repeated string columns = 2;
+    bool unique = 3;
+    bool primary = 4;
   }
 
   message Row {

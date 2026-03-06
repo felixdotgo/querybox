@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/felixdotgo/querybox/pkg/plugin"
 )
 
 func TestGetDatabaseFromConn(t *testing.T) {
@@ -58,3 +61,13 @@ func TestBuildDSNTLSParam(t *testing.T) {
     }
 }
 
+func TestDescribeSchemaInvalid(t *testing.T) {
+    m := &mysqlPlugin{}
+    resp, err := m.DescribeSchema(context.Background(), &plugin.DescribeSchemaRequest{Connection: map[string]string{}})
+    if err != nil {
+        t.Fatalf("DescribeSchema error: %v", err)
+    }
+    if len(resp.Tables) != 0 {
+        t.Errorf("expected no tables for invalid connection, got %d", len(resp.Tables))
+    }
+}

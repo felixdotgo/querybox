@@ -23,6 +23,7 @@ const (
 	PluginService_Exec_FullMethodName           = "/plugin.v1.PluginService/Exec"
 	PluginService_AuthForms_FullMethodName      = "/plugin.v1.PluginService/AuthForms"
 	PluginService_ConnectionTree_FullMethodName = "/plugin.v1.PluginService/ConnectionTree"
+	PluginService_DescribeSchema_FullMethodName = "/plugin.v1.PluginService/DescribeSchema"
 	PluginService_TestConnection_FullMethodName = "/plugin.v1.PluginService/TestConnection"
 )
 
@@ -49,6 +50,11 @@ type PluginServiceClient interface {
 	// ConnectionTree returns a driver-defined hierarchy of nodes and actions for
 	// a given connection.  The frontend uses this to render a browsable tree.
 	ConnectionTree(ctx context.Context, in *PluginV1_ConnectionTreeRequest, opts ...grpc.CallOption) (*PluginV1_ConnectionTreeResponse, error)
+	// DescribeSchema returns metadata about objects (tables, collections,
+	// etc.) present in the connection.  The request may optionally specify
+	// a database and/or object name to filter the result set.  Plugins that
+	// cannot provide metadata should return an empty response.
+	DescribeSchema(ctx context.Context, in *PluginV1_DescribeSchemaRequest, opts ...grpc.CallOption) (*PluginV1_DescribeSchemaResponse, error)
 	// TestConnection verifies that the provided credentials can reach the data
 	// store. Plugins MUST NOT persist any state; the call is fire-and-forget.
 	// Plugins that cannot meaningfully test connectivity should return ok=true.
@@ -103,6 +109,16 @@ func (c *pluginServiceClient) ConnectionTree(ctx context.Context, in *PluginV1_C
 	return out, nil
 }
 
+func (c *pluginServiceClient) DescribeSchema(ctx context.Context, in *PluginV1_DescribeSchemaRequest, opts ...grpc.CallOption) (*PluginV1_DescribeSchemaResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PluginV1_DescribeSchemaResponse)
+	err := c.cc.Invoke(ctx, PluginService_DescribeSchema_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *pluginServiceClient) TestConnection(ctx context.Context, in *PluginV1_TestConnectionRequest, opts ...grpc.CallOption) (*PluginV1_TestConnectionResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(PluginV1_TestConnectionResponse)
@@ -136,6 +152,11 @@ type PluginServiceServer interface {
 	// ConnectionTree returns a driver-defined hierarchy of nodes and actions for
 	// a given connection.  The frontend uses this to render a browsable tree.
 	ConnectionTree(context.Context, *PluginV1_ConnectionTreeRequest) (*PluginV1_ConnectionTreeResponse, error)
+	// DescribeSchema returns metadata about objects (tables, collections,
+	// etc.) present in the connection.  The request may optionally specify
+	// a database and/or object name to filter the result set.  Plugins that
+	// cannot provide metadata should return an empty response.
+	DescribeSchema(context.Context, *PluginV1_DescribeSchemaRequest) (*PluginV1_DescribeSchemaResponse, error)
 	// TestConnection verifies that the provided credentials can reach the data
 	// store. Plugins MUST NOT persist any state; the call is fire-and-forget.
 	// Plugins that cannot meaningfully test connectivity should return ok=true.
@@ -161,6 +182,9 @@ func (UnimplementedPluginServiceServer) AuthForms(context.Context, *PluginV1_Aut
 }
 func (UnimplementedPluginServiceServer) ConnectionTree(context.Context, *PluginV1_ConnectionTreeRequest) (*PluginV1_ConnectionTreeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ConnectionTree not implemented")
+}
+func (UnimplementedPluginServiceServer) DescribeSchema(context.Context, *PluginV1_DescribeSchemaRequest) (*PluginV1_DescribeSchemaResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DescribeSchema not implemented")
 }
 func (UnimplementedPluginServiceServer) TestConnection(context.Context, *PluginV1_TestConnectionRequest) (*PluginV1_TestConnectionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method TestConnection not implemented")
@@ -258,6 +282,24 @@ func _PluginService_ConnectionTree_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _PluginService_DescribeSchema_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PluginV1_DescribeSchemaRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PluginServiceServer).DescribeSchema(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PluginService_DescribeSchema_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PluginServiceServer).DescribeSchema(ctx, req.(*PluginV1_DescribeSchemaRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _PluginService_TestConnection_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(PluginV1_TestConnectionRequest)
 	if err := dec(in); err != nil {
@@ -298,6 +340,10 @@ var PluginService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ConnectionTree",
 			Handler:    _PluginService_ConnectionTree_Handler,
+		},
+		{
+			MethodName: "DescribeSchema",
+			Handler:    _PluginService_DescribeSchema_Handler,
 		},
 		{
 			MethodName: "TestConnection",

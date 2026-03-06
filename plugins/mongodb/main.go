@@ -31,6 +31,11 @@ func (m *mongoPlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRequest
     }, nil
 }
 
+func (m *mongoPlugin) DescribeSchema(ctx context.Context, req *plugin.DescribeSchemaRequest) (*plugin.DescribeSchemaResponse, error) {
+    // MongoDB is schemaless; return empty response
+    return &plugin.DescribeSchemaResponse{}, nil
+}
+
 func (m *mongoPlugin) AuthForms(ctx context.Context, _ *plugin.AuthFormsRequest) (*plugin.AuthFormsResponse, error) {
     basic := plugin.AuthForm{
         Key:  "basic",

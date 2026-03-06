@@ -1,16 +1,46 @@
 <script setup>
 import { NButton, NIcon } from 'naive-ui'
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, toRef, watch } from 'vue'
 import QueryEditor from '@/components/QueryEditor.vue'
 import ResultViewer from '@/components/ResultViewer.vue'
+import TableStructureViewer from '@/components/TableStructureViewer.vue'
 import WelcomeTab from '@/components/WelcomeTab.vue'
+import { useConnectionTree } from '@/composables/useConnectionTree'
 import { Analytics, Play } from '@/lib/icons'
 
 const props = defineProps({
   selectedConnection: { type: Object, default: null },
 })
+
 const emit = defineEmits(['tab-closed', 'active-connection-changed', 'refresh-tab'])
 
+// allow lookup of cached schemas; provide selectedConnection ref so
+// schema-related helpers know which connection to query.
+const { getSchema, fetchSchema } = useConnectionTree(toRef(props, 'selectedConnection'))
+
+const currentSchema = computed(() => {
+  // eslint-disable-next-line ts/no-use-before-define
+  const tab = tabs.value.find(t => t.key === activeTabKey.value)
+  if (!tab || !tab.context || !tab.context.node)
+    return null
+
+  // node.key may include conn prefix ("<conn.id>:"), strip if present
+  let key = tab.context.node.key
+  if (key && typeof key === 'string' && key.startsWith(`${tab.context.conn?.id}:`)) {
+    key = key.slice((`${tab.context.conn.id}:`).length)
+  }
+
+  // previously we trimmed the first segment of a dotted identifier
+  // (e.g. "db.table") here.  that logic was brittle when plugins
+  // returned fully-qualified names; `getSchema` could not find the
+  // entry and the structure tab stayed hidden.  the helper now handles
+  // suffix lookups itself, so just pass the raw key through.
+  if (!key || typeof key !== 'string')
+    return null
+  const schema = getSchema(key)
+  console.debug('currentSchema lookup', key, schema)
+  return schema
+})
 const tabs = ref([])
 const activeTabKey = ref('')
 
@@ -56,10 +86,52 @@ function getMonacoLanguage(driver) {
   return 'sql'
 }
 
+// helper to derive a table name from a tab object (mirrors
+// currentSchema computation logic).  returns null if no valid table.
+function extractTableName(tab) {
+  if (!tab || !tab.context || !tab.context.node)
+    return null
+  let key = tab.context.node.key
+  if (key && typeof key === 'string' && key.startsWith(`${tab.context.conn?.id}:`)) {
+    key = key.slice((`${tab.context.conn.id}:`).length)
+  }
+  if (!key || typeof key !== 'string')
+    return null
+  return key
+}
+
 watch(activeTabKey, (key) => {
+  console.debug('activeTabKey changed to', key)
   // tabKey format: conn.id + ":" + node.key — extract the connection ID
   const connId = key ? key.split(':')[0] : null
   emit('active-connection-changed', connId || null)
+
+  // if the new tab targets a table for which we don't yet have schema,
+  // kick off a background fetch. the composable will merge results and the
+  // `currentSchema` watcher will flip us to the Structure page when data
+  // arrives.
+  const tab = tabs.value.find(t => t.key === key)
+  const tbl = extractTableName(tab)
+  console.debug('activeTabKey watcher table', tbl, 'cached?', tbl ? !!getSchema(tbl) : null)
+  if (tbl) {
+    if (!getSchema(tbl)) {
+      console.debug('activeTabKey watcher invoking fetchSchema for', tbl)
+      fetchSchema(tbl).catch(err => console.error('fetchSchema failed', err))
+    }
+    else {
+      console.debug('schema already cached for', tbl)
+    }
+  }
+})
+
+// we still fetch schema for the active table, but no longer force the
+// view to switch to the structure pane.  result should remain the default
+// landing page so users can see query output immediately.
+// the watcher is kept for debugging but does not mutate innerTab.
+watch(currentSchema, (schema) => {
+  console.debug('currentSchema watcher fired', activeTabKey.value, schema)
+  // previously we changed tab.innerTab to 'structure' here; removing that
+  // behavior ensures the Result tab always stays visible after execution.
 })
 
 function openTab(title, result, error, tabKey, version, context) {
@@ -135,6 +207,23 @@ function openTab(title, result, error, tabKey, version, context) {
     else {
       newTab.result = null
       newTab.error = null
+    }
+  }
+
+  // if we already know the schema for this table, kick off a fetch so the
+  // structure tab can display quickly when the user switches to it. we no
+  // longer preselect the structure pane; result is always the starting point.
+  const prefetchTable = extractTableName(newTab)
+  if (prefetchTable) {
+    if (getSchema(prefetchTable)) {
+      // schema is cached, but don't switch tabs automatically
+      console.debug('schema already cached for', prefetchTable)
+    }
+    else {
+      // still initiate a fetch so the structure data will be available if the
+      // user clicks the tab later.
+      console.debug('openTab triggering fetchSchema for', prefetchTable)
+      fetchSchema(prefetchTable).catch(err => console.error('fetchSchema failed', err))
     }
   }
 
@@ -269,7 +358,7 @@ defineExpose({ openTab })
               </template>
               <n-tab-pane name="result" tab="Result">
                 <template #default>
-                  <ResultViewer v-if="tab.result" :result="tab.result" />
+                  <ResultViewer v-if="tab.result" :result="tab.result" :schema="currentSchema" />
                   <pre
                     v-else-if="tab.error"
                     class="whitespace-pre-wrap p-4 text-red-600 bg-red-50 flex-1 overflow-auto font-mono text-sm"
@@ -290,6 +379,11 @@ defineExpose({ openTab })
                   >
 {{ tab.explainError }}
                   </pre>
+                </template>
+              </n-tab-pane>
+              <n-tab-pane v-if="currentSchema" name="structure" tab="Structure">
+                <template #default>
+                  <TableStructureViewer :schema="currentSchema" />
                 </template>
               </n-tab-pane>
             </n-tabs>

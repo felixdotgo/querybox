@@ -89,7 +89,7 @@ const connecting = ref({})
 // pluginCaps is computed above; no async loader needed.
 const filter = ref('')
 // connectionTrees replaced by shared cache from composable
-const { cache: connectionTrees, load: loadConnectionTree } = useConnectionTree()
+const { cache: connectionTrees, load: loadConnectionTree, schemaCache } = useConnectionTree()
 const selectedConnection = ref(null)
 const expandedKeys = ref([])
 const deleteModal = ref({ visible: false, conn: null })
@@ -177,11 +177,13 @@ async function loadConnections() {
     connections.value = (await ListConnections()) || []
     // clear cache when whole list is reloaded; avoids stale entries
     Object.keys(connectionTrees).forEach(k => delete connectionTrees[k])
+    Object.keys(schemaCache).forEach(k => delete schemaCache[k])
   }
   catch (err) {
     console.error('ListConnections', err)
     connections.value = []
     Object.keys(connectionTrees).forEach(k => delete connectionTrees[k])
+    Object.keys(schemaCache).forEach(k => delete schemaCache[k])
   }
 }
 
@@ -206,6 +208,7 @@ function handleSelect(keys, options, meta) {
     if (!connectionTrees[conn.id]) {
       // clear cache just in case and fetch
       delete connectionTrees[conn.id]
+      delete schemaCache[conn.id]
       fetchTreeFor(conn)
       emit('connection-selected', conn)
       emit('connection-opened', conn)
@@ -278,6 +281,7 @@ function handleConnectionDblclick(conn) {
   // other interactions to load it.  The cache-clear ensures the next
   // single-click will refetch.
   delete connectionTrees[conn.id]
+  delete schemaCache[conn.id]
   checkConnection(conn)
   // tree load remains tied to the explicit connect button so we don't
   // auto-fetch here
@@ -342,6 +346,7 @@ function renderLabel({ option }) {
     onConnect() {
       if (connectionTrees[conn.id]) {
         delete connectionTrees[conn.id]
+        delete schemaCache[conn.id]
       }
       fetchTreeFor(conn)
     },
@@ -510,6 +515,7 @@ async function runTreeAction(conn, action, node, extras = {}) {
         console.debug('runTreeAction [hidden] ok', action.type)
         // Refresh the tree so newly created tables/databases appear.
         delete connectionTrees[conn.id]
+        delete schemaCache[conn.id]
         fetchTreeFor(conn)
       }
     }
@@ -686,6 +692,7 @@ const offConnectionDeleted = Events.On('connection:deleted', async (event) => {
   }
   // additional cleanup for tree cache/state
   delete connectionTrees[id]
+  delete schemaCache[id]
   if (selectedConnection.value?.id === id)
     selectedConnection.value = null
   expandedKeys.value = expandedKeys.value.filter(k => k !== id)

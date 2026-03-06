@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
+
+	"github.com/felixdotgo/querybox/pkg/plugin"
 )
 
 func TestGetRedisExplicitDB(t *testing.T) {
@@ -68,5 +71,16 @@ func TestBuildClientTLS(t *testing.T) {
         t.Errorf("expected non-nil TLSConfig when tls=true")
     } else if cli.Options().TLSConfig.RootCAs == nil {
         t.Errorf("TLSConfig.RootCAs not populated")
+    }
+}
+
+func TestDescribeSchemaRedis(t *testing.T) {
+    r := &redisPlugin{}
+    resp, err := r.DescribeSchema(context.Background(), &plugin.DescribeSchemaRequest{Connection: map[string]string{}})
+    if err != nil {
+        t.Fatalf("DescribeSchema error: %v", err)
+    }
+    if len(resp.Tables) != 0 {
+        t.Errorf("expected empty schema for redis, got %d", len(resp.Tables))
     }
 }

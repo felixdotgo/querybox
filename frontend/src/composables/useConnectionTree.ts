@@ -1,12 +1,15 @@
 import type { Ref } from 'vue'
 import { reactive, ref, watch } from 'vue'
-// @ts-expect-error: generated bindings may not yet have typings
 import { GetCredential } from '@/bindings/github.com/felixdotgo/querybox/services/connectionservice'
-// @ts-expect-error: generated bindings may not yet have typings
-import { GetConnectionTree } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
+import { DescribeSchema, GetConnectionTree } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
 
 // global reactive cache mapping connection id -> nodes array
 const treeCache: Record<string, any[]> = reactive({})
+
+// schemaCache maps connection id -> tableName -> Schema object returned by plugin
+// TODO: persist these entries on disk (via the connection service or similar)
+// so that table information can survive restarts and be available offline.
+const schemaCache: Record<string, Record<string, any>> = reactive({})
 
 // map proto enum numbers to lowercase names; mirrors ConnectionsPanel.NODE_TYPE_ENUM_MAP
 const NODE_TYPE_ENUM_MAP: Record<number, string> = {
@@ -71,6 +74,40 @@ export function useConnectionTree(connRef?: Ref<any | null>) {
       const resp = await GetConnectionTree(conn.driver_type, params)
       treeCache[id] = normalizeNodes(resp.nodes || [])
       console.debug('useConnectionTree.load: cached nodes for', id, treeCache[id])
+      // load schema info in parallel; ignore errors
+      try {
+        // @ts-expect-error: may be generated later
+        const schemaResp = await DescribeSchema(conn.driver_type, params)
+        console.debug('useConnectionTree.load: raw schema response', id, schemaResp)
+        console.debug('useConnectionTree.load: tables count', id, schemaResp?.tables?.length)
+        const tableMap: Record<string, any> = {}
+        if (schemaResp && Array.isArray(schemaResp.tables)) {
+          for (const t of schemaResp.tables) {
+            if (t && t.name) {
+              // cache under the exact name returned by the plugin
+              tableMap[t.name] = t
+              // if the name contains a dot, also cache the suffix after the
+              // first segment. many plugins return qualified names such as
+              // "public.users"; workspace tabs, however, strip the leading
+              // database/schema when constructing the key. duplicating the
+              // entry here keeps lookups simple and backwards-compatible.
+              const idx = t.name.indexOf('.')
+              if (idx !== -1 && idx < t.name.length - 1) {
+                const suffix = t.name.slice(idx + 1)
+                if (!(suffix in tableMap)) {
+                  tableMap[suffix] = t
+                }
+              }
+            }
+          }
+        }
+        schemaCache[id] = tableMap
+        console.debug('useConnectionTree.load: cached schema for', id, tableMap)
+      }
+      catch (err) {
+        console.error('useConnectionTree.load schema error', id, err)
+        schemaCache[id] = {}
+      }
     }
     catch (err) {
       console.error('useConnectionTree load', id, err)
@@ -114,11 +151,110 @@ export function useConnectionTree(connRef?: Ref<any | null>) {
     return cols
   }
 
+  function getSchema(tableName: string): any | null {
+    const id = connRef?.value?.id
+    if (!id)
+      return null
+    if (!schemaCache[id])
+      return null
+
+    // first try the direct key
+    let result = schemaCache[id][tableName]
+    if (result)
+      return result
+
+    // if the key contains a dot we may have cached the suffix; try that
+    const idx = tableName.indexOf('.')
+    if (idx !== -1 && idx < tableName.length - 1) {
+      const suffix = tableName.slice(idx + 1)
+      result = schemaCache[id][suffix]
+      if (result)
+        return result
+    }
+
+    // as a last resort, search for any entry whose name ends with ".<tableName>"
+    // this is slightly more expensive but guards against deeper qualifiers
+    for (const k in schemaCache[id]) {
+      if (k.endsWith(`.${tableName}`)) {
+        return schemaCache[id][k]
+      }
+    }
+
+    return null
+  }
+
+  function getAllSchemas(): Record<string, any> {
+    const id = connRef?.value?.id
+    if (!id)
+      return {}
+    return schemaCache[id] || {}
+  }
+
+  // fetch schema metadata for the specified table only and merge the results
+  // into the cache.  called lazily when the user selects a table that hasn't
+  // been previously described.
+  async function fetchSchema(table?: string) {
+    const id = connRef?.value?.id
+    const conn = connRef?.value
+    if (!id || !conn)
+      return
+    const cred = await GetCredential(id)
+    const params: Record<string, any> = {}
+    if (cred)
+      params.credential_blob = cred
+
+    // split a qualified table name into database and table filters
+    let dbFilter = ''
+    let tblFilter = ''
+    if (table) {
+      const parts = table.split('.')
+      if (parts.length > 1) {
+        dbFilter = parts[0]
+        tblFilter = parts.slice(1).join('.')
+      }
+      else {
+        tblFilter = table
+      }
+    }
+
+    try {
+      console.debug('useConnectionTree.fetchSchema', id, 'table', table, 'dbFilter', dbFilter, 'tblFilter', tblFilter)
+      // @ts-expect-error: may be generated later
+      const schemaResp = await DescribeSchema(conn.driver_type, params, dbFilter, tblFilter)
+      console.debug('useConnectionTree.fetchSchema: raw response', id, table, schemaResp)
+      const tableMap: Record<string, any> = {}
+      if (schemaResp && Array.isArray(schemaResp.tables)) {
+        for (const t of schemaResp.tables) {
+          if (t && t.name) {
+            tableMap[t.name] = t
+            const idx = t.name.indexOf('.')
+            if (idx !== -1 && idx < t.name.length - 1) {
+              const suffix = t.name.slice(idx + 1)
+              if (!(suffix in tableMap)) {
+                tableMap[suffix] = t
+              }
+            }
+          }
+        }
+        // merge into existing cache rather than clobber
+        schemaCache[id] = { ...(schemaCache[id] || {}), ...tableMap }
+        console.debug('useConnectionTree.fetchSchema: merged schema for', id, table, tableMap)
+      }
+    }
+    catch (err) {
+      console.error('useConnectionTree.fetchSchema error', id, table, err)
+    }
+  }
+
   return {
     nodes,
     load,
     getTableNames,
     getColumns,
+    getSchema,
+    getAllSchemas,
+    fetchSchema,
     cache: treeCache,
+    schemaCache,
   }
 }

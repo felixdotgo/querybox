@@ -164,6 +164,72 @@ export class PluginV1_AuthForm {
     }
 }
 
+/**
+ * ColumnSchema describes a column/field in a table.
+ */
+export class PluginV1_ColumnSchema {
+    /**
+     * Creates a new PluginV1_ColumnSchema instance.
+     * @param {Partial<PluginV1_ColumnSchema>} [$$source = {}] - The source object to create the PluginV1_ColumnSchema.
+     */
+    constructor($$source = {}) {
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["name"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["type"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {boolean | undefined}
+             */
+            this["nullable"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {boolean | undefined}
+             */
+            this["primary_key"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["default"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {number | undefined}
+             */
+            this["ordinal"] = undefined;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new PluginV1_ColumnSchema instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {PluginV1_ColumnSchema}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new PluginV1_ColumnSchema(/** @type {Partial<PluginV1_ColumnSchema>} */($$parsedSource));
+    }
+}
+
 export class PluginV1_ConnectionTreeAction {
     /**
      * Creates a new PluginV1_ConnectionTreeAction instance.
@@ -326,6 +392,41 @@ export class PluginV1_ConnectionTreeResponse {
 }
 
 /**
+ * DescribeSchemaResponse returns one entry per object matching the request.
+ */
+export class PluginV1_DescribeSchemaResponse {
+    /**
+     * Creates a new PluginV1_DescribeSchemaResponse instance.
+     * @param {Partial<PluginV1_DescribeSchemaResponse>} [$$source = {}] - The source object to create the PluginV1_DescribeSchemaResponse.
+     */
+    constructor($$source = {}) {
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {(PluginV1_TableSchema | null)[] | undefined}
+             */
+            this["tables"] = undefined;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new PluginV1_DescribeSchemaResponse instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {PluginV1_DescribeSchemaResponse}
+     */
+    static createFrom($$source = {}) {
+        const $$createField0_0 = $$createType12;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("tables" in $$parsedSource) {
+            $$parsedSource["tables"] = $$createField0_0($$parsedSource["tables"]);
+        }
+        return new PluginV1_DescribeSchemaResponse(/** @type {Partial<PluginV1_DescribeSchemaResponse>} */($$parsedSource));
+    }
+}
+
+/**
  * ExecResponse contains the output of an Exec call,
  * provide a typed, extensible envelope that can represent at least three
  * common data models (SQL, document/JSON, and simple key-value maps).  The
@@ -363,7 +464,7 @@ export class PluginV1_ExecResponse {
      * @returns {PluginV1_ExecResponse}
      */
     static createFrom($$source = {}) {
-        const $$createField0_0 = $$createType11;
+        const $$createField0_0 = $$createType14;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("result" in $$parsedSource) {
             $$parsedSource["result"] = $$createField0_0($$parsedSource["result"]);
@@ -410,6 +511,62 @@ export class PluginV1_ExecResult {
 }
 
 /**
+ * IndexSchema describes an index defined on a table.
+ */
+export class PluginV1_IndexSchema {
+    /**
+     * Creates a new PluginV1_IndexSchema instance.
+     * @param {Partial<PluginV1_IndexSchema>} [$$source = {}] - The source object to create the PluginV1_IndexSchema.
+     */
+    constructor($$source = {}) {
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["name"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string[] | undefined}
+             */
+            this["columns"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {boolean | undefined}
+             */
+            this["unique"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {boolean | undefined}
+             */
+            this["primary"] = undefined;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new PluginV1_IndexSchema instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {PluginV1_IndexSchema}
+     */
+    static createFrom($$source = {}) {
+        const $$createField1_0 = $$createType0;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("columns" in $$parsedSource) {
+            $$parsedSource["columns"] = $$createField1_0($$parsedSource["columns"]);
+        }
+        return new PluginV1_IndexSchema(/** @type {Partial<PluginV1_IndexSchema>} */($$parsedSource));
+    }
+}
+
+/**
  * NodeType is an optional hint for the frontend icon renderer and lets Go
  * code reference well-known node kinds via generated constants instead of
  * raw strings.
@@ -447,6 +604,59 @@ export const PluginV1_NodeType = {
      */
     PluginV1_NODE_TYPE_KEY: 8,
 };
+
+/**
+ * TableSchema represents the structure of a single table or collection.
+ */
+export class PluginV1_TableSchema {
+    /**
+     * Creates a new PluginV1_TableSchema instance.
+     * @param {Partial<PluginV1_TableSchema>} [$$source = {}] - The source object to create the PluginV1_TableSchema.
+     */
+    constructor($$source = {}) {
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["name"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {(PluginV1_ColumnSchema | null)[] | undefined}
+             */
+            this["columns"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {(PluginV1_IndexSchema | null)[] | undefined}
+             */
+            this["indexes"] = undefined;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new PluginV1_TableSchema instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {PluginV1_TableSchema}
+     */
+    static createFrom($$source = {}) {
+        const $$createField1_0 = $$createType17;
+        const $$createField2_0 = $$createType20;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("columns" in $$parsedSource) {
+            $$parsedSource["columns"] = $$createField1_0($$parsedSource["columns"]);
+        }
+        if ("indexes" in $$parsedSource) {
+            $$parsedSource["indexes"] = $$createField2_0($$parsedSource["indexes"]);
+        }
+        return new PluginV1_TableSchema(/** @type {Partial<PluginV1_TableSchema>} */($$parsedSource));
+    }
+}
 
 /**
  * TestConnectionResponse indicates whether the connection attempt succeeded.
@@ -503,5 +713,14 @@ const $$createType6 = $Create.Array($$createType5);
 const $$createType7 = PluginV1_ConnectionTreeAction.createFrom;
 const $$createType8 = $Create.Nullable($$createType7);
 const $$createType9 = $Create.Array($$createType8);
-const $$createType10 = PluginV1_ExecResult.createFrom;
+const $$createType10 = PluginV1_TableSchema.createFrom;
 const $$createType11 = $Create.Nullable($$createType10);
+const $$createType12 = $Create.Array($$createType11);
+const $$createType13 = PluginV1_ExecResult.createFrom;
+const $$createType14 = $Create.Nullable($$createType13);
+const $$createType15 = PluginV1_ColumnSchema.createFrom;
+const $$createType16 = $Create.Nullable($$createType15);
+const $$createType17 = $Create.Array($$createType16);
+const $$createType18 = PluginV1_IndexSchema.createFrom;
+const $$createType19 = $Create.Nullable($$createType18);
+const $$createType20 = $Create.Array($$createType19);

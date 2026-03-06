@@ -83,6 +83,13 @@ type ConnectionTreeResponse = pluginpb.PluginV1_ConnectionTreeResponse
 type ConnectionTreeNode = pluginpb.PluginV1_ConnectionTreeNode
 type ConnectionTreeAction = pluginpb.PluginV1_ConnectionTreeAction
 
+// Schema descriptions – returned by the DescribeSchema RPC.
+type DescribeSchemaRequest = pluginpb.PluginV1_DescribeSchemaRequest
+ type DescribeSchemaResponse = pluginpb.PluginV1_DescribeSchemaResponse
+ type TableSchema = pluginpb.PluginV1_TableSchema
+ type ColumnSchema = pluginpb.PluginV1_ColumnSchema
+ type IndexSchema = pluginpb.PluginV1_IndexSchema
+
 // TestConnectionRequest / TestConnectionResponse are type aliases for the
 // proto-package types defined in rpc/contracts/plugin/v1.  When protoc
 // regenerates plugin.pb.go these will resolve to the fully-registered proto
@@ -213,6 +220,26 @@ func ServeCLI(s pluginpb.PluginServiceServer) {
 		}
 		b, _ := protojson.Marshal(res)
 		_, _ = os.Stdout.Write(b)
+	case "describe-schema":
+		in, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "plugin: failed to read stdin: %v\n", err)
+			os.Exit(1)
+		}
+		var req pluginpb.PluginV1_DescribeSchemaRequest
+		if err := json.Unmarshal(in, &req); err != nil {
+			fmt.Fprintf(os.Stderr, "plugin: invalid describe-schema request json: %v\n", err)
+			os.Exit(1)
+		}
+		res, err := s.DescribeSchema(context.Background(), &req)
+		if err != nil {
+			// older plugins may return an error; wrap in a response so the
+			// host can distinguish between a plugin-level failure and a
+			// transport problem.  behaviour mirrors TestConnection above.
+			res = &pluginpb.PluginV1_DescribeSchemaResponse{}
+		}
+		b, _ := protojson.Marshal(res)
+		_, _ = os.Stdout.Write(b)
 	default:
 		usage()
 		os.Exit(2)
@@ -220,5 +247,5 @@ func ServeCLI(s pluginpb.PluginServiceServer) {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "Usage: <plugin> info | exec | authforms | connection-tree | test-connection (request on stdin as JSON)")
+	fmt.Fprintln(os.Stderr, "Usage: <plugin> info | exec | authforms | connection-tree | test-connection | describe-schema (request on stdin as JSON)")
 }

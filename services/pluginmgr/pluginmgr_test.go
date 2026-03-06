@@ -142,6 +142,91 @@ func TestExecTreeActionForwardsOptions(t *testing.T) {
 	}
 }
 
+func TestDescribeSchemaMissingPlugin(t *testing.T) {
+	m := New()
+	_, err := m.DescribeSchema("nonexistent", nil, "", "")
+	if err == nil {
+		t.Errorf("expected error for missing plugin")
+	}
+}
+
+// GetPluginAuthForms should not return an error when the plugin is absent;
+// callers treat a nil result as “no forms.” This simulates the dev-mode
+// scenario where the frontend queries before the scan completes.
+func TestGetPluginAuthFormsMissingPlugin(t *testing.T) {
+	m := New()
+	forms, err := m.GetPluginAuthForms("nonexistent")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if forms != nil {
+		t.Errorf("expected nil forms, got %#v", forms)
+	}
+}
+
+// If the plugin path exists but is not executable, treat it the same way.
+// Non-executable binaries may show up during scanning if permissions are wrong.
+func TestGetPluginAuthFormsNonExecutable(t *testing.T) {
+	dir, err := os.MkdirTemp("", "pmgrnoexec")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	name := pluginName("notexec")
+	path := filepath.Join(dir, name)
+	// create a file without exec bit
+	if err := os.WriteFile(path, []byte(""), 0o644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	m := &Manager{plugins: map[string]PluginInfo{"notexec": {Path: path}}}
+	forms, err := m.GetPluginAuthForms("notexec")
+	if err != nil {
+		t.Fatalf("unexpected error for non-exec path: %v", err)
+	}
+	if forms != nil {
+		t.Errorf("expected nil forms for non-executable plugin, got %#v", forms)
+	}
+}
+
+func TestDescribeSchemaParsesResponse(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell script plugin not supported on Windows")
+	}
+	// create a dummy executable that handles the describe-schema command
+	dir, err := os.MkdirTemp("", "pmgrschema")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	name := pluginName("dummy")
+	req := strings.TrimSuffix(name, filepath.Ext(name))
+	script := filepath.Join(dir, name)
+	bin := fmt.Sprintf(`#!/bin/sh
+if [ "$1" = "describe-schema" ]; then
+  echo '{"tables":[{"name":"foo","columns":[{"name":"id","type":"int"}],"indexes":[]}]}';
+else
+  echo '{"nodes":[]}'
+fi
+`)
+	if err := os.WriteFile(script, []byte(bin), 0o755); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+
+	m := &Manager{plugins: map[string]PluginInfo{req: {Path: script}}}
+
+	// DescribeSchema expects the plugin name without extension.
+	resp, err := m.DescribeSchema(req, nil, "", "")
+	if err != nil {
+		t.Fatalf("DescribeSchema error: %v", err)
+	}
+	if len(resp.Tables) != 1 || resp.Tables[0].Name != "foo" {
+		t.Errorf("unexpected response: %+v", resp)
+	}
+}
+
 func TestScanOnceConcurrent(t *testing.T) {
 	dir, err := os.MkdirTemp("", "pmgrscan")
 	if err != nil {

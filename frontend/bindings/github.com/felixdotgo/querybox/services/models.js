@@ -131,6 +131,11 @@ export const LogLevel = {
      */
     $zero: "",
 
+    /**
+     * LogLevelDebug can be used for low‑priority messages that are useful
+     * during development but not generally shown to end users.
+     */
+    LogLevelDebug: "debug",
     LogLevelInfo: "info",
     LogLevelWarn: "warn",
     LogLevelError: "error",

@@ -31,6 +31,22 @@ import * as application$0 from "../../../../wailsapp/wails/v3/pkg/application/mo
 import * as $models from "./models.js";
 
 /**
+ * DescribeSchema asks the named plugin to provide schema metadata for the
+ * given connection.  The optional database/table arguments may be empty;
+ * plugins are free to ignore them.  A 30-second timeout prevents hangs.
+ * @param {string} name
+ * @param {{ [_ in string]?: string }} connection
+ * @param {string} database
+ * @param {string} table
+ * @returns {$CancellablePromise<plugin$0.DescribeSchemaResponse | null>}
+ */
+export function DescribeSchema(name, connection, database, table) {
+    return $Call.ByID(1218238003, name, connection, database, table).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType1($result);
+    }));
+}
+
+/**
  * DisablePlugin is not applicable for on-demand execution model.
  * @param {string} name
  * @returns {$CancellablePromise<void>}
@@ -65,7 +81,7 @@ export function EnablePlugin(name) {
  */
 export function ExecPlugin(name, connection, query, options) {
     return $Call.ByID(2332402495, name, connection, query, options).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType1($result);
+        return $$createType3($result);
     }));
 }
 
@@ -81,7 +97,7 @@ export function ExecPlugin(name, connection, query, options) {
  */
 export function ExecTreeAction(name, connection, actionQuery, options) {
     return $Call.ByID(987162126, name, connection, actionQuery, options).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType1($result);
+        return $$createType3($result);
     }));
 }
 
@@ -95,7 +111,7 @@ export function ExecTreeAction(name, connection, actionQuery, options) {
  */
 export function GetConnectionTree(name, connection) {
     return $Call.ByID(3147399459, name, connection).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType3($result);
+        return $$createType5($result);
     }));
 }
 
@@ -109,7 +125,7 @@ export function GetConnectionTree(name, connection) {
  */
 export function GetPluginAuthForms(name) {
     return $Call.ByID(545463133, name).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType6($result);
+        return $$createType8($result);
     }));
 }
 
@@ -119,7 +135,7 @@ export function GetPluginAuthForms(name) {
  */
 export function ListPlugins() {
     return $Call.ByID(668942975).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType8($result);
+        return $$createType10($result);
     }));
 }
 
@@ -165,19 +181,21 @@ export function Shutdown() {
  */
 export function TestConnection(name, connection) {
     return $Call.ByID(2822844201, name, connection).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType10($result);
+        return $$createType12($result);
     }));
 }
 
 // Private type creation functions
-const $$createType0 = pluginpb$0.PluginV1_ExecResponse.createFrom;
+const $$createType0 = pluginpb$0.PluginV1_DescribeSchemaResponse.createFrom;
 const $$createType1 = $Create.Nullable($$createType0);
-const $$createType2 = pluginpb$0.PluginV1_ConnectionTreeResponse.createFrom;
+const $$createType2 = pluginpb$0.PluginV1_ExecResponse.createFrom;
 const $$createType3 = $Create.Nullable($$createType2);
-const $$createType4 = pluginpb$0.PluginV1_AuthForm.createFrom;
+const $$createType4 = pluginpb$0.PluginV1_ConnectionTreeResponse.createFrom;
 const $$createType5 = $Create.Nullable($$createType4);
-const $$createType6 = $Create.Map($Create.Any, $$createType5);
-const $$createType7 = $models.PluginInfo.createFrom;
-const $$createType8 = $Create.Array($$createType7);
-const $$createType9 = pluginpb$0.PluginV1_TestConnectionResponse.createFrom;
-const $$createType10 = $Create.Nullable($$createType9);
+const $$createType6 = pluginpb$0.PluginV1_AuthForm.createFrom;
+const $$createType7 = $Create.Nullable($$createType6);
+const $$createType8 = $Create.Map($Create.Any, $$createType7);
+const $$createType9 = $models.PluginInfo.createFrom;
+const $$createType10 = $Create.Array($$createType9);
+const $$createType11 = pluginpb$0.PluginV1_TestConnectionResponse.createFrom;
+const $$createType12 = $Create.Nullable($$createType11);

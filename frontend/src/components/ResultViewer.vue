@@ -9,6 +9,10 @@ const props = defineProps({
     type: Object,
     required: true,
   },
+  schema: {
+    type: Object,
+    required: false,
+  },
 })
 
 const payload = computed(() => {
@@ -84,7 +88,11 @@ const viewType = computed(() => {
 
 <template>
   <div class="h-full w-full overflow-hidden">
-    <ResultViewerRdbms v-if="viewType === 'rdbms'" :payload="payload" />
+    <ResultViewerRdbms
+      v-if="viewType === 'rdbms'"
+      :payload="payload"
+      :schema="props.schema"
+    />
     <ResultViewerDocument v-else-if="viewType === 'document'" :payload="payload" />
     <ResultViewerKeyValue v-else-if="viewType === 'kv'" :payload="payload" />
     <div v-else class="text-gray-500">

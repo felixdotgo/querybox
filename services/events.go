@@ -34,6 +34,9 @@ const (
 type LogLevel string
 
 const (
+	// LogLevelDebug can be used for low‑priority messages that are useful
+	// during development but not generally shown to end users.
+	LogLevelDebug LogLevel = "debug"
 	LogLevelInfo  LogLevel = "info"
 	LogLevelWarn  LogLevel = "warn"
 	LogLevelError LogLevel = "error"

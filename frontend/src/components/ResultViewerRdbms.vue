@@ -9,6 +9,10 @@ const props = defineProps({
     type: Object,
     required: true,
   },
+  schema: {
+    type: Object,
+    required: false,
+  },
 })
 
 const COL_MIN_WIDTH = 120
@@ -36,14 +40,29 @@ const tableColumns = computed(() => {
   const colMap = new Map()
   cols.forEach((c, idx) => {
     const name = c.name || `col${idx}`
+    // try to annotate with schema metadata if available
+    let display = name
+    let meta = null
+    if (props.schema && Array.isArray(props.schema.columns)) {
+      meta = props.schema.columns.find(x => x.name === name)
+      if (meta) {
+        display = name
+        if (meta.type) {
+          display += ` (${meta.type})`
+        }
+        if (meta.primary_key) {
+          display += ' **'
+        }
+      }
+    }
     const key = `col${idx}`
     const isPinned = pinnedColumns.value.includes(key)
-    const width = Math.max(COL_MIN_WIDTH, name.length * COL_CHAR_WIDTH + 24)
+    const width = Math.max(COL_MIN_WIDTH, display.length * COL_CHAR_WIDTH + 24)
 
     colMap.set(key, {
       title: () =>
         h('div', { class: 'flex items-center gap-1 w-full' }, [
-          h('span', { class: 'flex-1 truncate' }, name),
+          h('span', { class: 'flex-1 truncate' }, display),
           h(
             'button',
             {

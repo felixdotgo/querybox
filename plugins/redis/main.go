@@ -37,6 +37,11 @@ func (r *redisPlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRequest
 	}, nil
 }
 
+func (r *redisPlugin) DescribeSchema(ctx context.Context, req *plugin.DescribeSchemaRequest) (*plugin.DescribeSchemaResponse, error) {
+    // Redis is schemaless; return empty response
+    return &plugin.DescribeSchemaResponse{}, nil
+}
+
 func (r *redisPlugin) AuthForms(ctx context.Context, _ *plugin.AuthFormsRequest) (*plugin.AuthFormsResponse, error) {
 	basic := plugin.AuthForm{
 		Key:  "basic",
