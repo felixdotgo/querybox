@@ -56,6 +56,13 @@ async function openConnections() {
 }
 
 // panel state -------------------------------------------------------------
+// `connectionTrees` is a shared cache where an entry exists iff the
+// connection has been "connected" at least once.  presence in this cache
+// is treated as the authoritative flag for whether a single-click on a
+// connection root should fetch the tree or simply toggle expansion.
+//
+// TODO: once the frontend has a unit-test harness, add tests covering
+// behaviour around cached vs uncached roots.
 const treeScrollRef = ref(null)
 const isScrolled = ref(false)
 const connections = ref([])
@@ -191,13 +198,28 @@ function handleSelect(keys, options, meta) {
   const conn = connections.value.find(c => c.id === key)
   if (conn) {
     selectedConnection.value = conn
-    // On single-click of a connection root, automatically load its tree
-    // (perform a connect). Remove cached tree so a fresh fetch occurs.
-    // Emits mirror the explicit connect flow so callers can react.
-    delete connectionTrees[conn.id]
-    fetchTreeFor(conn)
-    emit('connection-selected', conn)
-    emit('connection-opened', conn)
+
+    // If the tree hasn't been loaded yet, perform the usual connect
+    // behaviour: clear any stale cache, fetch the tree, and fire events.
+    // Once the tree is cached we treat the connection as "connected" and
+    // subsequent single-clicks should simply expand/collapse the node.
+    if (!connectionTrees[conn.id]) {
+      // clear cache just in case and fetch
+      delete connectionTrees[conn.id]
+      fetchTreeFor(conn)
+      emit('connection-selected', conn)
+      emit('connection-opened', conn)
+    }
+    else {
+      // already connected; toggle expansion instead of reconnecting
+      const idx = expandedKeys.value.indexOf(conn.id)
+      if (idx === -1) {
+        expandedKeys.value = [...expandedKeys.value, conn.id]
+      }
+      else {
+        expandedKeys.value = expandedKeys.value.filter(k => k !== conn.id)
+      }
+    }
     return
   }
 
@@ -250,7 +272,11 @@ function handleConnectionDblclick(conn) {
   if (!conn)
     return
   selectedConnection.value = conn
-  // remove cached tree so that a fresh fetch happens on reconnect
+  // double-click has historically behaved as a "reconnect": clear the
+  // cache and run a quick check.  We deliberately do **not** auto-fetch
+  // the tree here; callers can click the connect button or wait for
+  // other interactions to load it.  The cache-clear ensures the next
+  // single-click will refetch.
   delete connectionTrees[conn.id]
   checkConnection(conn)
   // tree load remains tied to the explicit connect button so we don't

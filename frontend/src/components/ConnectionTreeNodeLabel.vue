@@ -1,7 +1,7 @@
 <script setup>
-import { computed, h } from 'vue'
 import { NIcon } from 'naive-ui'
-import { EllipsisHorizontal, actionTypeFallbackIcon, actionTypeIconMap } from '@/lib/icons'
+import { computed, h } from 'vue'
+import { actionTypeFallbackIcon, actionTypeIconMap, EllipsisHorizontal } from '@/lib/icons'
 
 const props = defineProps({
   /** Display label for the tree node */
@@ -75,7 +75,7 @@ function handleMenuSelect(key) {
           @click.stop
         >
           <template #icon>
-            <n-icon><EllipsisHorizontal /></n-icon>
+            <NIcon><EllipsisHorizontal /></NIcon>
           </template>
         </n-button>
       </n-dropdown>

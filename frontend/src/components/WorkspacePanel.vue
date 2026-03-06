@@ -4,7 +4,7 @@ import { onMounted, ref, watch } from 'vue'
 import QueryEditor from '@/components/QueryEditor.vue'
 import ResultViewer from '@/components/ResultViewer.vue'
 import WelcomeTab from '@/components/WelcomeTab.vue'
-import { Analytics, Play, Refresh } from '@/lib/icons'
+import { Analytics, Play } from '@/lib/icons'
 
 const props = defineProps({
   selectedConnection: { type: Object, default: null },
