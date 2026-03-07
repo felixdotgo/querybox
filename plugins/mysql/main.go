@@ -140,6 +140,17 @@ func buildDSN(connection map[string]string) (string, error) {
             }
         }
     }
+    // If the caller forwarded a specific database (e.g. from the tree-node
+    // context), override the DBName in the parsed DSN so the connection opens
+    // against the correct database regardless of the saved credential.
+    if dbOverride, ok := connection["database"]; ok && dbOverride != "" && dsn != "" {
+        if cfg, err2 := mysql.ParseDSN(dsn); err2 == nil {
+            cfg.DBName = dbOverride
+            if rebuilt := cfg.FormatDSN(); rebuilt != "" {
+                dsn = rebuilt
+            }
+        }
+    }
     return dsn, nil
 }
 
@@ -369,8 +380,8 @@ func (m *mysqlPlugin) ConnectionTree(ctx context.Context, req *plugin.Connection
 						Label:    tbl,
 						NodeType: plugin.ConnectionTreeNodeTypeTable,
 						Actions: []*plugin.ConnectionTreeAction{
-							{Type: plugin.ConnectionTreeActionSelect, Title: "Select rows", Query: fmt.Sprintf("SELECT * FROM `%s`.`%s` LIMIT 100;", dbname, tbl), Hidden: true, NewTab: true},
-							{Type: plugin.ConnectionTreeActionDropTable, Title: "Drop table", Query: fmt.Sprintf("DROP TABLE `%s`.`%s`;", dbname, tbl)},
+						{Type: plugin.ConnectionTreeActionSelect, Title: "Select rows", Query: fmt.Sprintf("SELECT * FROM `%s` LIMIT 100;", tbl), Hidden: true, NewTab: true},
+						{Type: plugin.ConnectionTreeActionDropTable, Title: "Drop table", Query: fmt.Sprintf("DROP TABLE `%s`;", tbl)},
 						},
 					})
 				}
@@ -383,7 +394,7 @@ func (m *mysqlPlugin) ConnectionTree(ctx context.Context, req *plugin.Connection
 			NodeType: plugin.ConnectionTreeNodeTypeDatabase,
 			Children: tables,
 			Actions: []*plugin.ConnectionTreeAction{
-				{Type: plugin.ConnectionTreeActionCreateTable, Title: "Create table", Query: fmt.Sprintf("CREATE TABLE `%s`.`new_table` (\n  `id` INT NOT NULL AUTO_INCREMENT,\n  PRIMARY KEY (`id`)\n);", dbname)},
+				{Type: plugin.ConnectionTreeActionCreateTable, Title: "Create table", Query: "CREATE TABLE `new_table` (\n  `id` INT NOT NULL AUTO_INCREMENT,\n  PRIMARY KEY (`id`)\n);"},
 				{Type: plugin.ConnectionTreeActionDropDatabase, Title: "Drop database", Query: fmt.Sprintf("DROP DATABASE `%s`;", dbname)},
 			},
 		})
