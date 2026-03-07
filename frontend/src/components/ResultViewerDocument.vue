@@ -1,7 +1,6 @@
 <script setup>
-import hljs from 'highlight.js/lib/core'
-import jsonLang from 'highlight.js/lib/languages/json'
 import { computed } from 'vue'
+import JsonNode from '@/components/JsonNode.vue'
 
 const props = defineProps({
   // Already-unwrapped document payload: either
@@ -13,10 +12,7 @@ const props = defineProps({
   },
 })
 
-// register only json to keep bundle small
-hljs.registerLanguage('json', jsonLang)
-
-// Normalised list of document payloads. always an array
+// Normalised list of document payloads — always an array
 const docs = computed(() => {
   if (props.payload.documents !== undefined) {
     return Array.isArray(props.payload.documents)
@@ -28,51 +24,31 @@ const docs = computed(() => {
   }
   return []
 })
-
-/**
- * Return a prettified string representation of a single document.
- */
-function format(doc) {
-  if (doc === null || doc === undefined)
-    return ''
-  if (typeof doc === 'string') {
-    try {
-      return JSON.stringify(JSON.parse(doc), null, 2)
-    }
-    catch {
-      return doc
-    }
-  }
-  return JSON.stringify(doc, null, 2)
-}
-
-/**
- * Return highlighted HTML using highlight.js.  relies on JSON language.
- */
-function highlight(doc) {
-  const code = format(doc)
-  const { value } = hljs.highlight(code, { language: 'json' })
-  return value
-}
 </script>
 
 <template>
   <div class="h-full w-full overflow-auto p-2">
     <template v-if="docs.length">
-      <n-space vertical size="small" class="w-full">
-        <n-card
-          v-for="(doc, idx) in docs"
-          :key="idx"
-          bordered
-          size="small"
-          class="w-full"
-        >
-          <pre class="whitespace-pre-wrap break-words text-sm rounded bg-gray-50 p-2"><code v-html="highlight(doc)" /></pre>
-        </n-card>
-      </n-space>
+      <div
+        v-for="(doc, idx) in docs"
+        :key="idx"
+        class="doc-row"
+      >
+        <JsonNode :node-key="null" :value="doc" :depth="0" />
+      </div>
     </template>
-    <div v-else class="text-center text-gray-500">
+    <div v-else class="text-center text-gray-500 py-6 text-sm">
       (no documents)
     </div>
   </div>
 </template>
+
+<style scoped>
+.doc-row {
+  border: 1px solid var(--n-border-color, #e5e7eb);
+  border-radius: 5px;
+  margin-bottom: 6px;
+  padding: 6px 10px;
+  background-color: var(--n-color, #fff);
+}
+</style>
