@@ -88,6 +88,12 @@ Section
 
     !insertmacro wails.files
 
+    !ifdef ARG_WAILS_PLUGINS_DIR
+        SetOutPath "$INSTDIR\bin\plugins"
+        File "${ARG_WAILS_PLUGINS_DIR}\*.exe"
+        SetOutPath "$INSTDIR"
+    !endif
+
     CreateShortcut "$SMPROGRAMS\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
     CreateShortCut "$DESKTOP\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
 
