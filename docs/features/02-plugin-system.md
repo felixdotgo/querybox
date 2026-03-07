@@ -20,8 +20,13 @@ Plugins are single-shot executables under `bin/plugins/`. The host spawns one su
 | `connection-tree` | `{connection}` | `{nodes: [...]}` | 30s | optional |
 | `test-connection` | `{connection}` | `{ok: bool, message: string}` | 15s | optional |
 | `describe-schema` | `{connection, database?, table?}` | `{tables: [{name, columns, indexes}]}` | 30s | optional |
+| `get-completion-fields` | `{connection, database?, collection?}` | `{fields: [{name, type?}]}` | 5s | optional |
 
 ### exec — result payloads
+
+### get-completion-fields — editor metadata
+`get-completion-fields` is used by the frontend query editor to obtain field/column names for the currently selected database and collection (or table). The request is best-effort; schemaless plugins may sample recent documents or inspect a limited catalog. The response should contain zero or more `fields` with `name` and optional `type`. Plugins that cannot provide metadata should return an empty response. This RPC is OPTIONAL and behaviour is equivalent to an empty response if the plugin simply exits without writing anything.
+
 
 `result` contains exactly one of:
 
@@ -101,12 +106,12 @@ If a plugin advertises `"explain-query"` in its `capabilities` array, the host r
 
 | Plugin | Commands | Capabilities | Notes |
 |--------|----------|-------------|-------|
-| `mysql` | exec, authforms, connection-tree, test-connection, describe-schema | explain-query | TLS support |
-| `postgresql` | exec, authforms, connection-tree, test-connection, describe-schema | explain-query | |
-| `sqlite` | exec, authforms, connection-tree, test-connection, describe-schema | explain-query | Two auth forms: local file (`modernc.org/sqlite`) + Turso Cloud (`go-libsql`) |
-| `mongodb` | exec, authforms, connection-tree, test-connection | — | Two auth forms: basic (host/port/password/db/auth-db) + URI string |
-| `redis` | exec, authforms | — | Two auth forms: basic (host/port/password/db) + URL string |
-| `arangodb` | exec, authforms | — | Multi-model (documents, graphs); basic auth form |
+| `mysql` | exec, authforms, connection-tree, test-connection, describe-schema, get-completion-fields | explain-query | TLS support; provides fields for editor autocomplete |
+| `postgresql` | exec, authforms, connection-tree, test-connection, describe-schema, get-completion-fields | explain-query | provides editor field suggestions |
+| `sqlite` | exec, authforms, connection-tree, test-connection, describe-schema, get-completion-fields | explain-query | Two auth forms: local file (`modernc.org/sqlite`) + Turso Cloud (`go-libsql`); samples schema for autocomplete |
+| `mongodb` | exec, authforms, connection-tree, test-connection, get-completion-fields | — | Two auth forms: basic (host/port/password/db/auth-db) + URI string; fields derived by sampling documents |
+| `redis` | exec, authforms | — | Two auth forms: basic (host/port/password/db) + URL string; no field metadata (key-value store) |
+| `arangodb` | exec, authforms, get-completion-fields | — | Multi-model (documents, graphs); basic auth form; ATTRIBUTES() comment for editor autocompletion |
 
 ---
 

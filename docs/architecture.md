@@ -28,7 +28,7 @@ graph LR
 
     FE --> BIND
     BIND -->|CRUD + GetCredential| CONN
-    BIND -->|Exec / Tree / Test / List| PLUGMGR
+    BIND -->|Exec / Tree / Test / List / Auto-complete| PLUGMGR
     BIND -->|Window controls| APP
 
     CONN --> SQLITE
@@ -79,6 +79,7 @@ graph LR
 | `ExecTreeAction(name, conn, query, opts)` | Delegates to `ExecPlugin` with action query |
 | `TestConnection(name, conn)` | Run `plugin test-connection`, **15s** timeout → `TestConnectionResponse` |
 | `DescribeSchema(name, conn, db, table)` | Run `plugin describe-schema`, 30s timeout → `DescribeSchemaResponse` |
+| `GetCompletionFields(name, conn, db?, collection?)` | Run `plugin get-completion-fields`, 5s timeout → `{fields:[{name,type?}]}` |
 
 
 ### Plugin events
@@ -134,4 +135,12 @@ graph LR
 3. Plugin queries the database catalog, returns `{"tables": [{"name", "columns": [...], "indexes": [...]}]}`
 4. PluginManager unmarshals via `protojson`, returns `DescribeSchemaResponse`
 5. Frontend renders column/index details (e.g. `TableStructureViewer` component)
+6. Plugin process exits
+
+### Auto‑complete Fields
+1. User types in a query editor tab; frontend determines active connection, database and collection/table context.
+2. Frontend → `PluginManager.GetCompletionFields(pluginName, connParams, database, collection)`
+3. Spawns `plugin get-completion-fields`, 5s timeout; stdin: `{"connection": {...}, "database": "...", "collection": "..."}`
+4. Plugin returns `{fields:[{name:"col1",type:"text"},...]}` or `{}` when metadata is unavailable.
+5. Frontend merges results with built‑in keywords/commands and shows ranked suggestions in the editor.
 6. Plugin process exits

@@ -123,6 +123,9 @@ See [docs/features/02-plugin-system.md](docs/features/02-plugin-system.md) for t
 
 See [docs/README.md](docs/README.md) for the full reading order. Quick links:
 
+- [Plugin system](docs/features/02-plugin-system.md)
+- [Query editor auto‑completion](docs/features/06-query-editor-autocomplete.md)
+
 ## Third-Party Licenses
 
 | Component | License | Notes |

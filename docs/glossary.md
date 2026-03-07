@@ -21,3 +21,5 @@
 | **Rescan** | Immediate synchronous plugin discovery triggered manually via `PluginManager.Rescan()` or the Rescan button in the Plugins window. Discovery also runs asynchronously once at application startup. Plugin binary changes require a restart or manual Rescan to take effect. |
 | **TestConnectionResponse** | Proto message `{ok: bool, message: string}` returned by `plugin test-connection`. |
 | **Wails Bindings** | Auto-generated TypeScript interfaces enabling type-safe frontend calls to Go services. |
+| **Auto‑completion** | In‑editor feature that suggests keywords, commands, or database field names while typing; driven by frontend logic and optional plugin metadata. |
+| **Completion Fields** | Metadata returned by the `get-completion-fields` RPC; a list of field/column names (and optional types) sampled from the target database/collection. |
