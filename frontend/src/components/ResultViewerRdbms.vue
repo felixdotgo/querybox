@@ -77,7 +77,7 @@ const tableColumns = computed(() => {
                 ? h(
                     NTag,
                     {
-                      size: 'small',
+                      size: 'tiny',
                       color: typeColor,
                       round: true,
                       class: 'datatype-badge',
@@ -87,7 +87,7 @@ const tableColumns = computed(() => {
                   )
                 : null,
               keyIcon
-                ? h(NIcon, { size: 12, class: 'primary-key-icon' }, { default: () => h(keyIcon) })
+                ? h(NIcon, { size: 16, class: 'primary-key-icon' }, { default: () => h(keyIcon) })
                 : null,
             ],
           ),
@@ -104,7 +104,7 @@ const tableColumns = computed(() => {
                 togglePin(key)
               },
             },
-            [h(NIcon, { size: 12 }, { default: () => h(isPinned ? Pin : Pin) })],
+            [h(NIcon, { size: 18 }, { default: () => h(isPinned ? Pin : Pin) })],
           ),
         ]),
       key,
@@ -184,7 +184,8 @@ const rowKeyFunction = row => row && row.key
       :max-height="tableHeight"
       :height-for-row="heightForRow"
       size="small"
-      bordered
+      :bordered="false"
+      :single-line="false"
       striped
       scrollable
       resizable
@@ -195,7 +196,7 @@ const rowKeyFunction = row => row && row.key
 
 <style scoped>
 :deep(.n-data-table-resize-button) {
-  right: -2.5px !important;
+  right: -4px !important;
   opacity: 1 !important;
 }
 :deep(.n-data-table-resize-button)::after {
@@ -216,7 +217,7 @@ const rowKeyFunction = row => row && row.key
 }
 
 :deep(.primary-key-icon) {
-  color: var(--n-loading-color, #18a058); /* green for PK */
+  color: var(--n-loading-color, #fffb1f); /* green for PK */
   opacity: 0.85;
 }
 </style>
