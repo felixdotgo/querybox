@@ -78,6 +78,7 @@ graph LR
 | `GetConnectionTree(name, conn)` | Run `plugin connection-tree`, 30s timeout → `ConnectionTreeResponse` |
 | `ExecTreeAction(name, conn, query, opts)` | Delegates to `ExecPlugin` with action query |
 | `TestConnection(name, conn)` | Run `plugin test-connection`, **15s** timeout → `TestConnectionResponse` |
+| `DescribeSchema(name, conn, db, table)` | Run `plugin describe-schema`, 30s timeout → `DescribeSchemaResponse` |
 
 
 ### Plugin events
@@ -126,3 +127,11 @@ graph LR
 2. Look up `credential_key`, call `CredManager.Delete`
 3. Remove row from `data/connections.db`
 4. `connection:deleted` event emitted → frontend removes entry from state
+
+### Schema Inspection
+1. Frontend → `PluginManager.DescribeSchema(pluginName, connParams, database, table)`
+2. Spawns `plugin describe-schema`, 30s timeout; stdin: `{"connection": {...}, "database": "...", "table": "..."}`
+3. Plugin queries the database catalog, returns `{"tables": [{"name", "columns": [...], "indexes": [...]}]}`
+4. PluginManager unmarshals via `protojson`, returns `DescribeSchemaResponse`
+5. Frontend renders column/index details (e.g. `TableStructureViewer` component)
+6. Plugin process exits

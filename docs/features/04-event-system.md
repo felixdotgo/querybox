@@ -16,6 +16,9 @@
 | `app:log` | All services | `LogEntry{Level, Message, Timestamp}` | Every significant service action |
 | `connection:created` | `ConnectionService.CreateConnection` | `ConnectionCreatedEvent{Connection}` | After successful DB insert |
 | `connection:deleted` | `ConnectionService.DeleteConnection` | `ConnectionDeletedEvent{ID}` | After successful DB delete |
+| `plugins:ready` | `PluginManager` | `nil` | After initial async scan completes, and after each `Rescan()` call |
+| `menu:logs-toggled` | Native menu handler (`services/menu.go`) | `nil` | When user activates the Logs item in the native menu |
+| `connections-window:closed` | `App Service` (`services/app.go`) | `true` (bool) | When the connections window is hidden |
 
 `app:log` is a **stream channel**, not a state-change event — it does not follow the past-tense verb rule.
 

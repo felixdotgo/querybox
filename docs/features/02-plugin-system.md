@@ -14,9 +14,9 @@ Plugins are single-shot executables under `bin/plugins/`. The host spawns one su
 
 | Command | Stdin | Stdout | Timeout | Required |
 |---------|-------|--------|---------|---------|
-| `info` | — | `{name, version, description, type, ...}` | 2s | ✓ |
+| `info` | — | `{name, version, description, type, ...}` | 5s | ✓ |
 | `exec` | `{connection, query, options?}` | `{result, error}` | 30s | ✓ |
-| `authforms` | — | Auth form definitions | 30s | ✓ |
+| `authforms` | — | Auth form definitions | 2s | ✓ |
 | `connection-tree` | `{connection}` | `{nodes: [...]}` | 30s | optional |
 | `test-connection` | `{connection}` | `{ok: bool, message: string}` | 15s | optional |
 | `describe-schema` | `{connection, database?, table?}` | `{tables: [{name, columns, indexes}]}` | 30s | optional |
@@ -101,9 +101,10 @@ If a plugin advertises `"explain-query"` in its `capabilities` array, the host r
 
 | Plugin | Commands | Capabilities | Notes |
 |--------|----------|-------------|-------|
-| `mysql` | exec, authforms, connection-tree, test-connection | explain-query | TLS support |
-| `postgresql` | exec, authforms, connection-tree, test-connection | explain-query | |
-| `sqlite` | exec, authforms, connection-tree, test-connection | explain-query | Two auth forms: local file (`modernc.org/sqlite`) + Turso Cloud (`go-libsql`) |
+| `mysql` | exec, authforms, connection-tree, test-connection, describe-schema | explain-query | TLS support |
+| `postgresql` | exec, authforms, connection-tree, test-connection, describe-schema | explain-query | |
+| `sqlite` | exec, authforms, connection-tree, test-connection, describe-schema | explain-query | Two auth forms: local file (`modernc.org/sqlite`) + Turso Cloud (`go-libsql`) |
+| `mongodb` | exec, authforms, connection-tree, test-connection | — | Two auth forms: basic (host/port/password/db/auth-db) + URI string |
 | `redis` | exec, authforms | — | Two auth forms: basic (host/port/password/db) + URL string |
 | `arangodb` | exec, authforms | — | Multi-model (documents, graphs); basic auth form |
 
