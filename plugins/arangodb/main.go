@@ -520,7 +520,11 @@ func (a *arangoPlugin) collectionNodes(ctx context.Context, db driver.Database, 
 	return nodes
 }
 
-// TestConnection verifies the ArangoDB connection by checking server version.
+// TestConnection verifies the ArangoDB connection.
+// It first attempts a server-level version check.  If that is denied (which
+// can happen for non-root users whose credentials are scoped to a specific
+// database), it falls back to opening the configured database and calling
+// Info, which validates the credentials and confirms database accessibility.
 func (a *arangoPlugin) TestConnection(ctx context.Context, req *plugin.TestConnectionRequest) (*plugin.TestConnectionResponse, error) {
 	p, err := parseConnParams(req.Connection)
 	if err != nil {
@@ -532,13 +536,29 @@ func (a *arangoPlugin) TestConnection(ctx context.Context, req *plugin.TestConne
 		return &plugin.TestConnectionResponse{Ok: false, Message: fmt.Sprintf("client error: %v", err)}, nil
 	}
 
-	v, err := client.Version(ctx)
+	// Prefer the version endpoint — it requires no database context and gives
+	// a rich confirmation message.  Non-root users may not have access to it,
+	// so on any error we fall through to a database-scoped check instead of
+	// failing immediately.
+	if v, vErr := client.Version(ctx); vErr == nil {
+		return &plugin.TestConnectionResponse{
+			Ok:      true,
+			Message: fmt.Sprintf("Connection successful (ArangoDB %s)", v.Version),
+		}, nil
+	}
+
+	// Version check unavailable — verify connectivity via database access.
+	db, err := client.Database(ctx, p.database)
 	if err != nil {
-		return &plugin.TestConnectionResponse{Ok: false, Message: fmt.Sprintf("version check error: %v", err)}, nil
+		return &plugin.TestConnectionResponse{Ok: false, Message: fmt.Sprintf("connection error: %v", err)}, nil
+	}
+	info, err := db.Info(ctx)
+	if err != nil {
+		return &plugin.TestConnectionResponse{Ok: false, Message: fmt.Sprintf("database access error: %v", err)}, nil
 	}
 	return &plugin.TestConnectionResponse{
 		Ok:      true,
-		Message: fmt.Sprintf("Connection successful (ArangoDB %s)", v.Version),
+		Message: fmt.Sprintf("Connection successful (database: %s)", info.Name),
 	}, nil
 }
 
