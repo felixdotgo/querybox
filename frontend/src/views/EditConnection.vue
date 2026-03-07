@@ -12,8 +12,8 @@ import {
   GetPluginAuthForms,
   TestConnection,
 } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
-import AuthFormRenderer from '@/components/AuthFormRenderer.vue'
-import SafeZone from '@/components/SafeZone.vue'
+import { AuthFormRenderer } from '@/components/connections'
+import { SafeZone } from '@/components/layout'
 
 const notification = useNotification()
 
@@ -202,7 +202,6 @@ onMounted(() => {
         <SafeZone />
         <div class="p-4 pb-6">
           <div class="max-w-3xl">
-
             <!-- Connection name -->
             <div class="mb-4">
               <label class="block mb-1.5 text-gray-700 font-bold">Name</label>

@@ -1,12 +1,12 @@
 <script setup>
 import { NButton, NIcon } from 'naive-ui'
 import { computed, onMounted, ref, toRef, watch } from 'vue'
-import QueryEditor from '@/components/QueryEditor.vue'
-import ResultViewer from '@/components/ResultViewer.vue'
-import TableStructureViewer from '@/components/TableStructureViewer.vue'
-import WelcomeTab from '@/components/WelcomeTab.vue'
+import { ResultViewer } from '@/components/results'
 import { useConnectionTree } from '@/composables/useConnectionTree'
 import { Analytics, Play } from '@/lib/icons'
+import QueryEditor from './QueryEditor.vue'
+import TableStructureViewer from './TableStructureViewer.vue'
+import WelcomeTab from './WelcomeTab.vue'
 
 const props = defineProps({
   selectedConnection: { type: Object, default: null },

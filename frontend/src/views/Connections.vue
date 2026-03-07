@@ -8,8 +8,8 @@ import {
   GetPluginAuthForms,
   TestConnection,
 } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
-import AuthFormRenderer from '@/components/AuthFormRenderer.vue'
-import SafeZone from '@/components/SafeZone.vue'
+import { AuthFormRenderer } from '@/components/connections'
+import { SafeZone } from '@/components/layout'
 import { usePlugins } from '@/composables/usePlugins'
 
 const notification = useNotification()

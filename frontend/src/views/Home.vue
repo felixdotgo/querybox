@@ -1,12 +1,9 @@
 <script setup>
 import { Events } from '@wailsio/runtime'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import AppMenuBar from '@/components/AppMenuBar.vue'
-import ConnectionsPanel from '@/components/ConnectionsPanel.vue'
-import LogsPanel from '@/components/LogsPanel.vue'
-import SafeZone from '@/components/SafeZone.vue'
-import TwoColumnLayout from '@/components/TwoColumnLayout.vue'
-import WorkspacePanel from '@/components/WorkspacePanel.vue'
+import { ConnectionsPanel } from '@/components/connections'
+import { AppMenuBar, LogsPanel, SafeZone, TwoColumnLayout } from '@/components/layout'
+import { WorkspacePanel } from '@/components/workspace'
 import {
   createHorizontalResizer,
   createVerticalResizer,

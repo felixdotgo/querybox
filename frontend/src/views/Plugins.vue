@@ -3,7 +3,7 @@ import { Events } from '@wailsio/runtime'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ClosePluginsWindow } from '@/bindings/github.com/felixdotgo/querybox/services/app'
 import { Rescan } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
-import SafeZone from '@/components/SafeZone.vue'
+import { SafeZone } from '@/components/layout'
 import { usePlugins } from '@/composables/usePlugins'
 
 const TYPE_LABELS = { 1: 'Driver', 2: 'Transformer', 3: 'Formatter' }

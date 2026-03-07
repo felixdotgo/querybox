@@ -17,14 +17,10 @@ import {
   ExecPlugin,
   ExecTreeAction,
 } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
-import ActionFormModal from '@/components/ActionFormModal.vue'
-import ConnectionNodeLabel from '@/components/ConnectionNodeLabel.vue'
-import ConnectionTreeNodeLabel from '@/components/ConnectionTreeNodeLabel.vue'
 import { useConnectionTree } from '@/composables/useConnectionTree'
 // plugin capability cache keyed by plugin id (driver name) derived
 // from the global plugin list.
 import { usePlugins } from '@/composables/usePlugins'
-
 import {
   AddCircle,
   nodeTypeFallbackIcon,
@@ -32,6 +28,10 @@ import {
   Search,
   Server,
 } from '@/lib/icons'
+import ActionFormModal from './ActionFormModal.vue'
+import ConnectionEntryLabel from './ConnectionEntryLabel.vue'
+
+import ConnectionTreeItemLabel from './ConnectionTreeItemLabel.vue'
 
 const props = defineProps({
   activeConnectionId: { type: String, default: null },
@@ -322,7 +322,7 @@ function renderLabel({ option }) {
 
   // non-connection nodes with plugin-defined actions: render action buttons on hover
   if (!conn && option.actions && option.actions.length > 0) {
-    return h(ConnectionTreeNodeLabel, {
+    return h(ConnectionTreeItemLabel, {
       label: option.label,
       actions: option.actions,
       onAction(action) {
@@ -339,7 +339,7 @@ function renderLabel({ option }) {
   if (!conn)
     return option.label
 
-  return h(ConnectionNodeLabel, {
+  return h(ConnectionEntryLabel, {
     label: option.label,
     hasTree: !!connectionTrees[conn.id],
     isActive: props.activeConnectionId === conn.id,

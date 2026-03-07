@@ -1,6 +1,6 @@
 <script setup>
 import { toRefs, watch } from 'vue'
-import { OpenFileDialog } from '../../bindings/github.com/felixdotgo/querybox/services/app.js'
+import { OpenFileDialog } from '@/bindings/github.com/felixdotgo/querybox/services/app.js'
 
 const props = defineProps({
   form: { type: Object, required: true },

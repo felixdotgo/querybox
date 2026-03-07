@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue'
-import JsonNode from '@/components/JsonNode.vue'
+import JsonNode from './JsonNode.vue'
 
 const props = defineProps({
   // Already-unwrapped document payload: either

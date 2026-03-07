@@ -1,8 +1,8 @@
 <script setup>
 import { computed } from 'vue'
-import ResultViewerDocument from '@/components/ResultViewerDocument.vue'
-import ResultViewerKeyValue from '@/components/ResultViewerKeyValue.vue'
-import ResultViewerRdbms from '@/components/ResultViewerRdbms.vue'
+import ResultViewerDocument from './ResultViewerDocument.vue'
+import ResultViewerKeyValue from './ResultViewerKeyValue.vue'
+import ResultViewerRdbms from './ResultViewerRdbms.vue'
 
 const props = defineProps({
   result: {
