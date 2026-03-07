@@ -442,6 +442,61 @@ func (r *redisPlugin) ConnectionTree(ctx context.Context, req *plugin.Connection
 	return &plugin.ConnectionTreeResponse{Nodes: nodes}, nil
 }
 
+// GetCompletionFields discovers hash field names for a key pattern.
+// req.Collection is treated as a key name or glob pattern (e.g. "user:*").
+// For hash-type keys matching the pattern we collect all field names via HKEYS.
+// Up to 100 unique keys are sampled; the result is the union of their fields.
+// This satisfies the plugin.CompletionFieldsProvider interface.
+func (r *redisPlugin) GetCompletionFields(ctx context.Context, req *plugin.GetCompletionFieldsRequest) (*plugin.GetCompletionFieldsResponse, error) {
+	client, err := buildClient(req.Connection)
+	if err != nil {
+		return &plugin.GetCompletionFieldsResponse{}, nil
+	}
+	defer client.Close()
+
+	pattern := req.Collection
+	if pattern == "" {
+		pattern = "*"
+	}
+
+	fieldSet := make(map[string]struct{})
+	var cursor uint64
+	sampled := 0
+	for {
+		keys, nextCursor, err := client.Scan(ctx, cursor, pattern, 20).Result()
+		if err != nil {
+			break
+		}
+		for _, key := range keys {
+			keyType, err := client.Type(ctx, key).Result()
+			if err != nil || keyType != "hash" {
+				continue
+			}
+			fields, err := client.HKeys(ctx, key).Result()
+			if err != nil {
+				continue
+			}
+			for _, f := range fields {
+				fieldSet[f] = struct{}{}
+			}
+			sampled++
+			if sampled >= 100 {
+				break
+			}
+		}
+		cursor = nextCursor
+		if cursor == 0 || sampled >= 100 {
+			break
+		}
+	}
+
+	result := make([]*plugin.FieldInfo, 0, len(fieldSet))
+	for name := range fieldSet {
+		result = append(result, &plugin.FieldInfo{Name: name})
+	}
+	return &plugin.GetCompletionFieldsResponse{Fields: result}, nil
+}
+
 // TestConnection pings the Redis server to verify the supplied credentials.
 func (r *redisPlugin) TestConnection(ctx context.Context, req *plugin.TestConnectionRequest) (*plugin.TestConnectionResponse, error) {
 	client, err := buildClient(req.Connection)

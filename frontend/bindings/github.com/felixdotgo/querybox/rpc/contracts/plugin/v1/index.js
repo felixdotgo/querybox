@@ -13,6 +13,8 @@ export {
     PluginV1_DescribeSchemaResponse,
     PluginV1_ExecResponse,
     PluginV1_ExecResult,
+    PluginV1_FieldInfo,
+    PluginV1_GetCompletionFieldsResponse,
     PluginV1_IndexSchema,
     PluginV1_NodeType,
     PluginV1_TableSchema,

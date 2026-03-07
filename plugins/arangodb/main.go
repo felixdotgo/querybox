@@ -520,6 +520,64 @@ func (a *arangoPlugin) collectionNodes(ctx context.Context, db driver.Database, 
 	return nodes
 }
 
+// GetCompletionFields samples field names from a collection using AQL
+// ATTRIBUTES() so the editor autocomplete can offer field suggestions.
+// This satisfies the plugin.CompletionFieldsProvider interface.
+func (a *arangoPlugin) GetCompletionFields(ctx context.Context, req *pluginpb.PluginV1_GetCompletionFieldsRequest) (*pluginpb.PluginV1_GetCompletionFieldsResponse, error) {
+	p, err := parseConnParams(req.Connection)
+	if err != nil {
+		return &pluginpb.PluginV1_GetCompletionFieldsResponse{}, nil
+	}
+	client, err := buildClient(p)
+	if err != nil {
+		return &pluginpb.PluginV1_GetCompletionFieldsResponse{}, nil
+	}
+
+	dbName := req.Database
+	if dbName == "" {
+		dbName = p.database
+	}
+	collName := req.Collection
+	if collName == "" {
+		return &pluginpb.PluginV1_GetCompletionFieldsResponse{}, nil
+	}
+
+	db, err := client.Database(ctx, dbName)
+	if err != nil {
+		return &pluginpb.PluginV1_GetCompletionFieldsResponse{}, nil
+	}
+
+	// ATTRIBUTES(doc, true) returns all attribute names including nested ones.
+	// We flatten the result into top-level names only for simplicity.
+	aql := fmt.Sprintf(
+		"FOR doc IN `%s` LIMIT 100 FOR attr IN ATTRIBUTES(doc, true) RETURN DISTINCT attr",
+		collName,
+	)
+	cursor, err := db.Query(ctx, aql, nil)
+	if err != nil {
+		return &pluginpb.PluginV1_GetCompletionFieldsResponse{}, nil
+	}
+	defer cursor.Close()
+
+	fieldSet := make(map[string]struct{})
+	for cursor.HasMore() {
+		var name string
+		if _, err := cursor.ReadDocument(ctx, &name); err != nil {
+			continue
+		}
+		if name != "" {
+			fieldSet[name] = struct{}{}
+		}
+	}
+
+	fields := make([]*pluginpb.PluginV1_FieldInfo, 0, len(fieldSet))
+	for name := range fieldSet {
+		fields = append(fields, &pluginpb.PluginV1_FieldInfo{Name: name})
+	}
+
+	return &pluginpb.PluginV1_GetCompletionFieldsResponse{Fields: fields}, nil
+}
+
 // TestConnection verifies the ArangoDB connection.
 // It first attempts a server-level version check.  If that is denied (which
 // can happen for non-root users whose credentials are scoped to a specific

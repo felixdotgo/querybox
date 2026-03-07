@@ -102,6 +102,23 @@ export function ExecTreeAction(name, connection, actionQuery, options) {
 }
 
 /**
+ * GetCompletionFields asks the named plugin for discoverable field names for a
+ * specific database/collection.  The call is used by the editor auto-completion
+ * feature.  Plugins that don't implement the CompletionFieldsProvider interface
+ * return an empty response.  A 15-second timeout guards misbehaving plugins.
+ * @param {string} name
+ * @param {{ [_ in string]?: string }} connection
+ * @param {string} database
+ * @param {string} collection
+ * @returns {$CancellablePromise<plugin$0.GetCompletionFieldsResponse | null>}
+ */
+export function GetCompletionFields(name, connection, database, collection) {
+    return $Call.ByID(2222067792, name, connection, database, collection).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType5($result);
+    }));
+}
+
+/**
  * GetConnectionTree asks the named plugin for its connection tree.  The
  * request contains only the connection map; the plugin defines node structure
  * and actions.  A timeout guards misbehaving plugins.
@@ -111,7 +128,7 @@ export function ExecTreeAction(name, connection, actionQuery, options) {
  */
 export function GetConnectionTree(name, connection) {
     return $Call.ByID(3147399459, name, connection).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType5($result);
+        return $$createType7($result);
     }));
 }
 
@@ -125,7 +142,7 @@ export function GetConnectionTree(name, connection) {
  */
 export function GetPluginAuthForms(name) {
     return $Call.ByID(545463133, name).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType8($result);
+        return $$createType10($result);
     }));
 }
 
@@ -135,7 +152,7 @@ export function GetPluginAuthForms(name) {
  */
 export function ListPlugins() {
     return $Call.ByID(668942975).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType10($result);
+        return $$createType12($result);
     }));
 }
 
@@ -181,7 +198,7 @@ export function Shutdown() {
  */
 export function TestConnection(name, connection) {
     return $Call.ByID(2822844201, name, connection).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType12($result);
+        return $$createType14($result);
     }));
 }
 
@@ -190,12 +207,14 @@ const $$createType0 = pluginpb$0.PluginV1_DescribeSchemaResponse.createFrom;
 const $$createType1 = $Create.Nullable($$createType0);
 const $$createType2 = pluginpb$0.PluginV1_ExecResponse.createFrom;
 const $$createType3 = $Create.Nullable($$createType2);
-const $$createType4 = pluginpb$0.PluginV1_ConnectionTreeResponse.createFrom;
+const $$createType4 = pluginpb$0.PluginV1_GetCompletionFieldsResponse.createFrom;
 const $$createType5 = $Create.Nullable($$createType4);
-const $$createType6 = pluginpb$0.PluginV1_AuthForm.createFrom;
+const $$createType6 = pluginpb$0.PluginV1_ConnectionTreeResponse.createFrom;
 const $$createType7 = $Create.Nullable($$createType6);
-const $$createType8 = $Create.Map($Create.Any, $$createType7);
-const $$createType9 = $models.PluginInfo.createFrom;
-const $$createType10 = $Create.Array($$createType9);
-const $$createType11 = pluginpb$0.PluginV1_TestConnectionResponse.createFrom;
-const $$createType12 = $Create.Nullable($$createType11);
+const $$createType8 = pluginpb$0.PluginV1_AuthForm.createFrom;
+const $$createType9 = $Create.Nullable($$createType8);
+const $$createType10 = $Create.Map($Create.Any, $$createType9);
+const $$createType11 = $models.PluginInfo.createFrom;
+const $$createType12 = $Create.Array($$createType11);
+const $$createType13 = pluginpb$0.PluginV1_TestConnectionResponse.createFrom;
+const $$createType14 = $Create.Nullable($$createType13);

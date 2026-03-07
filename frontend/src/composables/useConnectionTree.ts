@@ -151,6 +151,25 @@ export function useConnectionTree(connRef?: Ref<any | null>) {
     return cols
   }
 
+  /**
+   * Return rich column metadata for `tableName` from the schema cache.
+   * Each item includes { name, type, nullable, primary_key }.
+   * Falls back to plain name-only objects when schema data is unavailable.
+   */
+  function getColumnDetails(tableName: string): Array<{ name: string, type: string, nullable: boolean, primary_key: boolean }> {
+    const schema = getSchema(tableName)
+    if (schema && Array.isArray(schema.columns) && schema.columns.length > 0) {
+      return schema.columns.map((c: any) => ({
+        name: c.name || '',
+        type: c.type || '',
+        nullable: !!c.nullable,
+        primary_key: !!c.primary_key,
+      }))
+    }
+    // Fall back to tree-children names when schema cache has no columns metadata
+    return getColumns(tableName).map(name => ({ name, type: '', nullable: true, primary_key: false }))
+  }
+
   function getSchema(tableName: string): any | null {
     const id = connRef?.value?.id
     if (!id)
@@ -251,6 +270,7 @@ export function useConnectionTree(connRef?: Ref<any | null>) {
     load,
     getTableNames,
     getColumns,
+    getColumnDetails,
     getSchema,
     getAllSchemas,
     fetchSchema,

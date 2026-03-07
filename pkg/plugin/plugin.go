@@ -240,6 +240,23 @@ func ServeCLI(s pluginpb.PluginServiceServer) {
 		}
 		b, _ := protojson.Marshal(res)
 		_, _ = os.Stdout.Write(b)
+	case "completion-fields":
+		in, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "plugin: failed to read stdin: %v\n", err)
+			os.Exit(1)
+		}
+		var req pluginpb.PluginV1_GetCompletionFieldsRequest
+		if err := json.Unmarshal(in, &req); err != nil {
+			fmt.Fprintf(os.Stderr, "plugin: invalid completion-fields request json: %v\n", err)
+			os.Exit(1)
+		}
+		res, err := s.GetCompletionFields(context.Background(), &req)
+		if err != nil || res == nil {
+			res = &pluginpb.PluginV1_GetCompletionFieldsResponse{}
+		}
+		b, _ := protojson.Marshal(res)
+		_, _ = os.Stdout.Write(b)
 	default:
 		usage()
 		os.Exit(2)
@@ -247,5 +264,5 @@ func ServeCLI(s pluginpb.PluginServiceServer) {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "Usage: <plugin> info | exec | authforms | connection-tree | test-connection | describe-schema (request on stdin as JSON)")
+	fmt.Fprintln(os.Stderr, "Usage: <plugin> info | exec | authforms | connection-tree | test-connection | describe-schema | completion-fields (request on stdin as JSON)")
 }

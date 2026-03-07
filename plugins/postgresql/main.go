@@ -550,6 +550,60 @@ func formatPingError(err error) string {
 
 // TestConnection opens a PostgreSQL connection and pings the server to verify
 // the supplied credentials are valid. Nothing is persisted.
+// GetCompletionFields returns column names and types for the given table,
+// enabling context-aware auto-completion in the editor.
+func (m *postgresqlPlugin) GetCompletionFields(ctx context.Context, req *plugin.GetCompletionFieldsRequest) (*plugin.GetCompletionFieldsResponse, error) {
+	if req.Collection == "" {
+		return &plugin.GetCompletionFieldsResponse{}, nil
+	}
+	dsn, err := buildConnString(req.Connection)
+	if err != nil || dsn == "" {
+		return &plugin.GetCompletionFieldsResponse{}, nil
+	}
+	db, err := sql.Open("postgres", dsn)
+	if err != nil {
+		return &plugin.GetCompletionFieldsResponse{}, nil
+	}
+	defer db.Close()
+
+	// Support both "schema.table" and plain "table" forms.
+	schemaName := ""
+	tableName := req.Collection
+	if parts := strings.SplitN(req.Collection, ".", 2); len(parts) == 2 {
+		schemaName = parts[0]
+		tableName = parts[1]
+	}
+
+	// When no schema is known, ask the live connection for its current search-path
+	// schema so we don't hard-code "public" (schemas like dbo, myapp, etc. exist).
+	if schemaName == "" {
+		_ = db.QueryRowContext(ctx, "SELECT current_schema()").Scan(&schemaName)
+	}
+	if schemaName == "" {
+		schemaName = "public"
+	}
+
+	colQ := `SELECT column_name, data_type
+			 FROM information_schema.columns
+			 WHERE table_schema=$1 AND table_name=$2
+			 ORDER BY ordinal_position`
+	rows, err := db.QueryContext(ctx, colQ, schemaName, tableName)
+	if err != nil {
+		return &plugin.GetCompletionFieldsResponse{}, nil
+	}
+	defer rows.Close()
+
+	resp := &plugin.GetCompletionFieldsResponse{}
+	for rows.Next() {
+		var name, colType string
+		if rows.Scan(&name, &colType) != nil {
+			continue
+		}
+		resp.Fields = append(resp.Fields, &plugin.FieldInfo{Name: name, Type: colType})
+	}
+	return resp, nil
+}
+
 func (m *postgresqlPlugin) TestConnection(ctx context.Context, req *plugin.TestConnectionRequest) (*plugin.TestConnectionResponse, error) {
 	dsn, err := buildConnString(req.Connection)
 	if err != nil || dsn == "" {

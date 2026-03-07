@@ -511,6 +511,80 @@ export class PluginV1_ExecResult {
 }
 
 /**
+ * FieldInfo describes a single discoverable field name and its optional type.
+ */
+export class PluginV1_FieldInfo {
+    /**
+     * Creates a new PluginV1_FieldInfo instance.
+     * @param {Partial<PluginV1_FieldInfo>} [$$source = {}] - The source object to create the PluginV1_FieldInfo.
+     */
+    constructor($$source = {}) {
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["name"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * optional; may be empty for schemaless stores
+             * @member
+             * @type {string | undefined}
+             */
+            this["type"] = undefined;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new PluginV1_FieldInfo instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {PluginV1_FieldInfo}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new PluginV1_FieldInfo(/** @type {Partial<PluginV1_FieldInfo>} */($$parsedSource));
+    }
+}
+
+/**
+ * GetCompletionFieldsResponse holds the sampled field names for a collection.
+ */
+export class PluginV1_GetCompletionFieldsResponse {
+    /**
+     * Creates a new PluginV1_GetCompletionFieldsResponse instance.
+     * @param {Partial<PluginV1_GetCompletionFieldsResponse>} [$$source = {}] - The source object to create the PluginV1_GetCompletionFieldsResponse.
+     */
+    constructor($$source = {}) {
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {(PluginV1_FieldInfo | null)[] | undefined}
+             */
+            this["fields"] = undefined;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new PluginV1_GetCompletionFieldsResponse instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {PluginV1_GetCompletionFieldsResponse}
+     */
+    static createFrom($$source = {}) {
+        const $$createField0_0 = $$createType17;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("fields" in $$parsedSource) {
+            $$parsedSource["fields"] = $$createField0_0($$parsedSource["fields"]);
+        }
+        return new PluginV1_GetCompletionFieldsResponse(/** @type {Partial<PluginV1_GetCompletionFieldsResponse>} */($$parsedSource));
+    }
+}
+
+/**
  * IndexSchema describes an index defined on a table.
  */
 export class PluginV1_IndexSchema {
@@ -645,8 +719,8 @@ export class PluginV1_TableSchema {
      * @returns {PluginV1_TableSchema}
      */
     static createFrom($$source = {}) {
-        const $$createField1_0 = $$createType17;
-        const $$createField2_0 = $$createType20;
+        const $$createField1_0 = $$createType20;
+        const $$createField2_0 = $$createType23;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("columns" in $$parsedSource) {
             $$parsedSource["columns"] = $$createField1_0($$parsedSource["columns"]);
@@ -718,9 +792,12 @@ const $$createType11 = $Create.Nullable($$createType10);
 const $$createType12 = $Create.Array($$createType11);
 const $$createType13 = PluginV1_ExecResult.createFrom;
 const $$createType14 = $Create.Nullable($$createType13);
-const $$createType15 = PluginV1_ColumnSchema.createFrom;
+const $$createType15 = PluginV1_FieldInfo.createFrom;
 const $$createType16 = $Create.Nullable($$createType15);
 const $$createType17 = $Create.Array($$createType16);
-const $$createType18 = PluginV1_IndexSchema.createFrom;
+const $$createType18 = PluginV1_ColumnSchema.createFrom;
 const $$createType19 = $Create.Nullable($$createType18);
 const $$createType20 = $Create.Array($$createType19);
+const $$createType21 = PluginV1_IndexSchema.createFrom;
+const $$createType22 = $Create.Nullable($$createType21);
+const $$createType23 = $Create.Array($$createType22);

@@ -926,3 +926,75 @@ func (m *Manager) DisablePlugin(name string) error {
 // Shutdown is a no-op; there is no background scanner to stop.
 // It is kept so Wails can still call the lifecycle method without error.
 func (m *Manager) Shutdown() {}
+
+// GetCompletionFields asks the named plugin for discoverable field names for a
+// specific database/collection.  The call is used by the editor auto-completion
+// feature.  Plugins that don't implement the CompletionFieldsProvider interface
+// return an empty response.  A 15-second timeout guards misbehaving plugins.
+func (m *Manager) GetCompletionFields(name string, connection map[string]string, database, collection string) (*plugin.GetCompletionFieldsResponse, error) {
+	m.mu.Lock()
+	info, ok := m.plugins[name]
+	m.mu.Unlock()
+	if !ok {
+		return nil, fmt.Errorf("GetCompletionFields: plugin %s not found", name)
+	}
+	full := info.Path
+	if !isExecutable(full) {
+		return nil, fmt.Errorf("GetCompletionFields: plugin %s is not executable", name)
+	}
+	m.emitLog(services.LogLevelInfo, fmt.Sprintf("GetCompletionFields: fetching fields (driver: %s, collection: %s)", name, collection))
+
+	req := plugin.GetCompletionFieldsRequest{Connection: connection, Database: database, Collection: collection}
+	b, _ := json.Marshal(&req)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, full, "completion-fields")
+	hideWindow(cmd)
+	cmd.Env = append(os.Environ(), "QUERYBOX_PLUGIN_NAME="+name)
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, fmt.Errorf("GetCompletionFields: stdin pipe error: %w", err)
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, fmt.Errorf("GetCompletionFields: stdout pipe error: %w", err)
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, fmt.Errorf("GetCompletionFields: stderr pipe error: %w", err)
+	}
+
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("GetCompletionFields: start error: %w", err)
+	}
+
+	_, _ = stdin.Write(b)
+	_ = stdin.Close()
+
+	outB, _ := io.ReadAll(stdout)
+	errB, _ := io.ReadAll(stderr)
+
+	if err := cmd.Wait(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			m.emitLog(services.LogLevelError, fmt.Sprintf("GetCompletionFields: plugin '%s' timed out", name))
+			return nil, fmt.Errorf("GetCompletionFields: plugin timed out")
+		}
+		m.emitLog(services.LogLevelError, fmt.Sprintf("GetCompletionFields: plugin '%s' exited with error: %v, stderr: %s", name, err, string(errB)))
+		// Non-zero exit is expected for older plugins that don't implement this
+		// command — return empty response rather than an error so callers don't
+		// have to handle the unsupported case specially.
+		return &plugin.GetCompletionFieldsResponse{}, nil
+	}
+
+	resp := &plugin.GetCompletionFieldsResponse{}
+	if len(outB) == 0 {
+		return resp, nil
+	}
+	if err := protojson.Unmarshal(outB, resp); err != nil {
+		m.emitLog(services.LogLevelError, fmt.Sprintf("GetCompletionFields: invalid JSON from '%s': %v", name, err))
+		return &plugin.GetCompletionFieldsResponse{}, nil
+	}
+	m.emitLog(services.LogLevelInfo, fmt.Sprintf("GetCompletionFields: (driver: %s) returned %d fields", name, len(resp.Fields)))
+	return resp, nil
+}

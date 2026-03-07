@@ -338,6 +338,42 @@ func (m *sqlitePlugin) DescribeSchema(ctx context.Context, req *plugin.DescribeS
 }
 
 // TestConnection verifies the connection is reachable without persisting any state.
+// GetCompletionFields returns column names and types for the given table,
+// enabling context-aware auto-completion in the editor.
+func (m *sqlitePlugin) GetCompletionFields(ctx context.Context, req *plugin.GetCompletionFieldsRequest) (*plugin.GetCompletionFieldsResponse, error) {
+	if req.Collection == "" {
+		return &plugin.GetCompletionFieldsResponse{}, nil
+	}
+	c := parseCredential(req.Connection)
+	driver, dsn, err := driverDSN(c)
+	if err != nil {
+		return &plugin.GetCompletionFieldsResponse{}, nil
+	}
+	db, err := sql.Open(driver, dsn)
+	if err != nil {
+		return &plugin.GetCompletionFieldsResponse{}, nil
+	}
+	defer db.Close()
+
+	rows, err := db.QueryContext(ctx, fmt.Sprintf("PRAGMA table_info('%s')", req.Collection))
+	if err != nil {
+		return &plugin.GetCompletionFieldsResponse{}, nil
+	}
+	defer rows.Close()
+
+	resp := &plugin.GetCompletionFieldsResponse{}
+	for rows.Next() {
+		var cid, notnull, pk int
+		var name, colType string
+		var dflt sql.NullString
+		if err := rows.Scan(&cid, &name, &colType, &notnull, &dflt, &pk); err != nil {
+			continue
+		}
+		resp.Fields = append(resp.Fields, &plugin.FieldInfo{Name: name, Type: colType})
+	}
+	return resp, nil
+}
+
 func (m *sqlitePlugin) TestConnection(ctx context.Context, req *plugin.TestConnectionRequest) (*plugin.TestConnectionResponse, error) {
 	c := parseCredential(req.Connection)
 

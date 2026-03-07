@@ -416,6 +416,68 @@ func (m *mysqlPlugin) ConnectionTree(ctx context.Context, req *plugin.Connection
 
 // TestConnection opens a MySQL connection and pings the server to verify the
 // supplied credentials are valid. Nothing is persisted.
+// GetCompletionFields returns column names and types for the given table,
+// enabling context-aware auto-completion in the editor.
+func (m *mysqlPlugin) GetCompletionFields(ctx context.Context, req *plugin.GetCompletionFieldsRequest) (*plugin.GetCompletionFieldsResponse, error) {
+	if req.Collection == "" {
+		return &plugin.GetCompletionFieldsResponse{}, nil
+	}
+	dsn, err := buildDSN(req.Connection)
+	if err != nil || dsn == "" {
+		return &plugin.GetCompletionFieldsResponse{}, nil
+	}
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		return &plugin.GetCompletionFieldsResponse{}, nil
+	}
+	defer db.Close()
+
+	// Support both "schema.table" and plain "table" forms.
+	tableName := req.Collection
+	schemaName := req.Database
+	if parts := strings.SplitN(req.Collection, ".", 2); len(parts) == 2 {
+		schemaName = parts[0]
+		tableName = parts[1]
+	}
+
+	// When no schema is known, ask the live connection for the current database.
+	// This handles the common case where the DSN contains the DB but req.Database
+	// was not forwarded by the caller.
+	if schemaName == "" {
+		_ = db.QueryRowContext(ctx, "SELECT DATABASE()").Scan(&schemaName)
+	}
+
+	var rows *sql.Rows
+	if schemaName != "" {
+		colQ := `SELECT COLUMN_NAME, COLUMN_TYPE
+			 FROM information_schema.COLUMNS
+			 WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?
+			 ORDER BY ORDINAL_POSITION`
+		rows, err = db.QueryContext(ctx, colQ, schemaName, tableName)
+	} else {
+		// Last resort: search all schemas for this table name.
+		colQ := `SELECT COLUMN_NAME, COLUMN_TYPE
+			 FROM information_schema.COLUMNS
+			 WHERE TABLE_NAME = ?
+			 ORDER BY TABLE_SCHEMA, ORDINAL_POSITION`
+		rows, err = db.QueryContext(ctx, colQ, tableName)
+	}
+	if err != nil {
+		return &plugin.GetCompletionFieldsResponse{}, nil
+	}
+	defer rows.Close()
+
+	resp := &plugin.GetCompletionFieldsResponse{}
+	for rows.Next() {
+		var name, colType string
+		if rows.Scan(&name, &colType) != nil {
+			continue
+		}
+		resp.Fields = append(resp.Fields, &plugin.FieldInfo{Name: name, Type: colType})
+	}
+	return resp, nil
+}
+
 func (m *mysqlPlugin) TestConnection(ctx context.Context, req *plugin.TestConnectionRequest) (*plugin.TestConnectionResponse, error) {
 	dsn, err := buildDSN(req.Connection)
 	if err != nil || dsn == "" {

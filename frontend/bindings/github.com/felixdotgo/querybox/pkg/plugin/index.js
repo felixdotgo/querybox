@@ -7,5 +7,6 @@ export {
     ConnectionTreeResponse,
     DescribeSchemaResponse,
     ExecResponse,
+    GetCompletionFieldsResponse,
     TestConnectionResponse
 } from "./models.js";

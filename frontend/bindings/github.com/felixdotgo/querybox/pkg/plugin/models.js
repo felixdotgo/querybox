@@ -42,6 +42,12 @@ export const ExecResponse = pluginpb$0.PluginV1_ExecResponse;
  * @typedef {pluginpb$0.PluginV1_ExecResponse} ExecResponse
  */
 
+export const GetCompletionFieldsResponse = pluginpb$0.PluginV1_GetCompletionFieldsResponse;
+
+/**
+ * @typedef {pluginpb$0.PluginV1_GetCompletionFieldsResponse} GetCompletionFieldsResponse
+ */
+
 export const TestConnectionResponse = pluginpb$0.PluginV1_TestConnectionResponse;
 
 /**

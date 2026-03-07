@@ -306,7 +306,7 @@ defineExpose({ openTab })
               <QueryEditor
                 v-model="tab.query"
                 :language="tab.language || 'sql'"
-                :context="tab.context"
+                :tab="tab"
                 :connection="props.selectedConnection"
                 @execute="handleRefresh(tab)"
               />
