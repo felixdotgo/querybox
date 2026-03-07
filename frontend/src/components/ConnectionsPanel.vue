@@ -5,6 +5,7 @@ import { computed, h, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   ShowConnectionsWindow,
+  ShowEditConnectionWindow,
 } from '@/bindings/github.com/felixdotgo/querybox/services/app'
 import {
   DeleteConnection,
@@ -349,6 +350,9 @@ function renderLabel({ option }) {
         delete schemaCache[conn.id]
       }
       fetchTreeFor(conn)
+    },
+    onEdit() {
+      ShowEditConnectionWindow(conn.id)
     },
     onDelete() {
       deleteModal.value = { visible: true, conn }
@@ -702,11 +706,29 @@ const offConnectionDeleted = Events.On('connection:deleted', async (event) => {
   })
 })
 
+// connection:updated → refresh the list and clear the tree cache for the updated
+// connection so the next connect action fetches fresh data.
+const offConnectionUpdated = Events.On('connection:updated', async (event) => {
+  const id = (event?.data ?? event)?.connection?.id
+  if (id) {
+    delete connectionTrees[id]
+    delete schemaCache[id]
+  }
+  try {
+    await loadConnections()
+  }
+  catch (err) {
+    console.error('connection:updated handler loadConnections', err)
+  }
+})
+
 onUnmounted(() => {
   if (offConnectionCreated)
     offConnectionCreated()
   if (offConnectionDeleted)
     offConnectionDeleted()
+  if (offConnectionUpdated)
+    offConnectionUpdated()
 })
 
 // Expose runTreeAction to support Refresh from the Workspace panel.

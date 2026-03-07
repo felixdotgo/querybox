@@ -16,6 +16,7 @@ import {
   Cash,
   ChevronDown,
   CodeSlash,
+  CreateOutline,
   Document,
   EllipsisHorizontal,
   Eye,
@@ -42,6 +43,7 @@ export {
   Cash, // cost / dollar
   ChevronDown, // footer collapse toggle (rotate -90deg when collapsed)
   CodeSlash, // node_type === "column"
+  CreateOutline, // edit connection
   Document, // unknown / generic fallback
   EllipsisHorizontal, // three-dot context menu trigger
   Eye, // "select" action on tree nodes

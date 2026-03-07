@@ -104,6 +104,21 @@ export function Shutdown() {
     return $Call.ByID(2018664523);
 }
 
+/**
+ * UpdateConnection updates the name and credential of an existing connection.
+ * The credential key in the keyring is reused — only the stored value is
+ * overwritten — so the DB row never changes its credential_key reference.
+ * @param {string} id
+ * @param {string} name
+ * @param {string} credential
+ * @returns {$CancellablePromise<$models.Connection>}
+ */
+export function UpdateConnection(id, name, credential) {
+    return $Call.ByID(1549750468, id, name, credential).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType0($result);
+    }));
+}
+
 // Private type creation functions
 const $$createType0 = $models.Connection.createFrom;
 const $$createType1 = $Create.Array($$createType0);

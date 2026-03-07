@@ -19,6 +19,14 @@ export function CloseConnectionsWindow() {
 }
 
 /**
+ * CloseEditConnectionWindow hides the edit-connection window and emits the closed event.
+ * @returns {$CancellablePromise<void>}
+ */
+export function CloseEditConnectionWindow() {
+    return $Call.ByID(1460024755);
+}
+
+/**
  * CloseMainWindow closes the main application window and initiates
  * a full application shutdown.  Historically the UI called this method when
  * the user selected Quit from the menu or pressed the window close button.
@@ -74,6 +82,17 @@ export function NewAppMenu() {
  */
 export function NewConnectionsWindow() {
     return $Call.ByID(3366044994).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType3($result);
+    }));
+}
+
+/**
+ * NewEditConnectionWindow creates a new edit-connection window, initially hidden.
+ * The window mirrors the connections window options and is reused across sessions.
+ * @returns {$CancellablePromise<application$0.WebviewWindow | null>}
+ */
+export function NewEditConnectionWindow() {
+    return $Call.ByID(2162734037).then(/** @type {($result: any) => any} */(($result) => {
         return $$createType3($result);
     }));
 }
@@ -142,6 +161,16 @@ export function ShowAboutDialog() {
  */
 export function ShowConnectionsWindow() {
     return $Call.ByID(2544478289);
+}
+
+/**
+ * ShowEditConnectionWindow emits the opened event (carrying the connection ID)
+ * and then shows the edit-connection window, constructing it if necessary.
+ * @param {string} id
+ * @returns {$CancellablePromise<void>}
+ */
+export function ShowEditConnectionWindow(id) {
+    return $Call.ByID(1864370600, id);
 }
 
 /**

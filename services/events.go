@@ -16,6 +16,9 @@ const (
 	// EventConnectionCreated is emitted after a connection is successfully persisted.
 	EventConnectionCreated = "connection:created"
 
+	// EventConnectionUpdated is emitted after a connection is successfully updated.
+	EventConnectionUpdated = "connection:updated"
+
 	// EventConnectionDeleted is emitted after a connection is successfully removed.
 	EventConnectionDeleted = "connection:deleted"
 
@@ -24,6 +27,12 @@ const (
 
 	// EventConnectionsWindowClosed is emitted when the connections window is hidden.
 	EventConnectionsWindowClosed = "connections-window:closed"
+
+	// EventEditConnectionWindowOpened is emitted when the edit-connection window is shown, carrying the target connection ID.
+	EventEditConnectionWindowOpened = "edit-connection-window:opened"
+
+	// EventEditConnectionWindowClosed is emitted when the edit-connection window is hidden.
+	EventEditConnectionWindowClosed = "edit-connection-window:closed"
 
 	// EventPluginsReady is emitted by the plugin manager once the initial async
 	// scan has completed and ListPlugins() returns a populated result.
@@ -54,8 +63,18 @@ type ConnectionCreatedEvent struct {
 	Connection Connection `json:"connection"`
 }
 
+// ConnectionUpdatedEvent is the payload emitted on EventConnectionUpdated.
+type ConnectionUpdatedEvent struct {
+	Connection Connection `json:"connection"`
+}
+
 // ConnectionDeletedEvent is the payload emitted on EventConnectionDeleted.
 type ConnectionDeletedEvent struct {
+	ID string `json:"id"`
+}
+
+// EditConnectionWindowOpenedEvent is the payload emitted on EventEditConnectionWindowOpened.
+type EditConnectionWindowOpenedEvent struct {
 	ID string `json:"id"`
 }
 
@@ -78,6 +97,14 @@ func emitConnectionCreated(app *application.App, conn Connection) {
 		return
 	}
 	app.Event.Emit(EventConnectionCreated, ConnectionCreatedEvent{Connection: conn})
+}
+
+// emitConnectionUpdated emits EventConnectionUpdated with the updated connection as payload.
+func emitConnectionUpdated(app *application.App, conn Connection) {
+	if app == nil {
+		return
+	}
+	app.Event.Emit(EventConnectionUpdated, ConnectionUpdatedEvent{Connection: conn})
 }
 
 // emitConnectionDeleted emits EventConnectionDeleted with the removed connection's ID.

@@ -294,6 +294,53 @@ func (s *ConnectionService) GetCredential(ctx context.Context, id string) (strin
 	return cred, nil
 }
 
+// UpdateConnection updates the name and credential of an existing connection.
+// The credential key in the keyring is reused — only the stored value is
+// overwritten — so the DB row never changes its credential_key reference.
+func (s *ConnectionService) UpdateConnection(ctx context.Context, id, name, credential string) (Connection, error) {
+	if id == "" || name == "" {
+		return Connection{}, errors.New("id and name are required")
+	}
+	if !s.closeable() {
+		return Connection{}, errors.New("connections database not initialized")
+	}
+	emitLog(s.app, LogLevelInfo, fmt.Sprintf("UpdateConnection: updating connection '%s'", id))
+	existing, err := s.GetConnection(ctx, id)
+	if err != nil {
+		return Connection{}, err
+	}
+
+	// Overwrite the credential stored under the existing key.
+	if existing.CredentialKey != "" {
+		if err := s.cred.Store(existing.CredentialKey, credential); err != nil {
+			emitLog(s.app, LogLevelError, fmt.Sprintf("UpdateConnection: failed to update credential for '%s': %v", id, err))
+			return Connection{}, fmt.Errorf("update credential: %w", err)
+		}
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	res, err := s.db.ExecContext(ctx, `UPDATE connections SET name = ?, updated_at = ? WHERE id = ?`, name, now, id)
+	if err != nil {
+		emitLog(s.app, LogLevelError, fmt.Sprintf("UpdateConnection: failed to update connection '%s': %v", id, err))
+		return Connection{}, fmt.Errorf("update database connection: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return Connection{}, fmt.Errorf("database connection not found")
+	}
+
+	updated := Connection{
+		ID:            existing.ID,
+		Name:          name,
+		DriverType:    existing.DriverType,
+		CredentialKey: existing.CredentialKey,
+		CreatedAt:     existing.CreatedAt,
+		UpdatedAt:     now,
+	}
+	emitLog(s.app, LogLevelInfo, fmt.Sprintf("UpdateConnection: connection '%s' updated successfully", id))
+	emitConnectionUpdated(s.app, updated)
+	return updated, nil
+}
+
 // DeleteConnection removes a connection by id and attempts to remove the
 // associated secret from the keyring as a best-effort cleanup.
 func (s *ConnectionService) DeleteConnection(ctx context.Context, id string) error {

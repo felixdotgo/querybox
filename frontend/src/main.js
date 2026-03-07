@@ -4,6 +4,7 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 import { ShowConnectionsWindow, ShowPluginsWindow } from '@/bindings/github.com/felixdotgo/querybox/services/app'
 import App from './App.vue'
 import Connections from './views/Connections.vue'
+import EditConnection from './views/EditConnection.vue'
 import Home from './views/Home.vue'
 import Plugins from './views/Plugins.vue'
 import './styles/tailwind.css'
@@ -33,6 +34,7 @@ window.openPluginsWindow = async function openPluginsWindow() {
 const routes = [
   { path: '/', component: Home },
   { path: '/connections', component: Connections },
+  { path: '/edit-connection', component: EditConnection },
   { path: '/plugins', component: Plugins },
 ]
 

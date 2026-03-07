@@ -10,7 +10,9 @@ type App struct {
 	MainWindow        *application.WebviewWindow
 	ConnectionsWindow *application.WebviewWindow
 	// PluginsWindow is a secondary window used to display the plugin list.
-	PluginsWindow     *application.WebviewWindow
+	PluginsWindow        *application.WebviewWindow
+	// EditConnectionWindow is a secondary window used to edit an existing connection.
+	EditConnectionWindow *application.WebviewWindow
 }
 
 // NewAppService creates a new instance of the App service, which provides methods for controlling the main application window and the connections window.
@@ -154,6 +156,64 @@ func (a *App) ShowConnectionsWindow() {
 	}
 	a.ConnectionsWindow.Show()
 	a.ConnectionsWindow.Focus()
+}
+
+// NewEditConnectionWindow creates a new edit-connection window, initially hidden.
+// The window mirrors the connections window options and is reused across sessions.
+func (a *App) NewEditConnectionWindow() *application.WebviewWindow {
+	w := a.App.Window.NewWithOptions(application.WebviewWindowOptions{
+		Name:  "edit-connection",
+		Title: "Edit Connection",
+		URL:   "/#/edit-connection",
+
+		Frameless:     false,
+		DisableResize: true,
+		Hidden:        true,
+		HideOnEscape:  true,
+		MinWidth:      800,
+
+		Mac: application.MacWindow{
+			InvisibleTitleBarHeight: 50,
+			Backdrop:                application.MacBackdropTranslucent,
+			TitleBar:                application.MacTitleBarHiddenInset,
+		},
+
+		CloseButtonState: application.ButtonDisabled,
+	})
+
+	w.OnWindowEvent(events.Common.WindowClosing, func(e *application.WindowEvent) {
+		e.Cancel()
+		a.CloseEditConnectionWindow()
+	})
+
+	w.OnWindowEvent(events.Common.WindowMaximise, func(e *application.WindowEvent) { e.Cancel() })
+	w.OnWindowEvent(events.Common.WindowMinimise, func(e *application.WindowEvent) { e.Cancel() })
+
+	return w
+}
+
+// ShowEditConnectionWindow emits the opened event (carrying the connection ID)
+// and then shows the edit-connection window, constructing it if necessary.
+func (a *App) ShowEditConnectionWindow(id string) {
+	if a.EditConnectionWindow == nil {
+		a.EditConnectionWindow = a.NewEditConnectionWindow()
+	}
+	if a.App != nil {
+		a.App.Event.Emit(EventEditConnectionWindowOpened, EditConnectionWindowOpenedEvent{ID: id})
+	}
+	a.EditConnectionWindow.Show()
+	a.EditConnectionWindow.Focus()
+}
+
+// CloseEditConnectionWindow hides the edit-connection window and emits the closed event.
+func (a *App) CloseEditConnectionWindow() {
+	if a.EditConnectionWindow != nil {
+		a.EditConnectionWindow.SetAlwaysOnTop(false)
+		a.EditConnectionWindow.Hide()
+	}
+	if a.App != nil {
+		a.App.Event.Emit(EventEditConnectionWindowClosed, true)
+	}
 }
 
 // NewPluginsWindow creates a new plugins window, mirroring the behaviour of the

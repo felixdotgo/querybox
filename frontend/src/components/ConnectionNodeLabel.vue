@@ -1,7 +1,7 @@
 <script setup>
 import { NIcon } from 'naive-ui'
 import { computed, h } from 'vue'
-import { EllipsisHorizontal, Flash, Refresh, Trash } from '@/lib/icons'
+import { CreateOutline, EllipsisHorizontal, Flash, Refresh, Trash } from '@/lib/icons'
 
 const props = defineProps({
   /** Display name of the connection */
@@ -26,7 +26,7 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits(['connect', 'delete', 'dblclick'])
+const emit = defineEmits(['connect', 'edit', 'delete', 'dblclick'])
 
 function renderIcon(icon) {
   return () => h(NIcon, null, { default: () => h(icon) })
@@ -39,6 +39,11 @@ const menuOptions = computed(() => [
     icon: renderIcon(props.hasTree ? Refresh : Flash),
     disabled: props.loading,
   },
+  {
+    key: 'edit',
+    label: 'Edit',
+    icon: renderIcon(CreateOutline),
+  },
   { type: 'divider', key: 'divider-1' },
   {
     key: 'delete',
@@ -50,6 +55,8 @@ const menuOptions = computed(() => [
 function handleMenuSelect(key) {
   if (key === 'connect')
     emit('connect')
+  else if (key === 'edit')
+    emit('edit')
   else if (key === 'delete')
     emit('delete')
 }
