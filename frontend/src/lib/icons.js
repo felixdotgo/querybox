@@ -17,7 +17,7 @@ import {
   ChevronDown,
   CodeSlash,
   CreateOutline,
-  Document,
+  Documents,
   EllipsisHorizontal,
   Eye,
   Flash,
@@ -44,7 +44,7 @@ export {
   ChevronDown, // footer collapse toggle (rotate -90deg when collapsed)
   CodeSlash, // node_type === "column"
   CreateOutline, // edit connection
-  Document, // unknown / generic fallback
+  Documents, // unknown / generic fallback
   EllipsisHorizontal, // three-dot context menu trigger
   Eye, // "select" action on tree nodes
   Flash, // "Connect" action / execution time (bolt)
@@ -111,7 +111,7 @@ export function getDataTypeColor(type) {
  */
 export const nodeTypeIconMap = {
   server: Server,
-  database: Library,
+  database: Server,
   schema: Layers,
   table: Grid,
   column: CodeSlash,
@@ -119,7 +119,7 @@ export const nodeTypeIconMap = {
 }
 
 /** Used when a plugin node has no recognised node_type value. */
-export const nodeTypeFallbackIcon = Document
+export const nodeTypeFallbackIcon = Documents
 
 /**
  * Maps ConnectionTreeAction type strings (constants defined in pkg/plugin/plugin.go)
