@@ -62,7 +62,7 @@ func TestProbeInfoDecoding(t *testing.T) {
 		"license": "MIT",
 		"iconUrl": "https://example.org/icon.png",
 		"contact": "support@example.org",
-		"metadata": map[string]string{"key": "val"},
+		"metadata": map[string]string{"key": "val", "simple_icon": "postgresql"},
 		"settings": map[string]string{"k2": "v2"},
 	}
 	b, err := json.Marshal(raw)
@@ -108,6 +108,11 @@ func TestProbeInfoDecoding(t *testing.T) {
 	}
 	if res.Metadata == nil || res.Metadata["key"] != "val" {
 		t.Errorf("metadata missing: %+v", res.Metadata)
+	}
+	// simple_icon is a special hint used by the frontend to pick a branded
+	// database glyph.  Ensure it survives the normalization round-trip.
+	if res.Metadata["simple_icon"] != "postgresql" {
+		t.Errorf("simple_icon metadata not preserved: %+v", res.Metadata)
 	}
 }
 

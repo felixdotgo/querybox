@@ -367,6 +367,10 @@ func (m *Manager) scanOnce() {
 				info.License = meta.License
 				info.IconURL = meta.IconURL
 				info.Contact = meta.Contact
+				// copy through whatever metadata the plugin provided.  The frontend
+				// may look for specific hints such as `simple_icon` (a key that
+				// indicates a simple-icons glyph to render for the driver) when
+				// building the connection UI.
 				info.Metadata = meta.Metadata
 				info.Settings = meta.Settings
 				info.LastError = ""

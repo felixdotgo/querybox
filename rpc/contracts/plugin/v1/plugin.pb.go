@@ -286,6 +286,9 @@ type PluginV1_InfoResponse struct {
 	Author string `protobuf:"bytes,6,opt,name=author,proto3" json:"author,omitempty"` // maintainer or organization name
 	// Free-form maps for extensibility. Both are string to
 	// string for simplicity; plugins can embed JSON in values if needed.
+	// arbitrary plugin-specific info.  Hosts may look for known
+	// keys such as `simple_icon` (a simple-icons name) to render branded
+	// database icons in the UI; unknown keys must be ignored by clients.
 	Metadata      map[string]string `protobuf:"bytes,7,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // arbitrary plugin-specific info
 	Settings      map[string]string `protobuf:"bytes,8,rep,name=settings,proto3" json:"settings,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // hints the core can use (defaults, etc.)
 	Capabilities  []string          `protobuf:"bytes,9,rep,name=capabilities,proto3" json:"capabilities,omitempty"`                                                                   // use in background to determine which plugins support which features (e.g. "transactions", "stored procedures", "json support")

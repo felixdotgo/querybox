@@ -58,6 +58,12 @@ Plugins that return a raw string are wrapped in `kv` by the host.
 }
 ```
 
+`metadata` is an arbitrary string→string map.  The host currently recognises an
+optional `simple_icon` key whose value should match a name exported by the
+[`simple-icons`](https://www.npmjs.com/package/simple-icons) npm package; when
+present the UI will render that logo for connections associated with the
+plugin. Hosts must ignore unknown metadata keys.
+
 Hosts ignore unknown fields; older plugins emitting a numeric `type` are also accepted.
 
 ---

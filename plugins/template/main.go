@@ -26,7 +26,18 @@ func (t *templatePlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRequ
 		License:     "MIT",
 		IconUrl:     "https://example.com/icon.png",
 		Contact:     "support@example.com",
-		Metadata:    map[string]string{"exampleKey": "exampleValue"},
+		// `Metadata` is an arbitrary key/value map exposed via the plugin
+		// manager.  It can be used by the frontend for driver-specific hints;
+		// for example, supplying
+		//     "simple_icon": "postgresql"
+		// allows the UI to render the matching logo from the `simple-icons`
+		// package when displaying connections.  See docs/features/01-connection-management.md.
+		Metadata: map[string]string{
+			"exampleKey": "exampleValue",
+			// optional hint for frontend to choose a branded icon; value should
+			// match a simple-icons name such as "postgresql", "mysql", etc.
+			"simple_icon": "postgresql",
+		},
 	}, nil
 }
 

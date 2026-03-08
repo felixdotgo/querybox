@@ -9,8 +9,10 @@ import {
   TestConnection,
 } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
 import { AuthFormRenderer } from '@/components/connections'
+import DbIcon from '@/components/DbIcon.vue'
 import { SafeZone } from '@/components/layout'
 import { usePlugins } from '@/composables/usePlugins'
+import { getIconNameForDriver } from '@/lib/dbIcons'
 
 const notification = useNotification()
 
@@ -267,9 +269,12 @@ onMounted(async () => {
                 class="flex justify-between items-center text-left p-2"
                 @click="selectPlugin(p)"
               >
-                <div>
-                  {{ p.name }}
-                  <small class="opacity-70 ml-1.5">{{ p.version || "" }}</small>
+                <div class="flex items-center gap-2">
+                  <DbIcon :driver="(p.metadata?.simple_icon || p.id).toLowerCase()" size="16" />
+                  <span>
+                    {{ p.name }}
+                    <small class="opacity-70 ml-1.5">{{ p.version || "" }}</small>
+                  </span>
                 </div>
               </n-button>
             </li>

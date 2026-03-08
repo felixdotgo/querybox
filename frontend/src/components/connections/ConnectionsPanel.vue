@@ -17,16 +17,17 @@ import {
   ExecPlugin,
   ExecTreeAction,
 } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
+import DbIcon from '@/components/DbIcon.vue'
 import { useConnectionTree } from '@/composables/useConnectionTree'
 // plugin capability cache keyed by plugin id (driver name) derived
 // from the global plugin list.
 import { usePlugins } from '@/composables/usePlugins'
+import { getIconNameForDriver } from '@/lib/dbIcons'
 import {
   AddCircle,
   nodeTypeFallbackIcon,
   nodeTypeIconMap,
   Search,
-  Server,
 } from '@/lib/icons'
 import ActionFormModal from './ActionFormModal.vue'
 import ConnectionEntryLabel from './ConnectionEntryLabel.vue'
@@ -77,6 +78,19 @@ const pluginCaps = computed(() => {
   }
   return map
 })
+
+// map plugin ID → PluginInfo for quick lookup (used for icon hints)
+function createPluginMap(pluginList) {
+  const m = {}
+  for (const p of pluginList || []) {
+    if (p && p.id) {
+      m[p.id.toLowerCase()] = p
+    }
+  }
+  return m
+}
+
+const pluginMap = computed(() => createPluginMap(plugins.value))
 
 // track nodes that currently have an in-flight action/query
 // keyed by the node.key string.  the tree renderer uses this to show a
@@ -375,15 +389,17 @@ function renderPrefix({ option }) {
   if (option.node_type === 'action')
     return null
 
-  let icon
+  // connections get a branded icon based on plugin metadata/driver
   const conn = connections.value.find(c => c.id === option.key)
   if (conn) {
-    icon = Server
-  }
-  else {
-    icon = nodeTypeIconMap[option.node_type] ?? nodeTypeFallbackIcon
+    const key = conn.driver_type ? conn.driver_type.toLowerCase() : ''
+    const plugin = pluginMap.value[key]
+    const iconName = getIconNameForDriver(conn.driver_type, plugin)
+    return h(DbIcon, { driver: iconName, size: 14 })
   }
 
+  // non-connection nodes continue using the existing mapping
+  const icon = nodeTypeIconMap[option.node_type] ?? nodeTypeFallbackIcon
   const iconNode = h(NIcon, { size: 14 }, { default: () => h(icon) })
 
   if (conn && props.activeConnectionId === conn.id) {

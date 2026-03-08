@@ -72,6 +72,9 @@ message PluginV1 {
 
     // Free-form maps for extensibility. Both are string to
     // string for simplicity; plugins can embed JSON in values if needed.
+    // arbitrary plugin-specific info.  Hosts may look for known
+    // keys such as `simple_icon` (a simple-icons name) to render branded
+    // database icons in the UI; unknown keys must be ignored by clients.
     map<string,string> metadata = 7; // arbitrary plugin-specific info
     map<string,string> settings = 8; // hints the core can use (defaults, etc.)
 

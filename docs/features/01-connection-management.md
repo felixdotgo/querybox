@@ -74,3 +74,12 @@ Frontend passes the returned JSON as the `connection` parameter in plugin reques
 - SQLite pool: max 1 connection, 5-minute lifetime. Schema auto-created on startup.
 - Events emitted strictly **after** successful DB write — never speculatively.
 - `GetCredential` is intentionally a separate call so the frontend can defer credential fetch until plugin execution time.
+
+### Branding icons via plugin metadata
+
+Connections are rendered with a logo hinted by the driver plugin.  Drivers
+may supply a `simple_icon` key in their `metadata` map (a string corresponding
+to a key in the `simple-icons` npm package, e.g. `"postgresql"`).  When present
+and recognised the frontend will show that glyph; otherwise the generic server
+icon is used.  This makes the connection list more user-friendly without
+requiring frontend changes for every new driver.
