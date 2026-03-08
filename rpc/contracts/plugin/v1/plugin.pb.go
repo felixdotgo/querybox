@@ -84,6 +84,7 @@ const (
 	PluginV1_NODE_TYPE_ACTION     PluginV1_NodeType = 6 // indicates a leaf node that represents an action, not a database object
 	PluginV1_NODE_TYPE_COLLECTION PluginV1_NodeType = 7 // for document stores like Mongo
 	PluginV1_NODE_TYPE_KEY        PluginV1_NodeType = 8 // for key/value stores like Redis
+	PluginV1_NODE_TYPE_GROUP      PluginV1_NodeType = 9 // folder/category grouping node (e.g. Tables, Views, Indexes)
 )
 
 // Enum value maps for PluginV1_NodeType.
@@ -98,6 +99,7 @@ var (
 		6: "NODE_TYPE_ACTION",
 		7: "NODE_TYPE_COLLECTION",
 		8: "NODE_TYPE_KEY",
+		9: "NODE_TYPE_GROUP",
 	}
 	PluginV1_NodeType_value = map[string]int32{
 		"NODE_TYPE_UNKNOWN":    0,
@@ -109,6 +111,7 @@ var (
 		"NODE_TYPE_ACTION":     6,
 		"NODE_TYPE_COLLECTION": 7,
 		"NODE_TYPE_KEY":        8,
+		"NODE_TYPE_GROUP":      9,
 	}
 )
 
@@ -1963,7 +1966,7 @@ var File_contracts_plugin_v1_plugin_proto protoreflect.FileDescriptor
 
 const file_contracts_plugin_v1_plugin_proto_rawDesc = "" +
 	"\n" +
-	" contracts/plugin/v1/plugin.proto\x12\tplugin.v1\x1a\x1cgoogle/protobuf/struct.proto\"\xda#\n" +
+	" contracts/plugin/v1/plugin.proto\x12\tplugin.v1\x1a\x1cgoogle/protobuf/struct.proto\"\xef#\n" +
 	"\bPluginV1\x1a\r\n" +
 	"\vInfoRequest\x1a\xcf\x04\n" +
 	"\fInfoResponse\x12,\n" +
@@ -2130,7 +2133,7 @@ const file_contracts_plugin_v1_plugin_proto_rawDesc = "" +
 	"\x04Type\x12\v\n" +
 	"\aUNKNOWN\x10\x00\x12\n" +
 	"\n" +
-	"\x06DRIVER\x10\x01\"\xd1\x01\n" +
+	"\x06DRIVER\x10\x01\"\xe6\x01\n" +
 	"\bNodeType\x12\x15\n" +
 	"\x11NODE_TYPE_UNKNOWN\x10\x00\x12\x16\n" +
 	"\x12NODE_TYPE_DATABASE\x10\x01\x12\x13\n" +
@@ -2140,7 +2143,8 @@ const file_contracts_plugin_v1_plugin_proto_rawDesc = "" +
 	"\x0eNODE_TYPE_VIEW\x10\x05\x12\x14\n" +
 	"\x10NODE_TYPE_ACTION\x10\x06\x12\x18\n" +
 	"\x14NODE_TYPE_COLLECTION\x10\a\x12\x11\n" +
-	"\rNODE_TYPE_KEY\x10\b2\xb2\x05\n" +
+	"\rNODE_TYPE_KEY\x10\b\x12\x13\n" +
+	"\x0fNODE_TYPE_GROUP\x10\t2\xb2\x05\n" +
 	"\rPluginService\x12I\n" +
 	"\x04Info\x12\x1f.plugin.v1.PluginV1.InfoRequest\x1a .plugin.v1.PluginV1.InfoResponse\x12I\n" +
 	"\x04Exec\x12\x1f.plugin.v1.PluginV1.ExecRequest\x1a .plugin.v1.PluginV1.ExecResponse\x12X\n" +

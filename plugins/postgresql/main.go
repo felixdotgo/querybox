@@ -368,14 +368,26 @@ func (m *postgresqlPlugin) DescribeSchema(ctx context.Context, req *plugin.Descr
     if dsn == "" {
         return &plugin.DescribeSchemaResponse{}, nil
     }
-    db, err := sql.Open("postgres", dsn)
+    db, err := openPostgresDB(dsn)
     if err != nil {
         return &plugin.DescribeSchemaResponse{}, nil
     }
     defer db.Close()
 
     resp := &plugin.DescribeSchemaResponse{}
-    query := "SELECT table_schema, table_name FROM information_schema.tables WHERE table_type='BASE TABLE' AND table_schema NOT IN ('pg_catalog','information_schema')"
+    // base tables, excluding Postgres system schemas and partition children
+    query := `SELECT t.table_schema, t.table_name
+FROM information_schema.tables t
+WHERE t.table_type='BASE TABLE'
+  AND t.table_schema NOT IN ('pg_catalog','information_schema')
+  AND NOT EXISTS (
+      SELECT 1
+      FROM pg_catalog.pg_class c2
+      JOIN pg_catalog.pg_namespace n2 ON n2.oid = c2.relnamespace
+      JOIN pg_catalog.pg_inherits i ON i.inhrelid = c2.oid
+      WHERE n2.nspname = t.table_schema
+        AND c2.relname = t.table_name
+  )`
     args := []interface{}{}
     if req.Database != "" {
         query += " AND table_catalog = ?"
@@ -459,8 +471,8 @@ func (m *postgresqlPlugin) Exec(ctx context.Context, req *plugin.ExecRequest) (*
 		return &plugin.ExecResponse{Error: "missing dsn in connection"}, nil
 	}
 
-	// open postgres driver
-	db, err := sql.Open("postgres", dsn)
+	// open postgres driver (custom hook for testing)
+	db, err := openPostgresDB(dsn)
 	if err != nil {
 		return &plugin.ExecResponse{Error: fmt.Sprintf("open error: %v", err)}, nil
 	}
@@ -592,38 +604,31 @@ ORDER BY schema_name`)
 				continue
 			}
 
-			tables := []*plugin.ConnectionTreeNode{}
-			tblRows, err := conn.Query(`
-SELECT
-    c.relname,
-    CASE c.relkind
-        WHEN 'r' THEN 'table'
-        WHEN 'v' THEN 'view'
-        WHEN 'm' THEN 'view'
-        WHEN 'f' THEN 'foreign-table'
-        WHEN 'p' THEN 'table'
-        ELSE 'other'
-    END as type
+			// ── Tables (regular + partitioned) (hide partition children) ─────
+			var tableNodes []*plugin.ConnectionTreeNode
+			if rows, err := conn.Query(`
+SELECT c.relname
 FROM pg_catalog.pg_class c
 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
 WHERE n.nspname = $1
-  AND c.relkind IN ('r', 'v', 'm', 'f', 'p')
-ORDER BY c.relname`, schemaName)
-			if err == nil {
-				for tblRows.Next() {
+  AND c.relkind IN ('r', 'p')
+  -- exclude tables that inherit from another (i.e. partitions)
+  AND NOT EXISTS (
+      SELECT 1 FROM pg_catalog.pg_inherits i WHERE i.inhrelid = c.oid
+  )
+ORDER BY c.relname`, schemaName); err == nil {
+				for rows.Next() {
 					var tbl string
-					var tblType string
-					if err := tblRows.Scan(&tbl, &tblType); err == nil {
-						key := schemaName + "." + tbl
-						tables = append(tables, &plugin.ConnectionTreeNode{
-							Key:      key,
+					if err := rows.Scan(&tbl); err == nil {
+						tableNodes = append(tableNodes, &plugin.ConnectionTreeNode{
+							Key:      schemaName + "." + tbl,
 							Label:    tbl,
 							NodeType: plugin.ConnectionTreeNodeTypeTable,
 							Actions: []*plugin.ConnectionTreeAction{
 								{
-									Type:  plugin.ConnectionTreeActionSelect,
-									Title: "Select rows",
-									Query: fmt.Sprintf(`SELECT * FROM "%s"."%s" LIMIT 100;`, schemaName, tbl),
+									Type:   plugin.ConnectionTreeActionSelect,
+									Title:  "Select rows",
+									Query:  fmt.Sprintf(`SELECT * FROM "%s"."%s" LIMIT 100;`, schemaName, tbl),
 									Hidden: true,
 									NewTab: true,
 								},
@@ -633,24 +638,225 @@ ORDER BY c.relname`, schemaName)
 									Query: fmt.Sprintf(`DROP TABLE "%s"."%s";`, schemaName, tbl),
 								},
 							},
-					})
+						})
 					}
 				}
-				tblRows.Close()
+				rows.Close()
+			}
+
+			// ── Views ────────────────────────────────────────────────────────
+// 			var viewNodes []*plugin.ConnectionTreeNode
+// 			if rows, err := conn.Query(`
+// SELECT c.relname
+// FROM pg_catalog.pg_class c
+// JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+// WHERE n.nspname = $1
+//   AND c.relkind = 'v'
+// ORDER BY c.relname`, schemaName); err == nil {
+// 				for rows.Next() {
+// 					var v string
+// 					if err := rows.Scan(&v); err == nil {
+// 						viewNodes = append(viewNodes, &plugin.ConnectionTreeNode{
+// 							Key:      schemaName + ".v." + v,
+// 							Label:    v,
+// 							NodeType: plugin.ConnectionTreeNodeTypeView,
+// 							Actions: []*plugin.ConnectionTreeAction{
+// 								{
+// 									Type:   plugin.ConnectionTreeActionSelect,
+// 									Title:  "Select rows",
+// 									Query:  fmt.Sprintf(`SELECT * FROM "%s"."%s" LIMIT 100;`, schemaName, v),
+// 									Hidden: true,
+// 									NewTab: true,
+// 								},
+// 							},
+// 						})
+// 					}
+// 				}
+// 				rows.Close()
+// 			}
+
+			// ── Materialized Views ───────────────────────────────────────────
+// 			var matViewNodes []*plugin.ConnectionTreeNode
+// 			if rows, err := conn.Query(`
+// SELECT c.relname
+// FROM pg_catalog.pg_class c
+// JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+// WHERE n.nspname = $1
+//   AND c.relkind = 'm'
+// ORDER BY c.relname`, schemaName); err == nil {
+// 				for rows.Next() {
+// 					var v string
+// 					if err := rows.Scan(&v); err == nil {
+// 						matViewNodes = append(matViewNodes, &plugin.ConnectionTreeNode{
+// 							Key:      schemaName + ".mv." + v,
+// 							Label:    v,
+// 							NodeType: plugin.ConnectionTreeNodeTypeView,
+// 							Actions: []*plugin.ConnectionTreeAction{
+// 								{
+// 									Type:   plugin.ConnectionTreeActionSelect,
+// 									Title:  "Select rows",
+// 									Query:  fmt.Sprintf(`SELECT * FROM "%s"."%s" LIMIT 100;`, schemaName, v),
+// 									Hidden: true,
+// 									NewTab: true,
+// 								},
+// 							},
+// 						})
+// 					}
+// 				}
+// 				rows.Close()
+// 			}
+
+			// ── Foreign Tables ───────────────────────────────────────────────
+// 			var foreignTableNodes []*plugin.ConnectionTreeNode
+// 			if rows, err := conn.Query(`
+// SELECT c.relname
+// FROM pg_catalog.pg_class c
+// JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+// WHERE n.nspname = $1
+//   AND c.relkind = 'f'
+// ORDER BY c.relname`, schemaName); err == nil {
+// 				for rows.Next() {
+// 					var ft string
+// 					if err := rows.Scan(&ft); err == nil {
+// 						foreignTableNodes = append(foreignTableNodes, &plugin.ConnectionTreeNode{
+// 							Key:      schemaName + ".ft." + ft,
+// 							Label:    ft,
+// 							NodeType: plugin.ConnectionTreeNodeTypeTable,
+// 							Actions: []*plugin.ConnectionTreeAction{
+// 								{
+// 									Type:   plugin.ConnectionTreeActionSelect,
+// 									Title:  "Select rows",
+// 									Query:  fmt.Sprintf(`SELECT * FROM "%s"."%s" LIMIT 100;`, schemaName, ft),
+// 									Hidden: true,
+// 									NewTab: true,
+// 								},
+// 							},
+// 						})
+// 					}
+// 				}
+// 				rows.Close()
+// 			}
+
+			// ── Indexes ──────────────────────────────────────────────────────
+// 			var indexNodes []*plugin.ConnectionTreeNode
+// 			if rows, err := conn.Query(`
+// SELECT indexname
+// FROM pg_indexes
+// WHERE schemaname = $1
+// ORDER BY indexname`, schemaName); err == nil {
+// 				for rows.Next() {
+// 					var idx string
+// 					if err := rows.Scan(&idx); err == nil {
+// 						indexNodes = append(indexNodes, &plugin.ConnectionTreeNode{
+// 							Key:      schemaName + ".idx." + idx,
+// 							Label:    idx,
+// 							NodeType: plugin.ConnectionTreeNodeTypeGroup,
+// 						})
+// 					}
+// 				}
+// 				rows.Close()
+// 			}
+
+			// ── Functions ────────────────────────────────────────────────────
+// 			var functionNodes []*plugin.ConnectionTreeNode
+// 			if rows, err := conn.Query(`
+// SELECT p.proname || '(' || pg_catalog.pg_get_function_identity_arguments(p.oid) || ')' AS signature
+// FROM pg_catalog.pg_proc p
+// JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
+// WHERE n.nspname = $1
+//   AND p.prokind = 'f'
+// ORDER BY p.proname`, schemaName); err == nil {
+// 				for rows.Next() {
+// 					var sig string
+// 					if err := rows.Scan(&sig); err == nil {
+// 						functionNodes = append(functionNodes, &plugin.ConnectionTreeNode{
+// 							Key:      schemaName + ".fn." + sig,
+// 							Label:    sig,
+// 							NodeType: plugin.ConnectionTreeNodeTypeGroup,
+// 						})
+// 					}
+// 				}
+// 				rows.Close()
+// 			}
+
+			// ── Sequences ────────────────────────────────────────────────────
+// 			var sequenceNodes []*plugin.ConnectionTreeNode
+// 			if rows, err := conn.Query(`
+// SELECT sequence_name
+// FROM information_schema.sequences
+// WHERE sequence_schema = $1
+// ORDER BY sequence_name`, schemaName); err == nil {
+// 				for rows.Next() {
+// 					var seq string
+// 					if err := rows.Scan(&seq); err == nil {
+// 						sequenceNodes = append(sequenceNodes, &plugin.ConnectionTreeNode{
+// 							Key:      schemaName + ".seq." + seq,
+// 							Label:    seq,
+// 							NodeType: plugin.ConnectionTreeNodeTypeGroup,
+// 						})
+// 					}
+// 				}
+// 				rows.Close()
+// 			}
+
+			// ── Assemble category group nodes ────────────────────────────────
+			categories := []*plugin.ConnectionTreeNode{
+				{
+					Key:      schemaName + ".Tables",
+					Label:    "Tables",
+					NodeType: plugin.ConnectionTreeNodeTypeGroup,
+					Children: tableNodes,
+					Actions: []*plugin.ConnectionTreeAction{
+						{
+							Type:  plugin.ConnectionTreeActionCreateTable,
+							Title: "Create table",
+							Query: fmt.Sprintf("CREATE TABLE \"%s\".\"new_table\" (\n    id SERIAL PRIMARY KEY\n);", schemaName),
+						},
+					},
+				},
+				// {
+				// 	Key:      schemaName + ".Views",
+				// 	Label:    "Views",
+				// 	NodeType: plugin.ConnectionTreeNodeTypeGroup,
+				// 	Children: viewNodes,
+				// },
+				// {
+				// 	Key:      schemaName + ".Materialized Views",
+				// 	Label:    "Materialized Views",
+				// 	NodeType: plugin.ConnectionTreeNodeTypeGroup,
+				// 	Children: matViewNodes,
+				// },
+				// {
+				// 	Key:      schemaName + ".Foreign Tables",
+				// 	Label:    "Foreign Tables",
+				// 	NodeType: plugin.ConnectionTreeNodeTypeGroup,
+				// 	Children: foreignTableNodes,
+				// },
+				// {
+				// 	Key:      schemaName + ".Indexes",
+				// 	Label:    "Indexes",
+				// 	NodeType: plugin.ConnectionTreeNodeTypeGroup,
+				// 	Children: indexNodes,
+				// },
+				// {
+				// 	Key:      schemaName + ".Functions",
+				// 	Label:    "Functions",
+				// 	NodeType: plugin.ConnectionTreeNodeTypeGroup,
+				// 	Children: functionNodes,
+				// },
+				// {
+				// 	Key:      schemaName + ".Sequences",
+				// 	Label:    "Sequences",
+				// 	NodeType: plugin.ConnectionTreeNodeTypeGroup,
+				// 	Children: sequenceNodes,
+				// },
 			}
 
 			schemaNode := &plugin.ConnectionTreeNode{
 				Key:      schemaName,
 				Label:    schemaName,
 				NodeType: plugin.ConnectionTreeNodeTypeSchema,
-				Children: tables,
-				Actions: []*plugin.ConnectionTreeAction{
-					{
-						Type:  plugin.ConnectionTreeActionCreateTable,
-						Title: "Create table",
-						Query: fmt.Sprintf("CREATE TABLE \"%s\".\"new_table\" (\n    id SERIAL PRIMARY KEY\n);", schemaName),
-					},
-				},
+				Children: categories,
 			}
 			schemaNodes = append(schemaNodes, schemaNode)
 		}
@@ -731,7 +937,7 @@ func (m *postgresqlPlugin) GetCompletionFields(ctx context.Context, req *plugin.
 	if err != nil || dsn == "" {
 		return &plugin.GetCompletionFieldsResponse{}, nil
 	}
-	db, err := sql.Open("postgres", dsn)
+	db, err := openPostgresDB(dsn)
 	if err != nil {
 		return &plugin.GetCompletionFieldsResponse{}, nil
 	}
@@ -784,7 +990,7 @@ func (m *postgresqlPlugin) TestConnection(ctx context.Context, req *plugin.TestC
 		}
 		return &plugin.TestConnectionResponse{Ok: false, Message: msg}, nil
 	}
-	db, err := sql.Open("postgres", dsn)
+	db, err := openPostgresDB(dsn)
 	if err != nil {
 		return &plugin.TestConnectionResponse{Ok: false, Message: fmt.Sprintf("open error: %v", err)}, nil
 	}

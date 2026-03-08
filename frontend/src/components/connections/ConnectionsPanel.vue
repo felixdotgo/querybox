@@ -34,6 +34,36 @@ import ConnectionEntryLabel from './ConnectionEntryLabel.vue'
 
 import ConnectionTreeItemLabel from './ConnectionTreeItemLabel.vue'
 
+// helper exported for unit tests and the prose above runTreeAction
+// normalises node.key values from the connection tree.  It strips the
+// optional `<connId>:` prefix and then returns the characters preceding the
+// first '.' or ':' separator – that prefix represents the database name for
+// most drivers.  Returning `null` indicates nothing suitable was found.
+// eslint-disable-next-line vue/no-export-in-script-setup
+function extractDatabaseFromNodeKey(connId, nodeKey) {
+  if (!nodeKey || typeof nodeKey !== 'string') return null
+  let key = nodeKey
+  const prefix = `${connId}:`
+  if (key.startsWith(prefix)) {
+    key = key.slice(prefix.length)
+  }
+
+  const dot = key.indexOf('.')
+  const col = key.indexOf(':')
+  let cut = -1
+  if (dot !== -1 && col !== -1) {
+    cut = Math.min(dot, col)
+  } else if (dot !== -1) {
+    cut = dot
+  } else if (col !== -1) {
+    cut = col
+  }
+  if (cut !== -1) {
+    return key.slice(0, cut)
+  }
+  return null
+}
+
 const props = defineProps({
   activeConnectionId: { type: String, default: null },
 })
@@ -477,17 +507,20 @@ async function runTreeAction(conn, action, node, extras = {}) {
       const params = {}
       if (cred)
         params.credential_blob = cred
-      // If the action originates from a tree node, the node.key is
-      // constructed as "<database>.<collection>" — forward the selected
-      // database to the plugin so queries run against the expected DB.
+      // When the user clicks a node in the tree we may need to tell the
+      // plugin which database was selected.  The node.key value is a
+      // hierarchical identifier that uses `:` as the connection‑ID separator
+      // and may contain `.` inside the final segment (e.g. "public.users").
+      // Previously we naively split on `.` which produced incorrect overrides
+      // for Postgres keys like "phonedb:public:public.users"; the first
+      // segment contained extra colon‑separated context and became the bogus
+      // database name seen in the logs.  The helper below isolates the
+      // database name correctly by chopping at the first separator of either
+      // kind.
       if (node && node.key && typeof node.key === 'string') {
-        let key = node.key
-        const prefix = `${conn.id}:`
-        if (key.startsWith(prefix))
-          key = key.slice(prefix.length)
-        const parts = key.split('.')
-        if (parts.length > 1) {
-          params.database = parts[0]
+        const db = extractDatabaseFromNodeKey(conn.id, node.key)
+        if (db) {
+          params.database = db
         }
       }
       const res = await ExecTreeAction(conn.driver_type, params, action.query || '', extras.options || (extras.explain ? { 'explain-query': 'yes' } : {}))
@@ -515,13 +548,10 @@ async function runTreeAction(conn, action, node, extras = {}) {
       params.credential_blob = cred
     // forward selected database from the node key when available
     if (node && node.key && typeof node.key === 'string') {
-      let key = node.key
-      const prefix = `${conn.id}:`
-      if (key.startsWith(prefix))
-        key = key.slice(prefix.length)
-      const parts = key.split('.')
-      if (parts.length > 1)
-        params.database = parts[0]
+      const db = extractDatabaseFromNodeKey(conn.id, node.key)
+      if (db) {
+        params.database = db
+      }
     }
     let queryToRun = action.query || ''
     if (

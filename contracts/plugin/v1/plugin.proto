@@ -254,6 +254,7 @@ message PluginV1 {
     NODE_TYPE_ACTION     = 6; // indicates a leaf node that represents an action, not a database object
     NODE_TYPE_COLLECTION = 7; // for document stores like Mongo
     NODE_TYPE_KEY        = 8; // for key/value stores like Redis
+    NODE_TYPE_GROUP      = 9; // folder/category grouping node (e.g. Tables, Views, Indexes)
   }
 
   message ConnectionTreeNode {

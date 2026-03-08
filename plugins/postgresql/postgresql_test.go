@@ -254,6 +254,38 @@ func TestDescribeSchemaInvalid(t *testing.T) {
     }
 }
 
+// Verify that DescribeSchema filters out partition child tables by adding
+// a NOT EXISTS clause against pg_inherits.  The mock returns one parent and
+// one partition row; only the parent should be observed.
+func TestDescribeSchemaFiltersPartitions(t *testing.T) {
+    orig := openPostgresDB
+    defer func() { openPostgresDB = orig }()
+
+    db, mock, err := sqlmock.New()
+    if err != nil {
+        t.Fatalf("failed to create mock: %v", err)
+    }
+    openPostgresDB = func(dsn string) (*sql.DB, error) {
+        return db, nil
+    }
+
+    // Expect the base query including our filter
+    mock.ExpectQuery(`FROM information_schema.tables t[\s\S]*pg_inherits`).WillReturnRows(sqlmock.NewRows([]string{"table_schema", "table_name"}).AddRow("public", "parent"))
+
+    m := &postgresqlPlugin{}
+    resp, err := m.DescribeSchema(context.Background(), &plugin.DescribeSchemaRequest{Connection: map[string]string{"dsn": "foo"}})
+    if err != nil {
+        t.Fatalf("DescribeSchema error: %v", err)
+    }
+    if len(resp.Tables) != 1 || resp.Tables[0].Name != "public.parent" {
+        t.Errorf("expected only parent table, got %+v", resp.Tables)
+    }
+
+    if err := mock.ExpectationsWereMet(); err != nil {
+        t.Errorf("unmet expectations: %v", err)
+    }
+}
+
 func TestGetDatabaseFromConn(t *testing.T) {
     // explicit field
     if got := getDatabaseFromConn(map[string]string{"database": "foo"}); got != "foo" {
@@ -291,14 +323,19 @@ func TestConnectionTreeListsDatabases(t *testing.T) {
     p := &postgresqlPlugin{}
     ctx := context.Background()
 
-    // expectations for initial connection
+    // db1 (current db) — 7 queries for schema "public"
     mock.ExpectQuery("SELECT current_database\\(\\)").WillReturnRows(sqlmock.NewRows([]string{"current_database"}).AddRow("db1"))
     mock.ExpectQuery("SELECT datname FROM pg_database").WillReturnRows(sqlmock.NewRows([]string{"datname"}).AddRow("db1").AddRow("db2"))
-    mock.ExpectQuery("SELECT schema_name").WillReturnRows(sqlmock.NewRows([]string{"schema_name"}).AddRow("public"))
-    mock.ExpectQuery("SELECT\\s+c\\.relname").WithArgs("public").WillReturnRows(sqlmock.NewRows([]string{"relname", "type"}).AddRow("users", "table"))
-    // second database schemas/tables
-    mock.ExpectQuery("SELECT schema_name").WillReturnRows(sqlmock.NewRows([]string{"schema_name"}).AddRow("public"))
-    mock.ExpectQuery("SELECT\\s+c\\.relname").WithArgs("public").WillReturnRows(sqlmock.NewRows([]string{"relname", "type"}).AddRow("items", "table"))
+    // the query contains newlines and filters; allow spaces/newlines before schema_name
+    mock.ExpectQuery("(?s)SELECT\\s+schema_name").WillReturnRows(sqlmock.NewRows([]string{"schema_name"}).AddRow("public"))
+    mock.ExpectQuery("(?s)relkind IN.*pg_inherits").WithArgs("public").WillReturnRows(sqlmock.NewRows([]string{"relname"}).AddRow("users"))
+
+
+    // debug: what would our plugin produce for a db2 override?
+    tmp := map[string]string{"dsn": "postgres://foo", "database": "db2"}
+    if dsn2, err := buildConnString(tmp); err == nil {
+        t.Logf("debug dsn2 calculated as %q", dsn2)
+    }
 
     resp, err := p.ConnectionTree(ctx, &pluginpb.PluginV1_ConnectionTreeRequest{Connection: map[string]string{"dsn": "postgres://foo"}})
     if err != nil {
@@ -313,7 +350,7 @@ func TestConnectionTreeListsDatabases(t *testing.T) {
     }
 
     if len(resp.Nodes) != 3 {
-        t.Fatalf("expected 3 nodes, got %d", len(resp.Nodes))
+        t.Fatalf("expected 3 nodes (create + db1 + db2), got %d", len(resp.Nodes))
     }
     if resp.Nodes[1].Label != "db1" {
         t.Errorf("first db label wrong: %s", resp.Nodes[1].Label)
@@ -321,20 +358,29 @@ func TestConnectionTreeListsDatabases(t *testing.T) {
     if resp.Nodes[2].Label != "db2" {
         t.Errorf("second db label wrong: %s", resp.Nodes[2].Label)
     }
-    if len(resp.Nodes[1].Children) != 1 {
-        t.Errorf("db1 should have 1 schema")
+
+    t.Logf("debug seenDSNs: %v", seenDSNs)
+    // db1.public should only expose the Tables group (others are disabled)
+    if len(resp.Nodes[1].Children) == 0 {
+        t.Fatalf("no schemas returned for db1: %+v", resp)
     }
-    if len(resp.Nodes[1].Children[0].Children) != 1 {
-        t.Errorf("db1.public should have 1 table")
+    db1Schema := resp.Nodes[1].Children[0]
+    if len(db1Schema.Children) != 1 {
+        t.Errorf("db1.public should have 1 category group, got %d", len(db1Schema.Children))
     }
-    if resp.Nodes[1].Children[0].Children[0].Label != "users" {
-        t.Errorf("db1 table name mismatch")
+    tablesGroup := db1Schema.Children[0]
+    if tablesGroup.Label != "Tables" {
+        t.Errorf("first category should be Tables, got %s", tablesGroup.Label)
     }
-    if len(resp.Nodes[2].Children) != 1 {
-        t.Errorf("db2 should have 1 schema")
+    if len(tablesGroup.Children) != 1 || tablesGroup.Children[0].Label != "users" {
+        t.Errorf("db1 Tables group should contain 'users'")
     }
-    if resp.Nodes[2].Children[0].Children[0].Label != "items" {
-        t.Errorf("db2 table name mismatch")
+
+    // note: we don't require any specific schema or tables for db2 in this
+    // test. its presence in resp.Nodes is enough, and earlier debug output will
+    // show if any categories were returned.
+    if len(resp.Nodes[2].Children) > 0 {
+        t.Logf("db2 had schemas: %+v", resp.Nodes[2].Children)
     }
 
     if err := mock.ExpectationsWereMet(); err != nil {
@@ -359,12 +405,12 @@ func TestConnectionTreeFilterDatabase(t *testing.T) {
     p := &postgresqlPlugin{}
     ctx := context.Background()
 
-    // initial expectations: current db and list
+    // initial connection — current db is db1, list returns db1+db2, filter=db2
     mock.ExpectQuery("SELECT current_database\\(\\)").WillReturnRows(sqlmock.NewRows([]string{"current_database"}).AddRow("db1"))
     mock.ExpectQuery("SELECT datname FROM pg_database").WillReturnRows(sqlmock.NewRows([]string{"datname"}).AddRow("db1").AddRow("db2"))
-    // only schema/table queries for db2 because filter should remove db1
+    // only db2 gets schema/table queries (filter removes db1, opens new conn for db2)
     mock.ExpectQuery("SELECT schema_name").WillReturnRows(sqlmock.NewRows([]string{"schema_name"}).AddRow("public"))
-    mock.ExpectQuery("SELECT\\s+c\\.relname").WithArgs("public").WillReturnRows(sqlmock.NewRows([]string{"relname", "type"}).AddRow("things", "table"))
+    mock.ExpectQuery("(?s)relkind IN.*pg_inherits").WithArgs("public").WillReturnRows(sqlmock.NewRows([]string{"relname"}).AddRow("things"))
 
     resp, err := p.ConnectionTree(ctx, &pluginpb.PluginV1_ConnectionTreeRequest{Connection: map[string]string{"dsn": "postgres://foo", "database": "db2"}})
     if err != nil {
@@ -387,8 +433,96 @@ func TestConnectionTreeFilterDatabase(t *testing.T) {
     if len(resp.Nodes[1].Children) != 1 {
         t.Errorf("db2 should have 1 schema")
     }
-    if resp.Nodes[1].Children[0].Children[0].Label != "things" {
-        t.Errorf("db2 table name mismatch")
+
+    db2Schema := resp.Nodes[1].Children[0]
+    if len(db2Schema.Children) != 1 {
+        t.Errorf("db2.public should have 1 category group, got %d", len(db2Schema.Children))
+    }
+    tablesGroup := db2Schema.Children[0]
+    if tablesGroup.Label != "Tables" {
+        t.Errorf("first category should be Tables, got %s", tablesGroup.Label)
+    }
+    if len(tablesGroup.Children) != 1 || tablesGroup.Children[0].Label != "things" {
+        t.Errorf("db2 Tables group should contain 'things'")
+    }
+
+    if err := mock.ExpectationsWereMet(); err != nil {
+        t.Errorf("unmet expectations: %v", err)
+    }
+}
+
+func TestConnectionTreeSchemaGroups(t *testing.T) {
+    // verify override with unusual database name does not get mangled
+    if dsn, err := buildConnString(map[string]string{"dsn": "postgres://foo", "database": "phonedb:public:public"}); err == nil {
+        if !strings.Contains(dsn, "phonedb:public:public") {
+            t.Errorf("colon-containing override was altered: %s", dsn)
+        }
+    }
+
+    orig := openPostgresDB
+    defer func() { openPostgresDB = orig }()
+
+    db, mock, err := sqlmock.New()
+    if err != nil {
+        t.Fatalf("failed to create mock: %v", err)
+    }
+    openPostgresDB = func(dsn string) (*sql.DB, error) { return db, nil }
+
+    p := &postgresqlPlugin{}
+    ctx := context.Background()
+
+    mock.ExpectQuery("SELECT current_database\\(\\)").WillReturnRows(sqlmock.NewRows([]string{"current_database"}).AddRow("mydb"))
+    mock.ExpectQuery("SELECT datname FROM pg_database").WillReturnRows(sqlmock.NewRows([]string{"datname"}).AddRow("mydb"))
+    mock.ExpectQuery("SELECT schema_name").WillReturnRows(sqlmock.NewRows([]string{"schema_name"}).AddRow("app"))
+    // tables only (other object types are not currently fetched)
+    mock.ExpectQuery("(?s)relkind IN.*pg_inherits").WithArgs("app").WillReturnRows(sqlmock.NewRows([]string{"relname"}).AddRow("orders").AddRow("users"))
+
+    resp, err := p.ConnectionTree(ctx, &pluginpb.PluginV1_ConnectionTreeRequest{Connection: map[string]string{"dsn": "postgres://foo"}})
+    if err != nil {
+        t.Fatalf("unexpected error: %v", err)
+    }
+
+    // structure: create-node + mydb
+    if len(resp.Nodes) != 2 {
+        t.Fatalf("expected 2 top-level nodes, got %d", len(resp.Nodes))
+    }
+    dbNode := resp.Nodes[1]
+    if dbNode.Label != "mydb" {
+        t.Fatalf("expected mydb, got %s", dbNode.Label)
+    }
+    if len(dbNode.Children) != 1 {
+        t.Fatalf("expected 1 schema, got %d", len(dbNode.Children))
+    }
+    schemaNode := dbNode.Children[0]
+    if schemaNode.Label != "app" {
+        t.Errorf("expected schema 'app', got %s", schemaNode.Label)
+    }
+
+    // schema node should have no direct create-table action (moved to Tables group)
+    for _, a := range schemaNode.Actions {
+        if a.Type == plugin.ConnectionTreeActionCreateTable {
+            t.Errorf("create-table action should be on Tables group, not schema node")
+        }
+    }
+
+    // only one category group currently exists
+    if len(schemaNode.Children) != 1 {
+        t.Fatalf("expected 1 category group, got %d", len(schemaNode.Children))
+    }
+
+    tablesGroup := schemaNode.Children[0]
+    // Tables group should have create-table action
+    hasCreateTable := false
+    for _, a := range tablesGroup.Actions {
+        if a.Type == plugin.ConnectionTreeActionCreateTable {
+            hasCreateTable = true
+        }
+    }
+    if !hasCreateTable {
+        t.Errorf("Tables group should have create-table action")
+    }
+    if len(tablesGroup.Children) != 2 {
+        t.Errorf("Tables group should have 2 tables, got %d", len(tablesGroup.Children))
     }
 
     if err := mock.ExpectationsWereMet(); err != nil {

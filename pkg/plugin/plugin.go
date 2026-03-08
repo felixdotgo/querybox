@@ -129,6 +129,7 @@ const (
 	ConnectionTreeNodeTypeAction     = pluginpb.PluginV1_NODE_TYPE_ACTION
 	ConnectionTreeNodeTypeCollection = pluginpb.PluginV1_NODE_TYPE_COLLECTION
 	ConnectionTreeNodeTypeKey        = pluginpb.PluginV1_NODE_TYPE_KEY
+	ConnectionTreeNodeTypeGroup      = pluginpb.PluginV1_NODE_TYPE_GROUP // category grouping folder
 )
 
 // Historically this package exported a custom `Plugin` interface, but the

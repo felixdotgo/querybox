@@ -677,6 +677,11 @@ export const PluginV1_NodeType = {
      * for key/value stores like Redis
      */
     PluginV1_NODE_TYPE_KEY: 8,
+
+    /**
+     * folder/category grouping node (e.g. Tables, Views, Indexes)
+     */
+    PluginV1_NODE_TYPE_GROUP: 9,
 };
 
 /**

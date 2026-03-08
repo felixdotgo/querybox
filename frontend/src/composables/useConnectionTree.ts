@@ -22,6 +22,7 @@ export const NODE_TYPE_ENUM_MAP: Record<number, string> = {
   6: 'action',
   7: 'collection',
   8: 'key',
+  9: 'group',
 }
 
 // Recursively tag every node with its owning connection id, normalize the

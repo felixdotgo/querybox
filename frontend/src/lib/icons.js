@@ -21,6 +21,7 @@ import {
   EllipsisHorizontal,
   Eye,
   Flash,
+  Folder,
   Grid,
   Key,
   // tree / navigation
@@ -48,6 +49,7 @@ export {
   EllipsisHorizontal, // three-dot context menu trigger
   Eye, // "select" action on tree nodes
   Flash, // "Connect" action / execution time (bolt)
+  Folder, // node_type === "group" (category folder)
   Grid, // node_type === "table"
   Key, // primary key indicator
   Layers, // driver group node
@@ -113,6 +115,7 @@ export const nodeTypeIconMap = {
   server: Server,
   database: Server,
   schema: Layers,
+  group: Folder,
   table: Grid,
   column: CodeSlash,
   action: AddCircle,
