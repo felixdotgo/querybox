@@ -66,7 +66,7 @@ export function useTabCompletion(tabRef) {
    * Return cached sampled fields for `collection`, or fetch them on first call.
    * Returns an array of { name, type? } objects.
    * @param {string} collection
-   * @returns {Promise<Array<{name:string, type?:string}>>}
+   * @returns {Promise<Array<{name:string, type?:string}>>} cached or fetched completion fields
    */
   async function getCompletionFields(collection) {
     if (!collection)
@@ -108,7 +108,7 @@ export function useTabCompletion(tabRef) {
    * Attempt to resolve the database name from the connection tree nodes.
    * Walks the tree looking for a DATABASE ancestor of the named collection.
    * @param {string} collectionName
-   * @returns {string}
+   * @returns {string} database name or empty string if not found
    */
   function inferDatabase(collectionName) {
     function search(items, parent) {

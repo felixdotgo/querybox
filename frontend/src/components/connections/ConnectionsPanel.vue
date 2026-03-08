@@ -18,7 +18,7 @@ import {
   ExecTreeAction,
 } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
 import DbIcon from '@/components/DbIcon.vue'
-import { NODE_TYPE_ENUM_MAP, tagWithConnId, useConnectionTree } from '@/composables/useConnectionTree'
+import { tagWithConnId, useConnectionTree } from '@/composables/useConnectionTree'
 // plugin capability cache keyed by plugin id (driver name) derived
 // from the global plugin list.
 import { usePlugins } from '@/composables/usePlugins'
@@ -34,14 +34,27 @@ import ConnectionEntryLabel from './ConnectionEntryLabel.vue'
 
 import ConnectionTreeItemLabel from './ConnectionTreeItemLabel.vue'
 
+const props = defineProps({
+  activeConnectionId: { type: String, default: null },
+})
+
+// declare events emitted by this component
+const emit = defineEmits([
+  'connection-selected',
+  'query-result',
+  'connection-opened',
+])
+
 // helper exported for unit tests and the prose above runTreeAction
 // normalises node.key values from the connection tree.  It strips the
 // optional `<connId>:` prefix and then returns the characters preceding the
 // first '.' or ':' separator – that prefix represents the database name for
 // most drivers.  Returning `null` indicates nothing suitable was found.
-// eslint-disable-next-line vue/no-export-in-script-setup
 function extractDatabaseFromNodeKey(connId, nodeKey) {
-  if (!nodeKey || typeof nodeKey !== 'string') return null
+  if (!nodeKey || typeof nodeKey !== 'string') {
+    return null
+  }
+
   let key = nodeKey
   const prefix = `${connId}:`
   if (key.startsWith(prefix)) {
@@ -53,27 +66,20 @@ function extractDatabaseFromNodeKey(connId, nodeKey) {
   let cut = -1
   if (dot !== -1 && col !== -1) {
     cut = Math.min(dot, col)
-  } else if (dot !== -1) {
+  }
+  else if (dot !== -1) {
     cut = dot
-  } else if (col !== -1) {
+  }
+  else if (col !== -1) {
     cut = col
   }
+
   if (cut !== -1) {
     return key.slice(0, cut)
   }
+
   return null
 }
-
-const props = defineProps({
-  activeConnectionId: { type: String, default: null },
-})
-
-// declare events emitted by this component
-const emit = defineEmits([
-  'connection-selected',
-  'query-result',
-  'connection-opened',
-])
 
 const dialog = useDialog()
 

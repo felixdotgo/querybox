@@ -12,7 +12,6 @@ import { AuthFormRenderer } from '@/components/connections'
 import DbIcon from '@/components/DbIcon.vue'
 import { SafeZone } from '@/components/layout'
 import { usePlugins } from '@/composables/usePlugins'
-import { getIconNameForDriver } from '@/lib/dbIcons'
 
 const notification = useNotification()
 

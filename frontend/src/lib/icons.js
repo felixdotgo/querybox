@@ -92,7 +92,7 @@ export const dataTypeColorMap = {
  * Falls back to neutral if no mapping matches.
  *
  * @param {string} type
- * @returns {string}
+ * @returns {string} CSS color value from dataTypeColorMap or default if no match
  */
 export function getDataTypeColor(type) {
   if (!type || typeof type !== 'string')
