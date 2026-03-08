@@ -26,7 +26,7 @@ const currentSchema = computed(() => {
 
   // node.key may include conn prefix ("<conn.id>:"), strip if present
   let key = tab.context.node.key
-  if (key && typeof key === 'string' && key.startsWith(`${tab.context.conn?.id}:`)) {
+  if (key && typeof key === 'string' && tab.context?.conn && key.startsWith(`${tab.context.conn.id}:`)) {
     key = key.slice((`${tab.context.conn.id}:`).length)
   }
 
@@ -37,8 +37,8 @@ const currentSchema = computed(() => {
   // suffix lookups itself, so just pass the raw key through.
   if (!key || typeof key !== 'string')
     return null
-  const schema = getSchema(key)
-  console.debug('currentSchema lookup', key, schema)
+  const schema = getSchema(key, tab.context.conn)
+  console.debug('currentSchema lookup', key, 'conn', tab.context?.conn?.id, schema)
   return schema
 })
 const tabs = ref([])
@@ -112,26 +112,16 @@ watch(activeTabKey, (key) => {
   // arrives.
   const tab = tabs.value.find(t => t.key === key)
   const tbl = extractTableName(tab)
-  console.debug('activeTabKey watcher table', tbl, 'cached?', tbl ? !!getSchema(tbl) : null)
+  console.debug('activeTabKey watcher table', tbl, 'cached?', tbl ? !!getSchema(tbl, tab.context?.conn) : null)
   if (tbl) {
-    if (!getSchema(tbl)) {
-      console.debug('activeTabKey watcher invoking fetchSchema for', tbl)
-      fetchSchema(tbl).catch(err => console.error('fetchSchema failed', err))
+    if (!getSchema(tbl, tab.context?.conn)) {
+      console.debug('activeTabKey watcher invoking fetchSchema for', tbl, 'conn', tab.context?.conn?.id)
+      fetchSchema(tbl, tab.context?.conn).catch(err => console.error('fetchSchema failed', err))
     }
     else {
-      console.debug('schema already cached for', tbl)
+      console.debug('schema already cached for', tbl, 'conn', tab.context?.conn?.id)
     }
   }
-})
-
-// we still fetch schema for the active table, but no longer force the
-// view to switch to the structure pane.  result should remain the default
-// landing page so users can see query output immediately.
-// the watcher is kept for debugging but does not mutate innerTab.
-watch(currentSchema, (schema) => {
-  console.debug('currentSchema watcher fired', activeTabKey.value, schema)
-  // previously we changed tab.innerTab to 'structure' here; removing that
-  // behavior ensures the Result tab always stays visible after execution.
 })
 
 function openTab(title, result, error, tabKey, version, context) {
@@ -215,15 +205,15 @@ function openTab(title, result, error, tabKey, version, context) {
   // longer preselect the structure pane; result is always the starting point.
   const prefetchTable = extractTableName(newTab)
   if (prefetchTable) {
-    if (getSchema(prefetchTable)) {
+    if (getSchema(prefetchTable, newTab.context?.conn)) {
       // schema is cached, but don't switch tabs automatically
-      console.debug('schema already cached for', prefetchTable)
+      console.debug('schema already cached for', prefetchTable, 'conn', newTab.context?.conn?.id)
     }
     else {
       // still initiate a fetch so the structure data will be available if the
       // user clicks the tab later.
-      console.debug('openTab triggering fetchSchema for', prefetchTable)
-      fetchSchema(prefetchTable).catch(err => console.error('fetchSchema failed', err))
+      console.debug('openTab triggering fetchSchema for', prefetchTable, 'conn', newTab.context?.conn?.id)
+      fetchSchema(prefetchTable, newTab.context?.conn).catch(err => console.error('fetchSchema failed', err))
     }
   }
 

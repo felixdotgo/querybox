@@ -71,4 +71,50 @@ describe('workspacePanel.vue', () => {
     // the toolbar text should not contain the word "Structure"
     expect(wrapper.text()).not.toContain('Structure')
   })
+
+  it('passes the correct connection object to schema helpers when switching tabs', async () => {
+    const getSchema = vi.fn()
+    const fetchSchema = vi.fn()
+    setSchemaHelpers(getSchema, fetchSchema)
+
+    const wrapper: any = mount(WorkspacePanel, {
+      props: { selectedConnection: null },
+    })
+
+    const connA = { id: 'A', driver_type: 'mysql' }
+    const connB = { id: 'B', driver_type: 'mongodb' }
+
+    // open a tab for connection A; prefetch logic should call fetchSchema with that conn
+    wrapper.vm.openTab('a', { rows: [] }, null, 'kA', Date.now(), {
+      conn: connA,
+      node: { key: 'A:table1' },
+    })
+    await wrapper.vm.$nextTick()
+
+    expect(fetchSchema).toHaveBeenCalledWith('table1', connA)
+    // also getSchema may have been consulted, ensure it used connA
+    expect(getSchema).toHaveBeenCalledWith('table1', connA)
+
+    fetchSchema.mockClear()
+    getSchema.mockClear()
+
+    // open a second tab for connection B, this should trigger fetchSchema with connB
+    wrapper.vm.openTab('b', { rows: [] }, null, 'kB', Date.now(), {
+      conn: connB,
+      node: { key: 'B:coll' },
+    })
+    await wrapper.vm.$nextTick()
+
+    expect(fetchSchema).toHaveBeenCalledWith('coll', connB)
+    expect(getSchema).toHaveBeenCalledWith('coll', connB)
+
+    fetchSchema.mockClear()
+    getSchema.mockClear()
+
+    // switch back to the first tab by updating activeTabKey manually;
+    // the watcher should again pass connA when deciding to fetch
+    wrapper.vm.activeTabKey = 'kA'
+    await wrapper.vm.$nextTick()
+    expect(fetchSchema).toHaveBeenCalledWith('table1', connA)
+  })
 })

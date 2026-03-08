@@ -39,6 +39,14 @@ describe('useConnectionTree schema helpers', () => {
     expect(getSchema('baz')).toEqual({ name: 'foo.bar.baz', cols: [] })
     // unknown table should return null
     expect(getSchema('nope')).toBeNull()
+
+    // override connection should use different id and therefore return null
+    const override = { id: 'other', driver_type: 'dummy' }
+    expect(getSchema('public.users', override)).toBeNull()
+
+    // if we populate cache for the override ID we should get results
+    schemaCache.other = { 'public.users': { name: 'public.users', cols: [] } }
+    expect(getSchema('public.users', override)).toEqual({ name: 'public.users', cols: [] })
   })
 
   it('fetchSchema merges new entries without overwriting existing cache', async () => {
@@ -72,5 +80,11 @@ describe('useConnectionTree schema helpers', () => {
 
     await fetchSchema('foo.bar')
     expect(spy).toHaveBeenCalledWith('dummy', expect.any(Object), 'foo', 'bar')
+
+    // override the connection and ensure its driver_type is used
+    spy.mockClear()
+    const override = { id: 'c3', driver_type: 'bananas' }
+    await fetchSchema('foo.bar', override)
+    expect(spy).toHaveBeenCalledWith('bananas', expect.any(Object), 'foo', 'bar')
   })
 })

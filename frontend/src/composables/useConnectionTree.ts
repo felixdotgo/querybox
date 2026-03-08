@@ -170,8 +170,9 @@ export function useConnectionTree(connRef?: Ref<any | null>) {
     return getColumns(tableName).map(name => ({ name, type: '', nullable: true, primary_key: false }))
   }
 
-  function getSchema(tableName: string): any | null {
-    const id = connRef?.value?.id
+  function getSchema(tableName: string, overrideConn?: { id: string, driver_type: string }): any | null {
+    // connection id determined either from override or reactive ref
+    const id = overrideConn?.id || connRef?.value?.id
     if (!id)
       return null
     if (!schemaCache[id])
@@ -212,9 +213,10 @@ export function useConnectionTree(connRef?: Ref<any | null>) {
   // fetch schema metadata for the specified table only and merge the results
   // into the cache.  called lazily when the user selects a table that hasn't
   // been previously described.
-  async function fetchSchema(table?: string) {
-    const id = connRef?.value?.id
-    const conn = connRef?.value
+  async function fetchSchema(table?: string, overrideConn?: { id: string, driver_type: string }) {
+    // choose connection info from override or reactive ref
+    const conn = overrideConn || connRef?.value
+    const id = conn?.id
     if (!id || !conn)
       return
     const cred = await GetCredential(id)
@@ -265,6 +267,11 @@ export function useConnectionTree(connRef?: Ref<any | null>) {
     }
   }
 
+  // Note: `getSchema` and `fetchSchema` now accept an optional
+  // `overrideConn` parameter allowing callers to specify a connection
+  // object explicitly.  This is used by the workspace tabs so that
+  // schema lookups follow the context of each tab rather than the
+  // globally selected connection.
   return {
     nodes,
     load,
