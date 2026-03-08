@@ -140,9 +140,24 @@ func setSSLMode(dsn, mode string) string {
 // the provided connection map.  Extra DSN parameters are appended as
 // space-separated key=value pairs as required by lib/pq; URL-encoded (&)
 // format is NOT used because it is invalid for the postgres DSN format.
+//
+// Historically we ignored the "database" field when a raw DSN was present.
+// that meant that ConnectionTree created new connections for each database but
+// the DSN still pointed at the original database.  The symptom was that all
+// databases in the tree showed the same schemas/tables.  This helper now
+// overrides the DSN if a database override is supplied.
 func buildConnString(connection map[string]string) (string, error) {
 	// honour explicit DSN value and still ensure sslmode defaults correctly
 	if dsn, ok := connection["dsn"]; ok && dsn != "" {
+		// if the caller also supplied a "database" field, it should override
+		// whatever database is encoded in the DSN.
+		if db, ok2 := connection["database"]; ok2 && db != "" {
+			var err error
+			dsn, err = overrideDatabaseInDSN(dsn, db)
+			if err != nil {
+				return "", err
+			}
+		}
 		if tls, ok2 := connection["tls"]; ok2 && tls != "" {
 			dsn = setSSLMode(dsn, tls)
 		}
@@ -238,9 +253,111 @@ func buildConnString(connection map[string]string) (string, error) {
 			}
 		}
 	}
+	// Apply explicit database override that may have been injected by ConnectionTree
+	// when scanning non-current databases.  The credential_blob paths above build the
+	// DSN from blob fields without knowledge of this override, so we apply it here
+	// once, covering both the embedded-DSN and separate-fields blob forms.
+	if db, ok := connection["database"]; ok && db != "" && dsn != "" {
+		if newDSN, oErr := overrideDatabaseInDSN(dsn, db); oErr == nil {
+			dsn = newDSN
+		}
+	}
 	// final normalisation
 	dsn = ensureSSLMode(dsn)
 	return dsn, nil
+}
+
+// overrideDatabaseInDSN returns a copy of the supplied DSN with its database
+// name replaced by the provided value.  Both key/value and URL forms are
+// handled.  We do not attempt to fully validate the DSN; the operation is
+// best-effort so that callers can continue with whatever the driver accepts.
+func overrideDatabaseInDSN(dsn, database string) (string, error) {
+	// URL style
+	if strings.HasPrefix(dsn, "postgres://") || strings.HasPrefix(dsn, "postgresql://") {
+		u, err := url.Parse(dsn)
+		if err != nil {
+			return "", err
+		}
+		// override path (u.Path includes leading '/').  Some URLs may encode the
+		// database in a query parameter instead; set both to be safe.
+		u.Path = "/" + database
+		q := u.Query()
+		q.Set("dbname", database)
+		u.RawQuery = q.Encode()
+		return u.String(), nil
+	}
+
+	// keyword/value style: replace existing dbname= token if present, otherwise
+	// append it.
+	parts := strings.Fields(dsn)
+	var out []string
+	replaced := false
+	for _, tok := range parts {
+		if strings.HasPrefix(tok, "dbname=") {
+			out = append(out, "dbname="+database)
+			replaced = true
+		} else {
+			out = append(out, tok)
+		}
+	}
+	if !replaced {
+		out = append(out, "dbname="+database)
+	}
+	return strings.Join(out, " "), nil
+}
+// openPostgresDB wraps sql.Open so unit tests can replace it with a mock.
+var openPostgresDB = func(dsn string) (*sql.DB, error) {
+	return sql.Open("postgres", dsn)
+}
+
+// getDatabaseFromConn extracts a requested database name from the
+// connection metadata.  It checks the explicit "database" field, the
+// credential_blob payload, and finally any dbname element in a supplied
+// DSN string.  An empty return value indicates no preference.
+func getDatabaseFromConn(conn map[string]string) string {
+	if db, ok := conn["database"]; ok && db != "" {
+		return db
+	}
+	if blob, ok := conn["credential_blob"]; ok && blob != "" {
+		var payload struct {
+			Form   string            `json:"form"`
+			Values map[string]string `json:"values"`
+		}
+		if err := json.Unmarshal([]byte(blob), &payload); err == nil {
+			if v, ok := payload.Values["database"]; ok && v != "" {
+				return v
+			}
+			if v, ok := payload.Values["dsn"]; ok && v != "" {
+				if name := extractDBName(v); name != "" {
+					return name
+				}
+			}
+		}
+	}
+	if dsn, ok := conn["dsn"]; ok && dsn != "" {
+		if name := extractDBName(dsn); name != "" {
+			return name
+		}
+	}
+	return ""
+}
+
+// extractDBName returns the database name found in the provided DSN string.
+// Supports both URL and keyword forms.
+func extractDBName(dsn string) string {
+	if strings.HasPrefix(dsn, "postgres://") || strings.HasPrefix(dsn, "postgresql://") {
+		if u, err := url.Parse(dsn); err == nil {
+			if p := strings.TrimPrefix(u.Path, "/"); p != "" {
+				return p
+			}
+		}
+	}
+	for _, part := range strings.Fields(dsn) {
+		if strings.HasPrefix(part, "dbname=") {
+			return strings.TrimPrefix(part, "dbname=")
+		}
+	}
+	return ""
 }
 
 func (m *postgresqlPlugin) DescribeSchema(ctx context.Context, req *plugin.DescribeSchemaRequest) (*plugin.DescribeSchemaResponse, error) {
@@ -395,8 +512,9 @@ func (m *postgresqlPlugin) Exec(ctx context.Context, req *plugin.ExecRequest) (*
 }
 
 // ConnectionTree returns a server → database → schema → table hierarchy.
-// DDL actions (create/drop database, create/drop table) are attached at the
-// appropriate level.  Errors or missing credentials result in an empty tree.
+// It now enumerates _all_ databases on the server (subject to an explicit
+// database filter) rather than just the one to which the connection is
+// currently attached.  Behaviour falls back gracefully when listing fails.
 func (m *postgresqlPlugin) ConnectionTree(ctx context.Context, req *plugin.ConnectionTreeRequest) (*plugin.ConnectionTreeResponse, error) {
 	dsn, err := buildConnString(req.Connection)
 	if err != nil || dsn == "" {
@@ -404,42 +522,78 @@ func (m *postgresqlPlugin) ConnectionTree(ctx context.Context, req *plugin.Conne
 		return &plugin.ConnectionTreeResponse{}, nil
 	}
 
-	db, err := sql.Open("postgres", dsn)
+	db, err := openPostgresDB(dsn)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "postgresql: ConnectionTree: open error: %v\n", err)
 		return &plugin.ConnectionTreeResponse{}, nil
 	}
 	defer db.Close()
 
-	// Determine the currently connected database name.
+	// determine the database we are connected to now; used for reuse below
 	var currentDB string
 	if scanErr := db.QueryRow("SELECT current_database()").Scan(&currentDB); scanErr != nil {
 		currentDB = "current"
 	}
 
-	// List all non-system schemas in the connected database.
-	schemaRows, err := db.Query(`
+	// optional filter coming from the connection info
+	filterDB := getDatabaseFromConn(req.Connection)
+
+	// retrieve list of databases on the server
+	dbNames := []string{}
+	rows, err := db.Query(`SELECT datname FROM pg_database WHERE NOT datistemplate AND datallowconn`)
+	if err != nil {
+		// if we can't list, fall back to the one we know about
+		dbNames = []string{currentDB}
+	} else {
+		defer rows.Close()
+		var name string
+		for rows.Next() {
+			if err := rows.Scan(&name); err == nil {
+				dbNames = append(dbNames, name)
+			}
+		}
+		if len(dbNames) == 0 {
+			dbNames = []string{currentDB}
+		}
+	}
+
+	// apply explicit database filter if supplied
+	if filterDB != "" {
+		found := false
+		for _, n := range dbNames {
+			if n == filterDB {
+				dbNames = []string{n}
+				found = true
+				break
+			}
+		}
+		if !found {
+			dbNames = []string{filterDB} // still show the requested name
+		}
+	}
+
+	// helper to build schema nodes for a given *sql.DB
+	loadSchemas := func(conn *sql.DB) []*plugin.ConnectionTreeNode {
+		schemaRows, err := conn.Query(`
 SELECT schema_name
 FROM information_schema.schemata
 WHERE schema_name NOT IN ('pg_catalog','information_schema','pg_toast')
   AND schema_name NOT LIKE 'pg_%'
 ORDER BY schema_name`)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "postgresql: ConnectionTree: query schemas error: %v\n", err)
-		return &plugin.ConnectionTreeResponse{}, nil
-	}
-	defer schemaRows.Close()
-
-	var schemaNodes []*plugin.ConnectionTreeNode
-	for schemaRows.Next() {
-		var schemaName string
-		if err := schemaRows.Scan(&schemaName); err != nil {
-			continue
+		if err != nil {
+			return nil
 		}
+		defer schemaRows.Close()
 
-		// List base tables and views within this schema.
-		tables := []*plugin.ConnectionTreeNode{}
-		tblRows, err := db.Query(`
+		var schemaNodes []*plugin.ConnectionTreeNode
+		for schemaRows.Next() {
+			var schemaName string
+			if err := schemaRows.Scan(&schemaName); err != nil {
+				continue
+			}
+
+			tables := []*plugin.ConnectionTreeNode{}
+			tblRows, err := conn.Query(`
 SELECT
     c.relname,
     CASE c.relkind
@@ -455,71 +609,88 @@ JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
 WHERE n.nspname = $1
   AND c.relkind IN ('r', 'v', 'm', 'f', 'p')
 ORDER BY c.relname`, schemaName)
-		if err == nil {
-			for tblRows.Next() {
-				var tbl string
-				var tblType string
-				if err := tblRows.Scan(&tbl, &tblType); err == nil {
-					key := schemaName + "." + tbl
-					tables = append(tables, &plugin.ConnectionTreeNode{
-						Key:      key,
-						Label:    tbl,
-						NodeType: plugin.ConnectionTreeNodeTypeTable, // keep 'table' for now so it gets the grid icon
-						Actions: []*plugin.ConnectionTreeAction{
-							{
-								Type:  plugin.ConnectionTreeActionSelect,
-								Title: "Select rows",
-								Query: fmt.Sprintf(`SELECT * FROM "%s"."%s" LIMIT 100;`, schemaName, tbl),
-								Hidden: true,
-								NewTab: true,
+			if err == nil {
+				for tblRows.Next() {
+					var tbl string
+					var tblType string
+					if err := tblRows.Scan(&tbl, &tblType); err == nil {
+						key := schemaName + "." + tbl
+						tables = append(tables, &plugin.ConnectionTreeNode{
+							Key:      key,
+							Label:    tbl,
+							NodeType: plugin.ConnectionTreeNodeTypeTable,
+							Actions: []*plugin.ConnectionTreeAction{
+								{
+									Type:  plugin.ConnectionTreeActionSelect,
+									Title: "Select rows",
+									Query: fmt.Sprintf(`SELECT * FROM "%s"."%s" LIMIT 100;`, schemaName, tbl),
+									Hidden: true,
+									NewTab: true,
+								},
+								{
+									Type:  plugin.ConnectionTreeActionDropTable,
+									Title: "Drop table",
+									Query: fmt.Sprintf(`DROP TABLE "%s"."%s";`, schemaName, tbl),
+								},
 							},
-							{
-								Type:  plugin.ConnectionTreeActionDropTable,
-								Title: "Drop table",
-								Query: fmt.Sprintf(`DROP TABLE "%s"."%s";`, schemaName, tbl),
-							},
-						},
 					})
+					}
+				}
+				tblRows.Close()
+			}
+
+			schemaNode := &plugin.ConnectionTreeNode{
+				Key:      schemaName,
+				Label:    schemaName,
+				NodeType: plugin.ConnectionTreeNodeTypeSchema,
+				Children: tables,
+				Actions: []*plugin.ConnectionTreeAction{
+					{
+						Type:  plugin.ConnectionTreeActionCreateTable,
+						Title: "Create table",
+						Query: fmt.Sprintf("CREATE TABLE \"%s\".\"new_table\" (\n    id SERIAL PRIMARY KEY\n);", schemaName),
+					},
+				},
+			}
+			schemaNodes = append(schemaNodes, schemaNode)
+		}
+		return schemaNodes
+	}
+
+	var dbNodes []*plugin.ConnectionTreeNode
+	for _, dbname := range dbNames {
+		var schemas []*plugin.ConnectionTreeNode
+		if dbname == currentDB {
+			schemas = loadSchemas(db)
+		} else {
+			connMap := make(map[string]string)
+			for k, v := range req.Connection {
+				connMap[k] = v
+			}
+			connMap["database"] = dbname
+			if dsn2, err := buildConnString(connMap); err == nil && dsn2 != "" {
+				if db2, err2 := openPostgresDB(dsn2); err2 == nil {
+					schemas = loadSchemas(db2)
+					db2.Close()
 				}
 			}
-			tblRows.Close()
 		}
-
-		schemaNode := &plugin.ConnectionTreeNode{
-			Key:      schemaName,
-			Label:    schemaName,
-			NodeType: plugin.ConnectionTreeNodeTypeSchema,
-			Children: tables,
+		node := &plugin.ConnectionTreeNode{
+			Key:      dbname,
+			Label:    dbname,
+			NodeType: plugin.ConnectionTreeNodeTypeDatabase,
+			Children: schemas,
 			Actions: []*plugin.ConnectionTreeAction{
 				{
-					Type:  plugin.ConnectionTreeActionCreateTable,
-					Title: "Create table",
-					Query: fmt.Sprintf("CREATE TABLE \"%s\".\"new_table\" (\n    id SERIAL PRIMARY KEY\n);", schemaName),
+					Type:  plugin.ConnectionTreeActionDropDatabase,
+					Title: "Drop database",
+					Query: fmt.Sprintf(`DROP DATABASE "%s";`, dbname),
 				},
 			},
 		}
-
-		// Pre-expand public schema if it exists and has tables
-		schemaNodes = append(schemaNodes, schemaNode)
+		dbNodes = append(dbNodes, node)
 	}
 
-	// Wrap schemas under the current database node.
-	dbNode := &plugin.ConnectionTreeNode{
-		Key:      currentDB,
-		Label:    currentDB,
-		NodeType: plugin.ConnectionTreeNodeTypeDatabase,
-		Children: schemaNodes,
-		Actions: []*plugin.ConnectionTreeAction{
-			{
-				Type:  plugin.ConnectionTreeActionDropDatabase,
-				Title: "Drop database",
-				Query: fmt.Sprintf(`DROP DATABASE "%s";`, currentDB),
-			},
-		},
-	}
-
-	// Prepend a leaf node for the create-database action so the user can
-	// create a new database without a redundant wrapper server node.
 	createNode := &plugin.ConnectionTreeNode{
 		Key:      "__create_database__",
 		Label:    "New database",
@@ -529,12 +700,12 @@ ORDER BY c.relname`, schemaName)
 				Type:  plugin.ConnectionTreeActionCreateDatabase,
 				Title: "Create database",
 				Query: `CREATE DATABASE "new_database";`,
-				Hidden: true, // this action is only relevant when the root node is selected, so hide it from the context menu
+				Hidden: true,
 			},
 		},
 	}
 
-	return &plugin.ConnectionTreeResponse{Nodes: []*plugin.ConnectionTreeNode{createNode, dbNode}}, nil
+	return &plugin.ConnectionTreeResponse{Nodes: append([]*plugin.ConnectionTreeNode{createNode}, dbNodes...)}, nil
 }
 
 // formatPingError wraps a ping failure with supplemental hints when the

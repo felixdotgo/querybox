@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 
 import { DescribeSchema } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
-import { useConnectionTree } from './useConnectionTree'
+import { tagWithConnId, useConnectionTree } from './useConnectionTree'
 
 // stub out bindings that pull in the Wails runtime, which assumes a browser
 // `window` object; this prevents a ReferenceError in the Node test
@@ -67,6 +67,78 @@ describe('useConnectionTree schema helpers', () => {
     // calling again should merge but not duplicate
     await fetchSchema('newtable')
     expect(Object.keys(schemaCache.c2)).toEqual(expect.arrayContaining(['initial', 'newtable']))
+  })
+
+  it('tagWithConnId correctly tags nodes and removes duplicates', () => {
+    // prepare a small tree containing two siblings with the same key; the
+    // dedup logic should keep only the first, prefix every key with the
+    // connection id, and recurse into children.
+    const sample = [
+      { key: 'pub', label: 'public', node_type: 4, children: [
+        { key: 'users', label: 'users', node_type: 2 },
+      ] },
+      { key: 'pub', label: 'should be dropped', node_type: 4 },
+    ]
+    const result = tagWithConnId(sample, 'conn1')
+    expect(result.length).toBe(1)
+    expect(result[0].key).toBe('conn1:pub')
+    expect(result[0].node_type).toBe('schema')
+    expect(result[0].children && result[0].children[0].key).toBe('conn1:pub:users')
+
+    // invoking again on the same input should produce the same output (no
+    // cumulative duplicates)
+    const again = tagWithConnId(sample, 'conn1')
+    expect(again).toEqual(result)
+  })
+
+  it('tagWithConnId gives unique keys to same-named schemas in different databases', () => {
+    // Two database nodes each containing a "public" schema child.  After tagging,
+    // the schema keys must differ so that NaiveUI tracks their expansion state
+    // independently (the original bug: both resolved to "connId:public").
+    const tree = [
+      {
+        key: 'nguye',
+        label: 'nguye',
+        node_type: 1,
+        children: [
+          { key: 'public', label: 'public', node_type: 4, children: [
+            { key: 'public.users', label: 'users', node_type: 2 },
+          ] },
+        ],
+      },
+      {
+        key: 'phonedb',
+        label: 'phonedb',
+        node_type: 1,
+        children: [
+          { key: 'public', label: 'public', node_type: 4, children: [
+            { key: 'public.users', label: 'users', node_type: 2 },
+          ] },
+        ],
+      },
+    ]
+    const result = tagWithConnId(tree, 'c1')
+
+    const nguyeSchema = result.find(n => n.label === 'nguye')!.children[0]
+    const phonedbSchema = result.find(n => n.label === 'phonedb')!.children[0]
+
+    // database-level keys must be unique
+    expect(result[0].key).toBe('c1:nguye')
+    expect(result[1].key).toBe('c1:phonedb')
+
+    // schema keys must be unique across databases
+    expect(nguyeSchema.key).toBe('c1:nguye:public')
+    expect(phonedbSchema.key).toBe('c1:phonedb:public')
+    expect(nguyeSchema.key).not.toBe(phonedbSchema.key)
+
+    // table keys must also be unique
+    expect(nguyeSchema.children[0].key).toBe('c1:nguye:public:public.users')
+    expect(phonedbSchema.children[0].key).toBe('c1:phonedb:public:public.users')
+    expect(nguyeSchema.children[0].key).not.toBe(phonedbSchema.children[0].key)
+
+    // each node must carry the correct connection id regardless of depth
+    expect(nguyeSchema._connectionId).toBe('c1')
+    expect(phonedbSchema._connectionId).toBe('c1')
   })
 
   it('fetchSchema splits qualified name into db and table filters', async () => {

@@ -11,8 +11,9 @@ const treeCache: Record<string, any[]> = reactive({})
 // so that table information can survive restarts and be available offline.
 const schemaCache: Record<string, Record<string, any>> = reactive({})
 
-// map proto enum numbers to lowercase names; mirrors ConnectionsPanel.NODE_TYPE_ENUM_MAP
-const NODE_TYPE_ENUM_MAP: Record<number, string> = {
+// map proto enum numbers to lowercase names; used both here and by the
+// ConnectionsPanel component.  Exported so tests can verify tagging logic.
+export const NODE_TYPE_ENUM_MAP: Record<number, string> = {
   1: 'database',
   2: 'table',
   3: 'column',
@@ -21,6 +22,59 @@ const NODE_TYPE_ENUM_MAP: Record<number, string> = {
   6: 'action',
   7: 'collection',
   8: 'key',
+}
+
+// Recursively tag every node with its owning connection id, normalize the
+// `node_type` value, and sort/uniq siblings.  This mirrors nearly identical
+// logic previously in ConnectionsPanel.tagWithConnId; moving it here makes it
+// easier to test and avoids regenerating fresh objects on every render (which
+// confused the tree view and led to duplicate entries when a node was
+// expanded/collapsed repeatedly).
+export function tagWithConnId(nodes: any[], connId: string, _prefix?: string): any[] {
+  // `_prefix` accumulates the full ancestor key path so that sibling nodes
+  // in different databases (e.g. both have a "public" schema) receive distinct
+  // keys, preventing NaiveUI from conflating their expansion state.
+  const prefix = _prefix !== undefined ? _prefix : connId
+  const seenKeys = new Set<string>()
+
+  const tagged = nodes.map((n) => {
+    const nodeType = typeof n.node_type === 'number'
+      ? (NODE_TYPE_ENUM_MAP[n.node_type] ?? null)
+      : n.node_type
+
+    const base: any = {
+      ...n,
+      key: `${prefix}:${n.key}`,
+      _connectionId: connId,
+      node_type: nodeType,
+    }
+    if (n.children) {
+      base.children = tagWithConnId(n.children, connId, base.key)
+    }
+    return base
+  })
+
+  // deduplicate siblings by key preserving original order
+  const out: any[] = []
+  for (const t of tagged) {
+    if (!seenKeys.has(t.key)) {
+      seenKeys.add(t.key)
+      out.push(t)
+    }
+  }
+
+  // stable sort: action nodes first, then alphabetic by label
+  out.sort((a, b) => {
+    const aIsAction = a.node_type === 'action'
+    const bIsAction = b.node_type === 'action'
+    if (aIsAction && !bIsAction)
+      return -1
+    if (!aIsAction && bIsAction)
+      return 1
+    return (a.label ?? '').localeCompare(b.label ?? '')
+  })
+
+  return out
 }
 
 function normalizeNodes(nodes: any[]): any[] {

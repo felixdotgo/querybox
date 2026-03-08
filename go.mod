@@ -3,6 +3,7 @@ module github.com/felixdotgo/querybox
 go 1.26
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/arangodb/go-driver v1.6.9
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/google/uuid v1.6.0

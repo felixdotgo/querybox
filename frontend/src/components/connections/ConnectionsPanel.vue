@@ -18,7 +18,7 @@ import {
   ExecTreeAction,
 } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
 import DbIcon from '@/components/DbIcon.vue'
-import { useConnectionTree } from '@/composables/useConnectionTree'
+import { NODE_TYPE_ENUM_MAP, tagWithConnId, useConnectionTree } from '@/composables/useConnectionTree'
 // plugin capability cache keyed by plugin id (driver name) derived
 // from the global plugin list.
 import { usePlugins } from '@/composables/usePlugins'
@@ -121,22 +121,6 @@ const defaultExpandedKeys = computed(() => {
 })
 
 /**
- * Maps proto NodeType enum integers (as serialized by encoding/json) to the
- * lowercase strings expected by INSTANT_SELECT_TYPES, nodeTypeIconMap, and
- * the node-type guards throughout this component.
- */
-const NODE_TYPE_ENUM_MAP = {
-  1: 'database',
-  2: 'table',
-  3: 'column',
-  4: 'schema',
-  5: 'view',
-  6: 'action',
-  7: 'collection',
-  8: 'key', // plugin-local extension for key-value store leaf nodes (e.g. Redis)
-}
-
-/**
  * Recursively stamps every node (and its descendants) with the owning
  * connection id.  This lets the three parentConn-finder loops below resolve
  * the correct connection in O(1) instead of scanning every loaded tree,
@@ -146,28 +130,7 @@ const NODE_TYPE_ENUM_MAP = {
  * Also normalises node_type from proto enum integers (e.g. 2) to the
  * lowercase strings the rest of the component expects (e.g. "table").
  */
-function tagWithConnId(nodes, connId) {
-  return nodes.map((n) => {
-    const nodeType = typeof n.node_type === 'number'
-      ? (NODE_TYPE_ENUM_MAP[n.node_type] ?? null)
-      : n.node_type
-    return {
-      ...n,
-      key: `${connId}:${n.key}`,
-      _connectionId: connId,
-      node_type: nodeType,
-      children: n.children ? tagWithConnId(n.children, connId) : n.children,
-    }
-  }).sort((a, b) => {
-    const aIsAction = a.node_type === 'action'
-    const bIsAction = b.node_type === 'action'
-    if (aIsAction && !bIsAction)
-      return -1
-    if (!aIsAction && bIsAction)
-      return 1
-    return (a.label ?? '').localeCompare(b.label ?? '')
-  })
-}
+// moved to composable; imported above
 
 const treeData = computed(() => {
   return (connections.value || []).map((cc) => {
