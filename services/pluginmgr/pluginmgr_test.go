@@ -188,6 +188,14 @@ func TestGetPluginAuthFormsNonExecutable(t *testing.T) {
 	if forms != nil {
 		t.Errorf("expected nil forms for non-executable plugin, got %#v", forms)
 	}
+	// calling with extension should behave identically (normalization)
+	forms2, err2 := m.GetPluginAuthForms(name)
+	if err2 != nil {
+		t.Fatalf("unexpected error for non-exec path with ext: %v", err2)
+	}
+	if forms2 != nil {
+		t.Errorf("expected nil forms for non-executable plugin with ext, got %#v", forms2)
+	}
 }
 
 func TestDescribeSchemaParsesResponse(t *testing.T) {
@@ -217,13 +225,23 @@ fi
 
 	m := &Manager{plugins: map[string]PluginInfo{req: {Path: script}}}
 
-	// DescribeSchema expects the plugin name without extension.
+	// DescribeSchema expects the plugin name without extension.  Call with
+	// both trimmed and untrimmed inputs to ensure normalization logic works.
 	resp, err := m.DescribeSchema(req, nil, "", "")
 	if err != nil {
 		t.Fatalf("DescribeSchema error: %v", err)
 	}
 	if len(resp.Tables) != 1 || resp.Tables[0].Name != "foo" {
 		t.Errorf("unexpected response: %+v", resp)
+	}
+	// also try with the raw filename (extension included) to confirm it gets
+	// normalized before lookup
+	resp2, err2 := m.DescribeSchema(name, nil, "", "")
+	if err2 != nil {
+		t.Fatalf("DescribeSchema with extension failed: %v", err2)
+	}
+	if len(resp2.Tables) != 1 || resp2.Tables[0].Name != "foo" {
+		t.Errorf("unexpected response when using extension: %+v", resp2)
 	}
 }
 
@@ -254,7 +272,9 @@ func TestScanOnceConcurrent(t *testing.T) {
 		// delay so there is opportunity for overlap
 		time.Sleep(25 * time.Millisecond)
 		atomic.AddInt32(&active, -1)
-		return PluginInfo{ID: filepath.Base(fullpath), Name: filepath.Base(fullpath)}, nil
+		base := filepath.Base(fullpath)
+		trim := strings.TrimSuffix(base, filepath.Ext(base))
+		return PluginInfo{ID: trim, Name: trim}, nil
 	}
 	defer func() { probeInfoFunc = orig }()
 
@@ -274,14 +294,21 @@ func TestScanOnceConcurrent(t *testing.T) {
 		t.Errorf("probe did not execute concurrently, maxActive=%d", maxActive)
 	}
 
+	// map keys should be normalized (no .exe extension)
+	for k := range m.plugins {
+		if strings.HasSuffix(k, ".exe") {
+			t.Errorf("plugin key %s unexpectedly contains extension", k)
+		}
+	}
+
 	// deleting one file should prune the registry
 	os.Remove(filepath.Join(dir, pluginName("p1")))
 	m.scanOnce()
 	if len(m.plugins) != 1 {
 		t.Fatalf("expected 1 plugin after removal, got %d", len(m.plugins))
 	}
-	if _, ok := m.plugins[pluginName("p2")]; !ok {
-		t.Errorf("remaining plugin should be %s", pluginName("p2"))
+	if _, ok := m.plugins["p2"]; !ok {
+		t.Errorf("remaining plugin should be %s", "p2")
 	}
 }
 // TestPluginsReadyCallback ensures that the onPluginsReady hook is invoked

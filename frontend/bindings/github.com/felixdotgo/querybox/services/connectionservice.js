@@ -25,7 +25,8 @@ import * as $models from "./models.js";
 /**
  * CreateConnection inserts a new connection record and returns it. The
  * provided `credential` (typically the frontend-serialized auth form) is
- * stored in the OS keyring and the DB only keeps the key reference.
+ * stored in the OS keyring and the DB only keeps the key reference.  The
+ * driverType is normalized so that ".exe" suffixes are never stored.
  * @param {string} name
  * @param {string} driverType
  * @param {string} credential

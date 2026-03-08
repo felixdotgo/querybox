@@ -118,3 +118,42 @@ func TestConnectionService_UpdateConnection_UnknownID(t *testing.T) {
 		t.Fatal("expected error for unknown connection ID, got nil")
 	}
 }
+
+// Test that driverType values with platform-specific extensions are both
+// stored and returned in normalized form.  This guards against Windows saving
+// "mysql.exe" which would break across other platforms and confuse the UI.
+func TestConnectionService_DriverTypeNormalization(t *testing.T) {
+	svc := NewConnectionService()
+	if !svc.closeable() {
+		t.Skip("database not available, skipping test")
+	}
+	defer svc.Shutdown()
+
+	ctx := context.Background()
+	// intentionally include a fake ".exe" suffix to simulate Windows input
+	created, err := svc.CreateConnection(ctx, "foo", "dbdriver.exe", "cred")
+	if err != nil {
+		t.Fatalf("CreateConnection failed: %v", err)
+	}
+	if created.DriverType != "dbdriver" {
+		t.Errorf("expected normalized driver_type 'dbdriver', got %q", created.DriverType)
+	}
+
+	// ensure ListConnections also returns trimmed value
+	list, err := svc.ListConnections(ctx)
+	if err != nil {
+		t.Fatalf("ListConnections error: %v", err)
+	}
+	found := false
+	for _, c := range list {
+		if c.ID == created.ID {
+			found = true
+			if c.DriverType != "dbdriver" {
+				t.Errorf("listed connection had driver_type %q; want %q", c.DriverType, "dbdriver")
+			}
+		}
+	}
+	if !found {
+		t.Fatal("created connection not found in list")
+	}
+}

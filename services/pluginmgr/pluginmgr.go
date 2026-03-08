@@ -25,6 +25,11 @@ import (
 // scans or executions.
 //
 // PluginInfo holds metadata that the UI can display for each plugin.
+//
+// The `ID` field is used as the canonical driver identifier (also stored
+// in connection.driver_type).  It is always normalized to strip any
+// filesystem extension such as ".exe" so that the same value appears on all
+// OSes.
 type PluginInfo struct {
 	ID          string            `json:"id"`
 	Name        string            `json:"name"`
@@ -299,12 +304,14 @@ func (m *Manager) scanOnce() {
 			if f.IsDir() {
 				continue
 			}
-			name := f.Name()
+			origName := f.Name()
+			// normalize plugin identifier by stripping any filesystem extension
+			name := strings.TrimSuffix(origName, filepath.Ext(origName))
 			if _, seen := found[name]; seen {
 				// already discovered in a higher‑precedence directory
 				continue
 			}
-			full := filepath.Join(dir, name)
+			full := filepath.Join(dir, origName)
 			if !isExecutable(full) {
 				continue
 			}
@@ -328,6 +335,9 @@ func (m *Manager) scanOnce() {
 		wg.Add(1)
 		go func(c candidate) {
 			defer wg.Done()
+			// Use normalized `name` (no extension) for ID; keep the original
+			// filename as a fallback for display if plugin metadata doesn't
+			// provide a nicer human name.
 			info := PluginInfo{ID: c.name, Name: c.name, Path: c.full, Running: false}
 			meta, err := probeInfoFunc(c.full)
 			if err != nil && c.dirIdx == 0 && len(m.dirs) > 1 {
@@ -489,6 +499,9 @@ func (m *Manager) ListPlugins() []PluginInfo {
 // type) or an error.  Historically this returned a raw string; callers may need
 // to examine the `Result` field to access rows, documents, or key/value data.
 func (m *Manager) ExecPlugin(name string, connection map[string]string, query string, options map[string]string) (*plugin.ExecResponse, error) {
+	// callers may include platform-specific extensions; strip them so the
+	// lookup against m.plugins (which already uses normalized keys) succeeds.
+	name = strings.TrimSuffix(name, filepath.Ext(name))
 	m.mu.Lock()
 	info, ok := m.plugins[name]
 	m.mu.Unlock()
@@ -722,6 +735,7 @@ func (m *Manager) ExecTreeAction(name string, connection map[string]string, acti
 // given connection.  The optional database/table arguments may be empty;
 // plugins are free to ignore them.  A 30-second timeout prevents hangs.
 func (m *Manager) DescribeSchema(name string, connection map[string]string, database, table string) (*plugin.DescribeSchemaResponse, error) {
+	name = strings.TrimSuffix(name, filepath.Ext(name))
 	m.mu.Lock()
 	info, ok := m.plugins[name]
 	m.mu.Unlock()
@@ -800,6 +814,7 @@ func (m *Manager) DescribeSchema(name string, connection map[string]string, data
 // case TestConnection returns an error rather than a failed response so the
 // caller can distinguish "unsupported" from "tested and failed".
 func (m *Manager) TestConnection(name string, connection map[string]string) (*plugin.TestConnectionResponse, error) {
+	name = strings.TrimSuffix(name, filepath.Ext(name))
 	m.mu.Lock()
 	info, ok := m.plugins[name]
 	m.mu.Unlock()
@@ -870,6 +885,7 @@ func (m *Manager) TestConnection(name string, connection map[string]string) (*pl
 // plugin doesn't implement the command or returns no forms an empty map is
 // returned.
 func (m *Manager) GetPluginAuthForms(name string) (map[string]*plugin.AuthForm, error) {
+	name = strings.TrimSuffix(name, filepath.Ext(name))
 	// return nil,nil instead of an error when the plugin is temporarily
 	// unavailable.  The frontend treats a nil result as “no forms”, and
 	// this keeps dev‑mode HMR restarts from bubbling noisy binding errors.

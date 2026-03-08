@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/felixdotgo/querybox/services/credmanager"
@@ -108,28 +109,6 @@ func NewConnectionService() *ConnectionService {
 
 	svc := &ConnectionService{db: db, cred: credmanager.New()}
 
-	// Migration: move any legacy `credential_blob` into the keyring and set
-	// `credential_key` to the generated key.
-	if has, _ := svc.hasColumn("credential_blob"); has {
-		_, _ = db.Exec(`ALTER TABLE connections ADD COLUMN credential_key TEXT`)
-
-		rows, err := db.Query(`SELECT id, credential_blob FROM connections WHERE credential_blob IS NOT NULL AND credential_blob != ''`)
-		if err == nil {
-			defer rows.Close()
-			for rows.Next() {
-				var id string
-				var blob []byte
-				if err := rows.Scan(&id, &blob); err != nil {
-					continue
-				}
-				key := "connection:" + id
-				_ = svc.cred.Store(key, string(blob))
-				_, _ = db.Exec(`UPDATE connections SET credential_key = ? WHERE id = ?`, key, id)
-				_, _ = db.Exec(`UPDATE connections SET credential_blob = NULL WHERE id = ?`, id)
-			}
-		}
-	}
-
 	return svc
 }
 
@@ -192,6 +171,8 @@ func (s *ConnectionService) ListConnections(ctx context.Context) ([]Connection, 
 		if err := rows.Scan(&r.ID, &r.Name, &r.DriverType, &credKey, &r.CreatedAt, &r.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan connections: %w", err)
 		}
+		// ensure driver_type is normalized for callers
+		r.DriverType = normalizeDriverType(r.DriverType)
 		if credKey.Valid {
 			r.CredentialKey = credKey.String
 		}
@@ -224,13 +205,27 @@ func (s *ConnectionService) GetConnection(ctx context.Context, id string) (Conne
 	if credKey.Valid {
 		r.CredentialKey = credKey.String
 	}
+	// normalize before returning
+	r.DriverType = normalizeDriverType(r.DriverType)
 	return r, nil
+}
+
+// normalizeDriverType strips any filesystem extension (e.g. ".exe") from
+// a plugin identifier.  This ensures connections save the same driver name
+// across platforms and avoids persisting stale Windows-specific suffixes.
+func normalizeDriverType(dt string) string {
+    if dt == "" {
+        return dt
+    }
+    return strings.TrimSuffix(dt, filepath.Ext(dt))
 }
 
 // CreateConnection inserts a new connection record and returns it. The
 // provided `credential` (typically the frontend-serialized auth form) is
-// stored in the OS keyring and the DB only keeps the key reference.
+// stored in the OS keyring and the DB only keeps the key reference.  The
+// driverType is normalized so that ".exe" suffixes are never stored.
 func (s *ConnectionService) CreateConnection(ctx context.Context, name, driverType, credential string) (Connection, error) {
+    driverType = normalizeDriverType(driverType)
 	if name == "" || driverType == "" {
 		return Connection{}, errors.New("name and driverType are required")
 	}

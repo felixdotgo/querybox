@@ -13,6 +13,11 @@ import { Create as $Create } from "@wailsio/runtime";
  * scans or executions.
  * 
  * PluginInfo holds metadata that the UI can display for each plugin.
+ * 
+ * The `ID` field is used as the canonical driver identifier (also stored
+ * in connection.driver_type).  It is always normalized to strip any
+ * filesystem extension such as ".exe" so that the same value appears on all
+ * OSes.
  */
 export class PluginInfo {
     /**
