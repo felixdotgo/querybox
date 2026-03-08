@@ -71,3 +71,21 @@ func TestDescribeSchemaInvalid(t *testing.T) {
         t.Errorf("expected no tables for invalid connection, got %d", len(resp.Tables))
     }
 }
+
+func TestBuildDSNDatabaseOverrideWithColon(t *testing.T) {
+    // verify that an override containing a colon is used verbatim rather than
+    // being mangled by the driver.  this guards against regressions if the
+    // frontend ever passes a malformed value; the plugin should simply
+    // forward it and allow the database to reject it.
+    conn := map[string]string{"dsn": "user:pass@tcp(localhost:3306)/foo"}
+    // override to a name containing a colon
+    conn["database"] = "employees:employees"
+    dsn, err := buildDSN(conn)
+    if err != nil {
+        t.Fatalf("unexpected error: %v", err)
+    }
+    // parsed DSN should end with the override value after the last '/'
+    if !strings.Contains(dsn, "/employees:employees") {
+        t.Errorf("override not applied, dsn=%q", dsn)
+    }
+}
