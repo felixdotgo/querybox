@@ -1,6 +1,6 @@
 # QueryBox (Current under development - Not released)
 
-**QueryBox** is a database management tool for executing and managing queries across multiple database systems through a plugin-based architecture.
+**QueryBox** is a plugin-based database app for running core database actions, querying and viewing data across multiple systems. It is built for focused data work rather than complex database administration workflows.
 
 ![QueryBox Desktop](docs/querybox-development.png)
 
