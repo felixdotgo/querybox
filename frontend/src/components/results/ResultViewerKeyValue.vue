@@ -1,5 +1,8 @@
 <script setup>
-import { computed } from 'vue'
+import { NButton, NIcon } from 'naive-ui'
+import { computed, defineEmits, ref } from 'vue'
+import { Pencil, Trash } from '@/lib/icons'
+import RowEditorModal from './RowEditorModal.vue'
 
 const props = defineProps({
   // Already-unwrapped KV payload: { data: { key: value, ... } }
@@ -7,10 +10,43 @@ const props = defineProps({
     type: Object,
     required: true,
   },
+  connection: {
+    type: Object,
+    required: false,
+  },
 })
+
+const emit = defineEmits(['mutated'])
 
 // Normalise: payload may be { data: {...} } or a flat object of k/v pairs.
 const entries = computed(() => props.payload.data || props.payload || {})
+
+// modal state
+const showEditor = ref(false)
+const editorOperation = ref('update')
+const editorRow = ref(null)
+const editorFilter = ref('')
+const editorSource = ref('')
+
+function openEditor(op, row) {
+  editorOperation.value = op
+  editorRow.value = { ...row }
+  editorFilter.value = ''
+  editorSource.value = ''
+  showEditor.value = true
+}
+
+async function performMutation(params) {
+  const { mutateRow } = await import('@/composables/useRowMutation')
+  const conn = props.connection
+  try {
+    await mutateRow(conn, params.operation === 'delete' ? 3 : 2, params.source, params.values || {}, params.filter)
+    emit('mutated')
+  }
+  catch (err) {
+    console.error('mutation failed', err)
+  }
+}
 </script>
 
 <template>
@@ -20,7 +56,32 @@ const entries = computed(() => props.payload.data || props.payload || {})
       :key="k"
       :label="String(k)"
     >
+      <div class="flex justify-end gap-2 mb-1">
+        <NButton size="small" tertiary title="Edit entry" @click.stop.prevent="openEditor('update', { [k]: v })">
+          <template #icon>
+            <NIcon :size="16">
+              <Pencil />
+            </NIcon>
+          </template>
+        </NButton>
+        <NButton size="small" tertiary title="Delete entry" @click.stop.prevent="openEditor('delete', { [k]: v })">
+          <template #icon>
+            <NIcon :size="16">
+              <Trash />
+            </NIcon>
+          </template>
+        </NButton>
+      </div>
       {{ v }}
     </n-descriptions-item>
   </n-descriptions>
+  <RowEditorModal
+    v-model:show="showEditor"
+    :operation="editorOperation"
+    :row="editorRow"
+    :filter="editorFilter"
+    :source="editorSource"
+    @submit="performMutation"
+    @cancel="showEditor = false"
+  />
 </template>

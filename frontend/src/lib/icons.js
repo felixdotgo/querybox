@@ -24,6 +24,7 @@ import {
   Folder,
   Grid,
   Key,
+  Pencil,
   // tree / navigation
   Layers,
   Library,
@@ -62,6 +63,7 @@ export {
   Terminal, // logs panel header
   Time, // planning time (clock)
   Trash, // "Delete" action on connection row
+  Pencil, // generic edit/pencil icon for row‑mutation, etc.
 }
 
 // colours used to style datatype badges in result viewer headers

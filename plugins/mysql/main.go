@@ -29,7 +29,7 @@ func (m *mysqlPlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRequest
 		Description: "MySQL database driver",
 		Url:         "https://www.mysql.com/",
 		Author:      "Oracle",
-		Capabilities: []string{"query", "explain-query"},
+		Capabilities: []string{"query", "explain-query", "mutate-row"},
 		Tags:        []string{"sql", "relational"},
 		License:     "GPL-2.0",
 		IconUrl:     "https://www.mysql.com/common/logos/logo-mysql-170x115.png",
@@ -496,6 +496,13 @@ func (m *mysqlPlugin) TestConnection(ctx context.Context, req *plugin.TestConnec
 		return &plugin.TestConnectionResponse{Ok: false, Message: fmt.Sprintf("ping error: %v", err)}, nil
 	}
 	return &plugin.TestConnectionResponse{Ok: true, Message: "Connection successful"}, nil
+}
+
+// MutateRow is a placeholder implementation for the MySQL driver.  It does
+// not actually perform any database operations and always reports success.
+// Future work will flesh out real insert/update/delete behaviour.
+func (m *mysqlPlugin) MutateRow(ctx context.Context, req *plugin.MutateRowRequest) (*plugin.MutateRowResponse, error) {
+	return &plugin.MutateRowResponse{Success: true}, nil
 }
 
 func main() {

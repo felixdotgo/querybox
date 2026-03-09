@@ -21,6 +21,7 @@ Plugins are single-shot executables under `bin/plugins/`. The host spawns one su
 | `test-connection` | `{connection}` | `{ok: bool, message: string}` | 15s | optional |
 | `describe-schema` | `{connection, database?, table?}` | `{tables: [{name, columns, indexes}]}` | 30s | optional |
 | `get-completion-fields` | `{connection, database?, collection?}` | `{fields: [{name, type?}]}` | 5s | optional |
+| `mutate-row` | `{connection, operation, source, values?, filter?}` | `{success: bool, error?: string}` | 30s | optional |
 
 ### exec — result payloads
 
@@ -99,6 +100,18 @@ Plugins that do not implement `authforms` fall back to a single DSN/credential t
 ```
 
 When the user activates a node action, the frontend calls `ExecTreeAction(name, conn, actionQuery, options)` which delegates to `ExecPlugin`.
+
+---
+
+
+## Mutate‑Row Capability
+
+Plugins that support in‑place row/document editing advertise the
+`"mutate-row"` string in their `capabilities` list. The frontend uses this to
+show pencil/delete icons on query results; missing the capability or a
+failure/empty response from the RPC causes the UI to remain read-only. The
+RPC itself is optional and, if implemented, should accept the same JSON
+structure described earlier and return `success`/`error`.
 
 ---
 

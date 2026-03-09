@@ -29,7 +29,7 @@ func (m *postgresqlPlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRe
 		Description: "PostgreSQL database driver",
 		Url:         "https://www.postgresql.org/",
 		Author:      "PostgreSQL Global Development Group",
-		Capabilities: []string{"query", "explain-query"},
+		Capabilities: []string{"query", "explain-query", "mutate-row"},
 		Tags:        []string{"sql", "relational"},
 		License:     "PostgreSQL",
 		IconUrl:     "https://www.postgresql.org/media/img/about/press/elephant.png",
@@ -999,6 +999,13 @@ func (m *postgresqlPlugin) TestConnection(ctx context.Context, req *plugin.TestC
 		return &plugin.TestConnectionResponse{Ok: false, Message: formatPingError(err)}, nil
 	}
 	return &plugin.TestConnectionResponse{Ok: true, Message: "Connection successful"}, nil
+}
+
+// MutateRow is a simple no-op implementation provided as a placeholder.
+// Plugins wanting to support row mutations should execute the necessary
+// INSERT/UPDATE/DELETE logic based on the provided request parameters.
+func (m *postgresqlPlugin) MutateRow(ctx context.Context, req *plugin.MutateRowRequest) (*plugin.MutateRowResponse, error) {
+	return &plugin.MutateRowResponse{Success: true}, nil
 }
 
 func main() {

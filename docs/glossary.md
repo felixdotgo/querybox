@@ -13,7 +13,7 @@
 | **On-Demand Execution** | Plugin invocation model: one subprocess per request, exit after response. No persistent processes. |
 | **OS Keyring** | Platform-native secure store accessed via `go-keyring` (macOS Keychain, Windows Credential Manager, Linux Secret Service). |
 | **Plugin** | Standalone executable under `bin/plugins/` implementing the CLI JSON contract (`info`, `exec`, `authforms`, optionally `connection-tree`, `test-connection`). Language-agnostic. |
-| **Plugin Capabilities** | Optional string array in `info` response advertising extra features a plugin supports (e.g. `"explain-query"`). |
+| **Plugin Capabilities** | Optional string array in `info` response advertising extra features a plugin supports (e.g. "explain-query", "mutate-row"). |
 | **PluginManager** | Go service (`services/pluginmgr/pluginmgr.go`) that discovers plugin executables, maintains an in-memory registry, and executes plugins on-demand with timeout enforcement. |
 | **Plugin Registry** | In-memory map of discovered plugins keyed by name, containing full metadata. |
 | **Plugin SDK** | `pkg/plugin` — minimal Go package providing `ServeCLI` helper and protobuf type aliases for plugin authors. |

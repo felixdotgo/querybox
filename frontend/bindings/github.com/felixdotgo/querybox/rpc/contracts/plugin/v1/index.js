@@ -16,6 +16,8 @@ export {
     PluginV1_FieldInfo,
     PluginV1_GetCompletionFieldsResponse,
     PluginV1_IndexSchema,
+    PluginV1_MutateRowRequest_OperationType,
+    PluginV1_MutateRowResponse,
     PluginV1_NodeType,
     PluginV1_TableSchema,
     PluginV1_TestConnectionResponse

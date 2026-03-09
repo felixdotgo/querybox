@@ -157,6 +157,26 @@ export function ListPlugins() {
 }
 
 /**
+ * MutateRow forwards a single-row mutation request to the specified plugin.
+ * The semantics of `source`, `values` and `filter` are driver-defined; the
+ * core does not interpret them.  The operation type (insert/update/delete)
+ * is described by the OperationType enum.  A 30-second timeout guards
+ * against misbehaving plugins.
+ * @param {string} name
+ * @param {{ [_ in string]?: string }} connection
+ * @param {plugin$0.OperationType} operation
+ * @param {string} source
+ * @param {{ [_ in string]?: string }} values
+ * @param {string} filter
+ * @returns {$CancellablePromise<plugin$0.MutateRowResponse | null>}
+ */
+export function MutateRow(name, connection, operation, source, values, filter) {
+    return $Call.ByID(3105031897, name, connection, operation, source, values, filter).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType14($result);
+    }));
+}
+
+/**
  * Rescan clears the plugin registry and triggers a full re-probe of the
  * plugins directory. This ensures that any metadata changes to existing
  * plugins are picked up (e.g. after a plugin update).
@@ -198,7 +218,7 @@ export function Shutdown() {
  */
 export function TestConnection(name, connection) {
     return $Call.ByID(2822844201, name, connection).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType14($result);
+        return $$createType16($result);
     }));
 }
 
@@ -216,5 +236,7 @@ const $$createType9 = $Create.Nullable($$createType8);
 const $$createType10 = $Create.Map($Create.Any, $$createType9);
 const $$createType11 = $models.PluginInfo.createFrom;
 const $$createType12 = $Create.Array($$createType11);
-const $$createType13 = pluginpb$0.PluginV1_TestConnectionResponse.createFrom;
+const $$createType13 = pluginpb$0.PluginV1_MutateRowResponse.createFrom;
 const $$createType14 = $Create.Nullable($$createType13);
+const $$createType15 = pluginpb$0.PluginV1_TestConnectionResponse.createFrom;
+const $$createType16 = $Create.Nullable($$createType15);

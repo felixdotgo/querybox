@@ -46,6 +46,16 @@ service PluginService {
   // This RPC is OPTIONAL – plugins that do not implement it simply return an
   // empty GetCompletionFieldsResponse.
   rpc GetCompletionFields(PluginV1.GetCompletionFieldsRequest) returns (PluginV1.GetCompletionFieldsResponse);
+
+  // MutateRow performs an insert/update/delete operation on a single row.
+  // The plugin defines the semantics of the `source` (e.g. table name)
+  // and `filter` (e.g. WHERE clause) parameters, and the core simply forwards
+  // them from the UI.  The `values` map contains column→value pairs for
+  // insert/update operations.  The plugin returns success=true if the mutation
+  // succeeded, or false with an optional error message if it failed.  This
+  // RPC is OPTIONAL – plugins that do not implement it should return
+  // success=false and an appropriate error message.
+  rpc MutateRow(PluginV1.MutateRowRequest) returns (PluginV1.MutateRowResponse);
 }
 
 // PluginV1 defines the data structures for plugin information, execution, and authentication forms.
@@ -307,5 +317,28 @@ message PluginV1 {
   // GetCompletionFieldsResponse holds the sampled field names for a collection.
   message GetCompletionFieldsResponse {
     repeated FieldInfo fields = 1;
+  }
+
+  // MutateRowRequest carries the information needed to perform a row mutation (insert/update/delete).
+  message MutateRowRequest {
+    // OperationType defines the type of mutation operation to perform.
+    enum OperationType {
+      OP_UNKNOWN = 0;
+      INSERT = 1;
+      UPDATE = 2;
+      DELETE = 3;
+    }
+
+    map<string, string> connection = 1;
+    OperationType operation = 2;
+    string source = 3;
+    map<string, string> values = 4; // column→value for insert/update
+    string filter = 5; // optional filter expression for update/delete
+  }
+
+  // MutateRowResponse indicates whether the mutation operation succeeded.
+  message MutateRowResponse {
+    bool success = 1;
+    string error = 2; // optional error message
   }
 }

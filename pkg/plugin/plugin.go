@@ -64,6 +64,18 @@ type DocumentResult = pluginpb.PluginV1_DocumentResult
 
 type KeyValueResult = pluginpb.PluginV1_KeyValueResult
 
+// MutateRow aliases – request, response, and operation enum.
+// These mirror the protobuf definitions and are provided for convenience
+// so plugin authors can reference them from the stable `pkg/plugin`
+// import path without directly depending on the generated package.
+//
+// OperationType corresponds to the MutateRowRequest.OperationType enum.
+type MutateRowRequest = pluginpb.PluginV1_MutateRowRequest
+
+type MutateRowResponse = pluginpb.PluginV1_MutateRowResponse
+
+type OperationType = pluginpb.PluginV1_MutateRowRequest_OperationType
+
 // DriverType reuse from protobuf enum
 type DriverType = pluginpb.PluginV1_Type
 
@@ -258,6 +270,24 @@ func ServeCLI(s pluginpb.PluginServiceServer) {
 		}
 		b, _ := protojson.Marshal(res)
 		_, _ = os.Stdout.Write(b)
+case "mutate-row":
+		in, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "plugin: failed to read stdin: %v\n", err)
+			os.Exit(1)
+		}
+		var req pluginpb.PluginV1_MutateRowRequest
+		if err := json.Unmarshal(in, &req); err != nil {
+			fmt.Fprintf(os.Stderr, "plugin: invalid mutate-row request json: %v\n", err)
+			os.Exit(1)
+		}
+		res, err := s.MutateRow(context.Background(), &req)
+		if err != nil {
+			// wrap error in response so failures are distinguishable
+			res = &pluginpb.PluginV1_MutateRowResponse{Success: false, Error: err.Error()}
+		}
+		b, _ := protojson.Marshal(res)
+		_, _ = os.Stdout.Write(b)
 	default:
 		usage()
 		os.Exit(2)
@@ -265,5 +295,5 @@ func ServeCLI(s pluginpb.PluginServiceServer) {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "Usage: <plugin> info | exec | authforms | connection-tree | test-connection | describe-schema | completion-fields (request on stdin as JSON)")
+	fmt.Fprintln(os.Stderr, "Usage: <plugin> info | exec | authforms | connection-tree | test-connection | describe-schema | completion-fields | mutate-row (request on stdin as JSON)")
 }

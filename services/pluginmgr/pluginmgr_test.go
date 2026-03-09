@@ -139,6 +139,41 @@ func TestExecRequestMarshalling(t *testing.T) {
 	}
 }
 
+// TestMutateRowRequestMarshalling ensures the internal mutateRowRequest
+// serialises the operation enum and other fields correctly.
+func TestMutateRowRequestMarshalling(t *testing.T) {
+	r := mutateRowRequest{
+		Connection: map[string]string{"a": "b"},
+		Operation:  pluginpb.PluginV1_MutateRowRequest_INSERT,
+		Source:     "t1",
+		Values:     map[string]string{"x": "y"},
+		Filter:     "id=1",
+	}
+	b, err := json.Marshal(&r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	// encoding/json will represent the enum as a number (float64 here).
+	if op, ok := m["operation"].(float64); !ok || op != float64(pluginpb.PluginV1_MutateRowRequest_INSERT) {
+		t.Errorf("operation not marshalled as numeric value: %#v", m["operation"])
+	}
+	if m["filter"] != "id=1" {
+		t.Errorf("filter wrong: %#v", m["filter"])
+	}
+}
+
+func TestMutateRowMissingPlugin(t *testing.T) {
+	m := New()
+	_, err := m.MutateRow("nonexistent", nil, pluginpb.PluginV1_MutateRowRequest_DELETE, "t", nil, "")
+	if err == nil {
+		t.Errorf("expected error for missing plugin")
+	}
+}
+
 func TestExecTreeActionForwardsOptions(t *testing.T) {
 	m := New()
 	_, err := m.ExecTreeAction("nonexistent", nil, "SELECT 1", map[string]string{"explain-query": "yes"})
@@ -246,6 +281,50 @@ fi
 		t.Fatalf("DescribeSchema with extension failed: %v", err2)
 	}
 	if len(resp2.Tables) != 1 || resp2.Tables[0].Name != "foo" {
+		t.Errorf("unexpected response when using extension: %+v", resp2)
+	}
+}
+
+func TestMutateRowParsesResponse(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell script plugin not supported on Windows")
+	}
+	// create a dummy executable that handles the mutate-row command
+	dir, err := os.MkdirTemp("", "pmgrmutate")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	name := pluginName("dummy")
+	req := strings.TrimSuffix(name, filepath.Ext(name))
+	script := filepath.Join(dir, name)
+	bin := fmt.Sprintf(`#!/bin/sh
+if [ "$1" = "mutate-row" ]; then
+  echo '{"success":true}';
+else
+  echo '{}' ;
+fi
+`)
+	if err := os.WriteFile(script, []byte(bin), 0o755); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+
+	m := &Manager{plugins: map[string]PluginInfo{req: {Path: script}}}
+
+	resp, err := m.MutateRow(req, nil, pluginpb.PluginV1_MutateRowRequest_INSERT, "t", nil, "")
+	if err != nil {
+		t.Fatalf("MutateRow error: %v", err)
+	}
+	if !resp.Success {
+		t.Errorf("unexpected response: %+v", resp)
+	}
+	// also try with extension to ensure normalization
+	resp2, err2 := m.MutateRow(name, nil, pluginpb.PluginV1_MutateRowRequest_INSERT, "t", nil, "")
+	if err2 != nil {
+		t.Fatalf("MutateRow with extension failed: %v", err2)
+	}
+	if !resp2.Success {
 		t.Errorf("unexpected response when using extension: %+v", resp2)
 	}
 }

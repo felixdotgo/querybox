@@ -80,6 +80,7 @@ graph LR
 | `TestConnection(name, conn)` | Run `plugin test-connection`, **15s** timeout → `TestConnectionResponse` |
 | `DescribeSchema(name, conn, db, table)` | Run `plugin describe-schema`, 30s timeout → `DescribeSchemaResponse` |
 | `GetCompletionFields(name, conn, db?, collection?)` | Run `plugin get-completion-fields`, 5s timeout → `{fields:[{name,type?}]}` |
+| `MutateRow(name, conn, operation, source, values, filter)` | Run `plugin mutate-row` (CLI command); request is JSON‑encoded (enum as numeric value), 30s timeout → `{success:bool,error?:string}`. Plugins that lack the optional RPC or capability should return failure/empty result, and the UI hides the icons. |
 
 
 ### Plugin events

@@ -641,6 +641,62 @@ export class PluginV1_IndexSchema {
 }
 
 /**
+ * OperationType defines the type of mutation operation to perform.
+ * @readonly
+ * @enum {number}
+ */
+export const PluginV1_MutateRowRequest_OperationType = {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero: 0,
+
+    PluginV1_MutateRowRequest_OP_UNKNOWN: 0,
+    PluginV1_MutateRowRequest_INSERT: 1,
+    PluginV1_MutateRowRequest_UPDATE: 2,
+    PluginV1_MutateRowRequest_DELETE: 3,
+};
+
+/**
+ * MutateRowResponse indicates whether the mutation operation succeeded.
+ */
+export class PluginV1_MutateRowResponse {
+    /**
+     * Creates a new PluginV1_MutateRowResponse instance.
+     * @param {Partial<PluginV1_MutateRowResponse>} [$$source = {}] - The source object to create the PluginV1_MutateRowResponse.
+     */
+    constructor($$source = {}) {
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {boolean | undefined}
+             */
+            this["success"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * optional error message
+             * @member
+             * @type {string | undefined}
+             */
+            this["error"] = undefined;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new PluginV1_MutateRowResponse instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {PluginV1_MutateRowResponse}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new PluginV1_MutateRowResponse(/** @type {Partial<PluginV1_MutateRowResponse>} */($$parsedSource));
+    }
+}
+
+/**
  * NodeType is an optional hint for the frontend icon renderer and lets Go
  * code reference well-known node kinds via generated constants instead of
  * raw strings.

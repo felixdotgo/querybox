@@ -13,6 +13,12 @@ const props = defineProps({
     type: Object,
     required: false,
   },
+  // the connection object associated with this result tab; passed
+  // through to viewers so they can perform mutations.
+  connection: {
+    type: Object,
+    required: false,
+  },
 })
 
 const payload = computed(() => {
@@ -92,6 +98,7 @@ const viewType = computed(() => {
       v-if="viewType === 'rdbms'"
       :payload="payload"
       :schema="props.schema"
+      :connection="props.connection"
     />
     <ResultViewerDocument v-else-if="viewType === 'document'" :payload="payload" />
     <ResultViewerKeyValue v-else-if="viewType === 'kv'" :payload="payload" />

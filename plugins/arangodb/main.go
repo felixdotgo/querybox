@@ -620,6 +620,11 @@ func (a *arangoPlugin) TestConnection(ctx context.Context, req *plugin.TestConne
 	}, nil
 }
 
+// MutateRow stub for ArangoDB driver; always reports not supported.
+func (a *arangoPlugin) MutateRow(ctx context.Context, req *plugin.MutateRowRequest) (*plugin.MutateRowResponse, error) {
+	return &plugin.MutateRowResponse{Error: "not supported"}, nil
+}
+
 func main() {
 	plugin.ServeCLI(&arangoPlugin{})
 }

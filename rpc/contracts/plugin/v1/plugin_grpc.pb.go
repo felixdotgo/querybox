@@ -26,6 +26,7 @@ const (
 	PluginService_DescribeSchema_FullMethodName      = "/plugin.v1.PluginService/DescribeSchema"
 	PluginService_TestConnection_FullMethodName      = "/plugin.v1.PluginService/TestConnection"
 	PluginService_GetCompletionFields_FullMethodName = "/plugin.v1.PluginService/GetCompletionFields"
+	PluginService_MutateRow_FullMethodName           = "/plugin.v1.PluginService/MutateRow"
 )
 
 // PluginServiceClient is the client API for PluginService service.
@@ -67,6 +68,15 @@ type PluginServiceClient interface {
 	// This RPC is OPTIONAL – plugins that do not implement it simply return an
 	// empty GetCompletionFieldsResponse.
 	GetCompletionFields(ctx context.Context, in *PluginV1_GetCompletionFieldsRequest, opts ...grpc.CallOption) (*PluginV1_GetCompletionFieldsResponse, error)
+	// MutateRow performs an insert/update/delete operation on a single row.
+	// The plugin defines the semantics of the `source` (e.g. table name)
+	// and `filter` (e.g. WHERE clause) parameters, and the core simply forwards
+	// them from the UI.  The `values` map contains column→value pairs for
+	// insert/update operations.  The plugin returns success=true if the mutation
+	// succeeded, or false with an optional error message if it failed.  This
+	// RPC is OPTIONAL – plugins that do not implement it should return
+	// success=false and an appropriate error message.
+	MutateRow(ctx context.Context, in *PluginV1_MutateRowRequest, opts ...grpc.CallOption) (*PluginV1_MutateRowResponse, error)
 }
 
 type pluginServiceClient struct {
@@ -147,6 +157,16 @@ func (c *pluginServiceClient) GetCompletionFields(ctx context.Context, in *Plugi
 	return out, nil
 }
 
+func (c *pluginServiceClient) MutateRow(ctx context.Context, in *PluginV1_MutateRowRequest, opts ...grpc.CallOption) (*PluginV1_MutateRowResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PluginV1_MutateRowResponse)
+	err := c.cc.Invoke(ctx, PluginService_MutateRow_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // PluginServiceServer is the server API for PluginService service.
 // All implementations must embed UnimplementedPluginServiceServer
 // for forward compatibility.
@@ -186,6 +206,15 @@ type PluginServiceServer interface {
 	// This RPC is OPTIONAL – plugins that do not implement it simply return an
 	// empty GetCompletionFieldsResponse.
 	GetCompletionFields(context.Context, *PluginV1_GetCompletionFieldsRequest) (*PluginV1_GetCompletionFieldsResponse, error)
+	// MutateRow performs an insert/update/delete operation on a single row.
+	// The plugin defines the semantics of the `source` (e.g. table name)
+	// and `filter` (e.g. WHERE clause) parameters, and the core simply forwards
+	// them from the UI.  The `values` map contains column→value pairs for
+	// insert/update operations.  The plugin returns success=true if the mutation
+	// succeeded, or false with an optional error message if it failed.  This
+	// RPC is OPTIONAL – plugins that do not implement it should return
+	// success=false and an appropriate error message.
+	MutateRow(context.Context, *PluginV1_MutateRowRequest) (*PluginV1_MutateRowResponse, error)
 	mustEmbedUnimplementedPluginServiceServer()
 }
 
@@ -216,6 +245,9 @@ func (UnimplementedPluginServiceServer) TestConnection(context.Context, *PluginV
 }
 func (UnimplementedPluginServiceServer) GetCompletionFields(context.Context, *PluginV1_GetCompletionFieldsRequest) (*PluginV1_GetCompletionFieldsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetCompletionFields not implemented")
+}
+func (UnimplementedPluginServiceServer) MutateRow(context.Context, *PluginV1_MutateRowRequest) (*PluginV1_MutateRowResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method MutateRow not implemented")
 }
 func (UnimplementedPluginServiceServer) mustEmbedUnimplementedPluginServiceServer() {}
 func (UnimplementedPluginServiceServer) testEmbeddedByValue()                       {}
@@ -364,6 +396,24 @@ func _PluginService_GetCompletionFields_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _PluginService_MutateRow_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PluginV1_MutateRowRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PluginServiceServer).MutateRow(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PluginService_MutateRow_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PluginServiceServer).MutateRow(ctx, req.(*PluginV1_MutateRowRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // PluginService_ServiceDesc is the grpc.ServiceDesc for PluginService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -398,6 +448,10 @@ var PluginService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetCompletionFields",
 			Handler:    _PluginService_GetCompletionFields_Handler,
+		},
+		{
+			MethodName: "MutateRow",
+			Handler:    _PluginService_MutateRow_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

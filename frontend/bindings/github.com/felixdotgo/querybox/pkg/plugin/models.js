@@ -48,6 +48,16 @@ export const GetCompletionFieldsResponse = pluginpb$0.PluginV1_GetCompletionFiel
  * @typedef {pluginpb$0.PluginV1_GetCompletionFieldsResponse} GetCompletionFieldsResponse
  */
 
+export const MutateRowResponse = pluginpb$0.PluginV1_MutateRowResponse;
+
+/**
+ * @typedef {pluginpb$0.PluginV1_MutateRowResponse} MutateRowResponse
+ */
+
+/**
+ * @typedef {pluginpb$0.PluginV1_MutateRowRequest_OperationType} OperationType
+ */
+
 export const TestConnectionResponse = pluginpb$0.PluginV1_TestConnectionResponse;
 
 /**

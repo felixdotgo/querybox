@@ -21,7 +21,7 @@ func (t *templatePlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRequ
 		Description: "Template plugin (on-demand)",
 		Url:         "https://example.com/template-plugin",
 		Author:      "Querybox Core Team",
-		Capabilities: []string{"demo", "example"},
+		Capabilities: []string{"demo", "example", "mutate-row"},
 		Tags:        []string{"template", "sample"},
 		License:     "MIT",
 		IconUrl:     "https://example.com/icon.png",
@@ -107,6 +107,13 @@ func (t *templatePlugin) ConnectionTreeAction(req *plugin.ConnectionTreeAction) 
 // open the data store and verify credentials.
 func (t *templatePlugin) TestConnection(ctx context.Context, req *plugin.TestConnectionRequest) (*plugin.TestConnectionResponse, error) {
 	return &plugin.TestConnectionResponse{Ok: true, Message: "Connection successful (template stub)"}, nil
+}
+
+// MutateRow is a no-op implementation used by tests and the template driver.
+// It simply reports success; real plugins should perform the requested
+// insert/update/delete operation and return accurate success/error state.
+func (t *templatePlugin) MutateRow(ctx context.Context, req *plugin.MutateRowRequest) (*plugin.MutateRowResponse, error) {
+	return &plugin.MutateRowResponse{Success: true}, nil
 }
 
 func main() {

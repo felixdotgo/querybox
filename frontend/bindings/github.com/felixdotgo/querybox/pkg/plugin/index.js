@@ -8,5 +8,12 @@ export {
     DescribeSchemaResponse,
     ExecResponse,
     GetCompletionFieldsResponse,
+    MutateRowResponse,
     TestConnectionResponse
 } from "./models.js";
+
+import * as $models from "./models.js";
+
+/**
+ * @typedef {$models.OperationType} OperationType
+ */

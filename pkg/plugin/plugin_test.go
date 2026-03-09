@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/felixdotgo/querybox/pkg/plugin"
+	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -109,5 +110,79 @@ func main() {
     }
     if len(resp.Tables) != 1 || resp.Tables[0].Name != "t1" {
         t.Errorf("unexpected schema response: %+v", resp)
+    }
+}
+
+// TestServeCLI_MutateRow verifies that the CLI helper correctly
+// marshals a MutateRowRequest and decodes the response. It mirrors
+// TestServeCLI_DescribeSchema above but exercises the new command.
+func TestServeCLI_MutateRow(t *testing.T) {
+    dir := t.TempDir()
+    src := filepath.Join(dir, "main.go")
+    bin := filepath.Join(dir, "testplugin")
+    if runtime.GOOS == "windows" {
+        bin += ".exe"
+    }
+
+    const program = `package main
+
+import (
+    "context"
+
+    "github.com/felixdotgo/querybox/pkg/plugin"
+    pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
+)
+
+type server struct {
+    pluginpb.UnimplementedPluginServiceServer
+}
+
+func (s *server) MutateRow(ctx context.Context, req *pluginpb.PluginV1_MutateRowRequest) (*pluginpb.PluginV1_MutateRowResponse, error) {
+    // echo back the request contents to ensure we received them correctly
+    return &pluginpb.PluginV1_MutateRowResponse{
+        Success: true,
+    }, nil
+}
+
+func (s *server) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRequest) (*plugin.InfoResponse, error) {
+    return &plugin.InfoResponse{Type: plugin.TypeDriver}, nil
+}
+
+func main() {
+    plugin.ServeCLI(&server{})
+}
+`
+
+    if err := os.WriteFile(src, []byte(program), 0o644); err != nil {
+        t.Fatalf("write source: %v", err)
+    }
+
+    cmd := exec.Command("go", "build", "-o", bin, src)
+    if out, err := cmd.CombinedOutput(); err != nil {
+        t.Fatalf("go build failed: %v\n%s", err, string(out))
+    }
+
+    req := plugin.MutateRowRequest{
+        Connection: map[string]string{"foo": "bar"},
+        Operation: pluginpb.PluginV1_MutateRowRequest_INSERT,
+        Source: "t1",
+        Values: map[string]string{"a": "1"},
+        Filter: "id = 1",
+    }
+    in, _ := json.Marshal(&req)
+
+    cmd = exec.Command(bin, "mutate-row")
+    cmd.Stdin = bytes.NewReader(in)
+    out, err := cmd.CombinedOutput()
+    if err != nil {
+        t.Fatalf("plugin exited with error: %v\nstderr+stdout:\n%s", err, string(out))
+    }
+
+    var resp plugin.MutateRowResponse
+    if err := protojson.Unmarshal(out, &resp); err != nil {
+        t.Fatalf("unmarshal mutate-row response: %v", err)
+    }
+    if !resp.Success {
+        t.Errorf("expected success response, got %+v", resp)
     }
 }

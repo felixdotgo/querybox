@@ -1,7 +1,8 @@
 <script setup>
-import { NIcon, NTag } from 'naive-ui'
-import { computed, h, onBeforeUnmount, onMounted, ref } from 'vue'
-import { getDataTypeColor, Key, Pin } from '@/lib/icons'
+import { NButton, NIcon, NTag } from 'naive-ui'
+import { computed, defineEmits, h, onBeforeUnmount, onMounted, ref } from 'vue'
+import { getDataTypeColor, Key, Pencil, Pin, Trash } from '@/lib/icons'
+import RowEditorModal from './RowEditorModal.vue'
 
 const props = defineProps({
   // Already-unwrapped RDBMS payload: { columns: [...], rows: [...] }
@@ -13,7 +14,13 @@ const props = defineProps({
     type: Object,
     required: false,
   },
+  connection: {
+    type: Object,
+    required: false,
+  },
 })
+
+const emit = defineEmits(['mutated'])
 
 const COL_MIN_WIDTH = 120
 const COL_CHAR_WIDTH = 9 // approximate px per character for column title
@@ -121,7 +128,34 @@ const tableColumns = computed(() => {
   // Pinned columns first (in pin order), then the rest in original order
   const pinned = pinnedColumns.value.map(k => colMap.get(k)).filter(Boolean)
   const unpinned = [...colMap.values()].filter(c => !c.fixed)
-  return [...pinned, ...unpinned]
+  // add actions column at end
+  const actionsCol = {
+    className: 'shadow-md bg-slate-50 w-[120px]',
+    title: 'Actions',
+    key: 'actions',
+    align: 'center',
+    width: 120, // fixed pixel width
+    minWidth: 120, // prevent shrinking
+    resizable: false, // user may not adjust size
+    fixed: 'right',
+    render: row => h('div', { class: 'flex gap-1 justify-center' }, [
+      h(NButton, {
+        class: 'cursor-pointer',
+        title: 'Edit row',
+        onClick: (e) => { e.stopPropagation(); openEditor('update', row) },
+        tertiary: true,
+        size: 'small',
+      }, h(NIcon, { size: 16 }, { default: () => h(Pencil) })),
+      h(NButton, {
+        class: 'cursor-pointer',
+        title: 'Delete row',
+        onClick: (e) => { e.stopPropagation(); openEditor('delete', row) },
+        tertiary: true,
+        size: 'small',
+      }, h(NIcon, { size: 16 }, { default: () => h(Trash) })),
+    ]),
+  }
+  return [...pinned, ...unpinned, actionsCol]
 })
 
 const scrollX = computed(() => {
@@ -171,7 +205,53 @@ const tableData = computed(() => {
   })
 })
 
+// modal state for editing/deleting rows
+const showEditor = ref(false)
+const editorOperation = ref('update') // 'update' or 'delete'
+const editorRow = ref(null)
+const editorFilter = ref('')
+const editorSource = ref('')
+
 const rowKeyFunction = row => row && row.key
+
+// compute a default filter string equality comparison from a row object
+function defaultFilterFor(row) {
+  if (!row)
+    return ''
+  const parts = []
+  for (const key in row) {
+    if (key === 'key')
+      continue
+    const val = row[key]
+    // simple quoting; frontend-sanitization is responsibility of plugin/driver
+    parts.push(`${key} = '${val}'`)
+  }
+  return parts.join(' AND ')
+}
+
+function openEditor(op, row) {
+  editorOperation.value = op
+  editorRow.value = row
+  editorFilter.value = defaultFilterFor(row)
+  // source could be derived from schema or left blank; leave blank for now
+  editorSource.value = ''
+  showEditor.value = true
+}
+
+async function performMutation(params) {
+  // This composable will be implemented separately; to avoid circular
+  // imports we load lazily here.
+  const { mutateRow } = await import('@/composables/useRowMutation')
+  const conn = props.connection
+  try {
+    await mutateRow(conn, params.operation === 'delete' ? 3 : 2, params.source, params.values, params.filter)
+    // emit event for parent to refresh
+    emit('mutated')
+  }
+  catch (err) {
+    console.error('mutation failed', err)
+  }
+}
 </script>
 
 <template>
@@ -190,6 +270,15 @@ const rowKeyFunction = row => row && row.key
       scrollable
       resizable
       class="w-full"
+    />
+    <RowEditorModal
+      v-model:show="showEditor"
+      :operation="editorOperation"
+      :row="editorRow"
+      :filter="editorFilter"
+      :source="editorSource"
+      @submit="performMutation"
+      @cancel="showEditor = false"
     />
   </div>
 </template>

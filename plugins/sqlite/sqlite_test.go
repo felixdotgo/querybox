@@ -86,3 +86,21 @@ func TestDescribeSchema(t *testing.T) {
         t.Errorf("id column should be marked primary")
     }
 }
+
+func TestMutateRowStub(t *testing.T) {
+    plugin := &sqlitePlugin{}
+    req := &pluginpb.PluginV1_MutateRowRequest{
+        Connection: map[string]string{},
+        Operation:  pluginpb.PluginV1_MutateRowRequest_DELETE,
+        Source:     "users",
+        Values:     map[string]string{"id": "1"},
+        Filter:     "id=1",
+    }
+    resp, err := plugin.MutateRow(context.Background(), req)
+    if err != nil {
+        t.Fatalf("MutateRow error: %v", err)
+    }
+    if !resp.Success {
+        t.Errorf("expected success response, got %+v", resp)
+    }
+}

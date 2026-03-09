@@ -119,6 +119,17 @@ type execRequest struct {
 	Options    map[string]string `json:"options,omitempty"`
 }
 
+// mutateRowRequest mirrors the protobuf MutateRowRequest but uses simple
+// Go types for CLI JSON encoding.  The `Operation` field reuses the
+// alias defined in pkg/plugin so the enum names are consistent.
+type mutateRowRequest struct {
+	Connection map[string]string        `json:"connection"`
+	Operation  plugin.OperationType     `json:"operation"`
+	Source     string                   `json:"source"`
+	Values     map[string]string        `json:"values"`
+	Filter     string                   `json:"filter"`
+}
+
 // We reuse the generated protobuf alias for the response so we stay in sync
 // with any future changes.
 //
@@ -733,6 +744,84 @@ func (m *Manager) GetConnectionTree(name string, connection map[string]string) (
 // propagates any provided options map (for example "explain-query").
 func (m *Manager) ExecTreeAction(name string, connection map[string]string, actionQuery string, options map[string]string) (*plugin.ExecResponse, error) {
 	return m.ExecPlugin(name, connection, actionQuery, options)
+}
+
+// MutateRow forwards a single-row mutation request to the specified plugin.
+// The semantics of `source`, `values` and `filter` are driver-defined; the
+// core does not interpret them.  The operation type (insert/update/delete)
+// is described by the OperationType enum.  A 30-second timeout guards
+// against misbehaving plugins.
+func (m *Manager) MutateRow(name string, connection map[string]string, operation plugin.OperationType, source string, values map[string]string, filter string) (*plugin.MutateRowResponse, error) {
+	name = strings.TrimSuffix(name, filepath.Ext(name))
+	m.mu.Lock()
+	info, ok := m.plugins[name]
+	m.mu.Unlock()
+	if !ok {
+		m.emitLog(services.LogLevelError, fmt.Sprintf("MutateRow: plugin '%s' not found", name))
+		return nil, fmt.Errorf("MutateRow: plugin %s not found", name)
+	}
+	full := info.Path
+	if !isExecutable(full) {
+		m.emitLog(services.LogLevelError, fmt.Sprintf("MutateRow: plugin '%s' is not executable", name))
+		return nil, fmt.Errorf("MutateRow: plugin %s is not executable", name)
+	}
+	m.emitLog(services.LogLevelInfo, fmt.Sprintf("MutateRow: (driver: %s) op=%v source=%q filter=%q", name, operation, source, filter))
+
+	req := mutateRowRequest{Connection: connection, Operation: operation, Source: source, Values: values, Filter: filter}
+	b, _ := json.Marshal(&req)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, full, "mutate-row")
+	hideWindow(cmd)
+	cmd.Env = append(os.Environ(), "QUERYBOX_PLUGIN_NAME="+name)
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		m.emitLog(services.LogLevelError, fmt.Sprintf("MutateRow: stdin pipe error for plugin '%s': %v", name, err))
+		return nil, fmt.Errorf("MutateRow: stdin pipe error: %w", err)
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		m.emitLog(services.LogLevelError, fmt.Sprintf("MutateRow: stdout pipe error for plugin '%s': %v", name, err))
+		return nil, fmt.Errorf("MutateRow: stdout pipe error: %w", err)
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		m.emitLog(services.LogLevelError, fmt.Sprintf("MutateRow: stderr pipe error for plugin '%s': %v", name, err))
+		return nil, fmt.Errorf("MutateRow: stderr pipe error: %w", err)
+	}
+
+	if err := cmd.Start(); err != nil {
+		m.emitLog(services.LogLevelError, fmt.Sprintf("MutateRow: failed to start plugin '%s': %v", name, err))
+		return nil, fmt.Errorf("MutateRow: start error: %w", err)
+	}
+
+	// send request
+	_, _ = stdin.Write(b)
+	_ = stdin.Close()
+
+	outB, _ := io.ReadAll(stdout)
+	errB, _ := io.ReadAll(stderr)
+
+	if err := cmd.Wait(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			m.emitLog(services.LogLevelError, fmt.Sprintf("MutateRow: plugin '%s' timed out after 30s", name))
+			return nil, fmt.Errorf("MutateRow: plugin timed out after 30s")
+		}
+		m.emitLog(services.LogLevelError, fmt.Sprintf("MutateRow: plugin '%s' exited with error: %v", name, err))
+		return nil, fmt.Errorf("MutateRow: plugin exited: %w - stderr: %s", err, string(errB))
+	}
+
+	resp := &plugin.MutateRowResponse{}
+	if len(outB) == 0 {
+		m.emitLog(services.LogLevelInfo, fmt.Sprintf("MutateRow: (driver: %s) returned empty response", name))
+		return resp, nil
+	}
+	if err := json.Unmarshal(outB, resp); err != nil {
+		m.emitLog(services.LogLevelError, fmt.Sprintf("MutateRow: invalid JSON from '%s': %v", name, err))
+		return nil, fmt.Errorf("MutateRow: invalid json: %w", err)
+	}
+	return resp, nil
 }
 
 // DescribeSchema asks the named plugin to provide schema metadata for the

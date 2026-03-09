@@ -1,13 +1,13 @@
 package main
 
 import (
-    "context"
-    "fmt"
-    "time"
+	"context"
+	"fmt"
+	"time"
 
-    "github.com/felixdotgo/querybox/pkg/plugin"
-    pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
-    "go.mongodb.org/mongo-driver/bson"
+	"github.com/felixdotgo/querybox/pkg/plugin"
+	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 // mongoPlugin implements the protobuf PluginServiceServer interface for MongoDB.
@@ -23,7 +23,7 @@ func (m *mongoPlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRequest
         Description:  "MongoDB document database driver",
         Url:          "https://www.mongodb.com/",
         Author:       "MongoDB Inc.",
-        Capabilities: []string{"query"},
+        Capabilities: []string{"query", "mutate-row"},
         Tags:         []string{"nosql", "document"},
         License:      "Apache-2.0",
         IconUrl:      "https://www.mongodb.com/assets/images/global/favicon.ico",
@@ -153,6 +153,12 @@ func (m *mongoPlugin) TestConnection(ctx context.Context, req *plugin.TestConnec
         return &plugin.TestConnectionResponse{Ok: false, Message: fmt.Sprintf("ping error: %v", err)}, nil
     }
     return &plugin.TestConnectionResponse{Ok: true, Message: "Connection successful"}, nil
+}
+
+
+// MutateRow stub for MongoDB driver; always reports not supported.
+func (m *mongoPlugin) MutateRow(ctx context.Context, req *plugin.MutateRowRequest) (*plugin.MutateRowResponse, error) {
+    return &plugin.MutateRowResponse{Error: "not supported"}, nil
 }
 
 func main() {

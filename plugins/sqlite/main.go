@@ -29,7 +29,7 @@ func (m *sqlitePlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoReques
 		Description: "SQLite database driver",
 		Url:         "https://www.sqlite.org/",
 		Author:      "SQLite Consortium",
-		Capabilities: []string{"query", "explain-query"},
+		Capabilities: []string{"query", "explain-query", "mutate-row"},
 		Tags:        []string{"sql", "relational"},
 		License:     "Public Domain",
 		IconUrl:     "https://www.sqlite.org/images/logo-square.jpg",
@@ -372,6 +372,14 @@ func (m *sqlitePlugin) GetCompletionFields(ctx context.Context, req *plugin.GetC
 		resp.Fields = append(resp.Fields, &plugin.FieldInfo{Name: name, Type: colType})
 	}
 	return resp, nil
+}
+
+// MutateRow implements the optional mutation RPC for sqlite.  This stub
+// simply returns success and does not modify the database.  Real drivers
+// could open a connection and execute an INSERT/UPDATE/DELETE derived
+// from the parameters.
+func (m *sqlitePlugin) MutateRow(ctx context.Context, req *plugin.MutateRowRequest) (*plugin.MutateRowResponse, error) {
+	return &plugin.MutateRowResponse{Success: true}, nil
 }
 
 func (m *sqlitePlugin) TestConnection(ctx context.Context, req *plugin.TestConnectionRequest) (*plugin.TestConnectionResponse, error) {

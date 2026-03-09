@@ -511,6 +511,11 @@ func (r *redisPlugin) TestConnection(ctx context.Context, req *plugin.TestConnec
 	return &plugin.TestConnectionResponse{Ok: true, Message: "Connection successful"}, nil
 }
 
+// MutateRow stub for Redis plugin; always reports not supported.
+func (r *redisPlugin) MutateRow(ctx context.Context, req *plugin.MutateRowRequest) (*plugin.MutateRowResponse, error) {
+	return &plugin.MutateRowResponse{Error: "not supported"}, nil
+}
+
 func main() {
 	plugin.ServeCLI(&redisPlugin{})
 }
