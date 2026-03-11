@@ -120,6 +120,10 @@ tasks:
     cmds:
       - cp "{{.APP_BINARY}}" "{{.APP_NAME}}"
       - cp ../../appicon.png "{{.APP_NAME}}.png"
+      # Stage plugin binaries into the appimage build dir so build.sh can
+      # copy them into the AppDir at the correct location.
+      - mkdir -p {{.ROOT_DIR}}/build/linux/appimage/build/plugins
+      - cp -r {{.ROOT_DIR}}/bin/plugins/. {{.ROOT_DIR}}/build/linux/appimage/build/plugins/
       - wails3 generate appimage -binary "{{.APP_NAME}}" -icon {{.ICON}} -desktopfile {{.DESKTOP_FILE}} -outputdir {{.OUTPUT_DIR}} -builddir {{.ROOT_DIR}}/build/linux/appimage/build
     vars:
       APP_NAME: '{{.APP_NAME}}'

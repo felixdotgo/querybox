@@ -17,8 +17,25 @@ license: "MIT"
 release: "1"
 
 contents:
+  # Main binary lives under /usr/lib/querybox so that the bundled plugins
+  # directory sits at /usr/lib/querybox/bin/plugins – the path that
+  # bundledPluginsDir() resolves to after following the symlink below.
   - src: "./bin/querybox"
-    dst: "/usr/local/bin/querybox"
+    dst: "/usr/lib/querybox/querybox"
+    file_info:
+      mode: 0755
+
+  # Symlink keeps the binary on PATH without changing the resolved exe dir.
+  - src: "/usr/lib/querybox/querybox"
+    dst: "/usr/bin/querybox"
+    type: symlink
+
+  # Bundled plugin executables – copied to the per-user config dir on first run.
+  - src: "./bin/plugins/*"
+    dst: "/usr/lib/querybox/bin/plugins/"
+    file_info:
+      mode: 0755
+
   - src: "./build/appicon.png"
     dst: "/usr/share/icons/hicolor/128x128/apps/querybox.png"
   - src: "./build/linux/querybox.desktop"
@@ -36,8 +53,8 @@ overrides:
     depends:
       - gtk3
       - webkit2gtk4.1
-  
-  # Arch Linux packages (WebKit 4.1)  
+
+  # Arch Linux packages (WebKit 4.1)
   archlinux:
     depends:
       - gtk3

@@ -14,6 +14,15 @@ cp -r "${APP_BINARY}" "${APP_DIR}/usr/bin/"
 cp "${ICON_PATH}" "${APP_DIR}/"
 cp "${DESKTOP_FILE}" "${APP_DIR}/"
 
+# Bundle plugin executables so they are available at runtime inside the
+# mounted AppImage. bundledPluginsDir() resolves the symlink of the running
+# executable (usr/bin/<app>) and looks for bin/plugins/ relative to that
+# directory, i.e. usr/bin/bin/plugins/.
+if [ -d "./plugins" ]; then
+    mkdir -p "${APP_DIR}/usr/bin/bin/plugins"
+    cp -r "./plugins/." "${APP_DIR}/usr/bin/bin/plugins/"
+fi
+
 if [[ $(uname -m) == *x86_64* ]]; then
     # Download linuxdeploy and make it executable
     wget -q -4 -N https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
