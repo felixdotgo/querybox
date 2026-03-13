@@ -1,3 +1,4 @@
+import type { Ref } from 'vue'
 import { computed, ref } from 'vue'
 import { GetCredential } from '@/bindings/github.com/felixdotgo/querybox/services/connectionservice'
 import { GetCompletionFields } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
@@ -5,7 +6,7 @@ import { useConnectionTree } from '@/composables/useConnectionTree'
 
 // Module-level cache: connId:collection -> FieldInfo[] so results survive
 // tab switches and aren't refetched for every editor keystroke.
-const completionFieldsCache = new Map()
+const completionFieldsCache = new Map<string, Array<{ name: string; type: string }>>()
 
 /**
  * Per-tab completion data composable.
@@ -17,7 +18,7 @@ const completionFieldsCache = new Map()
  *
  * @param {import('vue').Ref} tabRef - reactive reference to the current tab object
  */
-export function useTabCompletion(tabRef) {
+export function useTabCompletion(tabRef: Ref<any>) {
   const { nodes, load, getTableNames, getColumns, getColumnDetails, getSchema, getAllSchemas } = useConnectionTree()
 
   // Lazily-fetched sampled fields, keyed by collection name
@@ -57,7 +58,7 @@ export function useTabCompletion(tabRef) {
   /**
    * Cache key prefix scoped to the connection.
    */
-  function cacheKey(collection) {
+  function cacheKey(collection: string) {
     const id = conn.value?.id || 'unknown'
     return `${id}:${collection}`
   }
@@ -68,12 +69,12 @@ export function useTabCompletion(tabRef) {
    * @param {string} collection
    * @returns {Promise<Array<{name:string, type?:string}>>} cached or fetched completion fields
    */
-  async function getCompletionFields(collection) {
+  async function getCompletionFields(collection: string): Promise<Array<{ name: string; type: string }>> {
     if (!collection)
       return []
     const key = cacheKey(collection)
     if (completionFieldsCache.has(key))
-      return completionFieldsCache.get(key)
+      return completionFieldsCache.get(key)!
 
     const connection = conn.value
     if (!connection)
@@ -82,7 +83,7 @@ export function useTabCompletion(tabRef) {
     completionFieldsLoading.value = true
     try {
       const cred = await GetCredential(connection.id)
-      const params = {}
+      const params: Record<string, string> = {}
       if (cred)
         params.credential_blob = cred
 
@@ -91,7 +92,7 @@ export function useTabCompletion(tabRef) {
       const database = inferDatabase(collection)
 
       const resp = await GetCompletionFields(connection.driver_type, params, database, collection)
-      const fields = (resp?.fields || []).map(f => ({ name: f.name, type: f.type || '' }))
+      const fields = (resp?.fields || []).map((f: any) => ({ name: f.name, type: f.type || '' }))
       completionFieldsCache.set(key, fields)
       return fields
     }
@@ -110,8 +111,8 @@ export function useTabCompletion(tabRef) {
    * @param {string} collectionName
    * @returns {string} database name or empty string if not found
    */
-  function inferDatabase(collectionName) {
-    function search(items, parent) {
+  function inferDatabase(collectionName: string): string {
+    function search(items: any[], parent: string): string | null {
       for (const n of items) {
         if (n.label === collectionName)
           return parent

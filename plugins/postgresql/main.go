@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
@@ -165,23 +164,18 @@ func buildConnString(connection map[string]string) (string, error) {
 	}
 	dsn, ok := connection["dsn"]
 	if !ok || dsn == "" {
-		if blob, ok2 := connection["credential_blob"]; ok2 && blob != "" {
-			var payload struct {
-				Form   string            `json:"form"`
-				Values map[string]string `json:"values"`
-			}
-			if err := json.Unmarshal([]byte(blob), &payload); err == nil {
-				if v, ok := payload.Values["dsn"]; ok && v != "" {
+		if cred, err := plugin.ParseCredentialBlob(connection); err == nil {
+				if v, ok := cred.Values["dsn"]; ok && v != "" {
 					dsn = ensureSSLMode(v)
 				} else {
-					host := payload.Values["host"]
-					user := payload.Values["user"]
-					pass := payload.Values["password"]
-					port := payload.Values["port"]
-					dbname := payload.Values["database"]
+					host := cred.Values["host"]
+					user := cred.Values["user"]
+					pass := cred.Values["password"]
+					port := cred.Values["port"]
+					dbname := cred.Values["database"]
 					// The "tls" form field carries a postgres sslmode value
 					// (disable / require / verify-ca / verify-full).
-					sslmode := payload.Values["tls"]
+					sslmode := cred.Values["tls"]
 					if port == "" {
 						port = "5432"
 					}
@@ -218,7 +212,7 @@ func buildConnString(connection map[string]string) (string, error) {
 						"tls": true, "params": true,
 					}
 					var extra []string
-					for k, v := range payload.Values {
+					for k, v := range cred.Values {
 						if skip[k] || v == "" {
 							continue
 						}
@@ -226,7 +220,7 @@ func buildConnString(connection map[string]string) (string, error) {
 					}
 					// The "params" field lets users supply additional DSN
 					// key=value pairs separated by spaces or "&".
-					if raw := payload.Values["params"]; raw != "" {
+					if raw := cred.Values["params"]; raw != "" {
 						for _, part := range strings.FieldsFunc(raw, func(r rune) bool {
 							return r == '&' || r == ' '
 						}) {
@@ -250,7 +244,6 @@ func buildConnString(connection map[string]string) (string, error) {
 						dsn = dsn + " " + strings.Join(extra, " ")
 					}
 				}
-			}
 		}
 	}
 	// Apply explicit database override that may have been injected by ConnectionTree
@@ -318,19 +311,13 @@ func getDatabaseFromConn(conn map[string]string) string {
 	if db, ok := conn["database"]; ok && db != "" {
 		return db
 	}
-	if blob, ok := conn["credential_blob"]; ok && blob != "" {
-		var payload struct {
-			Form   string            `json:"form"`
-			Values map[string]string `json:"values"`
+	if cred, err := plugin.ParseCredentialBlob(conn); err == nil {
+		if v, ok := cred.Values["database"]; ok && v != "" {
+			return v
 		}
-		if err := json.Unmarshal([]byte(blob), &payload); err == nil {
-			if v, ok := payload.Values["database"]; ok && v != "" {
-				return v
-			}
-			if v, ok := payload.Values["dsn"]; ok && v != "" {
-				if name := extractDBName(v); name != "" {
-					return name
-				}
+		if v, ok := cred.Values["dsn"]; ok && v != "" {
+			if name := extractDBName(v); name != "" {
+				return name
 			}
 		}
 	}

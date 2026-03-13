@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
@@ -83,22 +82,17 @@ func buildDSN(connection map[string]string) (string, error) {
     dsn, ok := connection["dsn"]
     if !ok || dsn == "" {
         // try credential_blob
-        if blob, ok2 := connection["credential_blob"]; ok2 && blob != "" {
-            var payload struct {
-                Form   string            `json:"form"`
-                Values map[string]string `json:"values"`
-            }
-            if err := json.Unmarshal([]byte(blob), &payload); err == nil {
+        if cred, err := plugin.ParseCredentialBlob(connection); err == nil {
                 // if plugin stored a dsn inside values, prefer that
-                if v, ok := payload.Values["dsn"]; ok && v != "" {
+                if v, ok := cred.Values["dsn"]; ok && v != "" {
                     dsn = v
                 } else {
                     // build a simple DSN from common keys
-                    host := payload.Values["host"]
-                    user := payload.Values["user"]
-                    pass := payload.Values["password"]
-                    port := payload.Values["port"]
-                    dbname := payload.Values["database"]
+                    host := cred.Values["host"]
+                    user := cred.Values["user"]
+                    pass := cred.Values["password"]
+                    port := cred.Values["port"]
+                    dbname := cred.Values["database"]
                     if port == "" {
                         port = "3306"
                     }
@@ -109,7 +103,7 @@ func buildDSN(connection map[string]string) (string, error) {
                 // append any extra parameters as query string
                 if dsn != "" {
                     params := url.Values{}
-                    for k, v := range payload.Values {
+                    for k, v := range cred.Values {
                         switch k {
                         case "host", "user", "password", "port", "database", "dsn":
                             // already handled above
@@ -137,7 +131,6 @@ func buildDSN(connection map[string]string) (string, error) {
                         dsn = dsn + sep + params.Encode()
                     }
                 }
-            }
         }
     }
     // If the caller forwarded a specific database (e.g. from the tree-node

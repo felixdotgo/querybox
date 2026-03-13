@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -85,20 +84,12 @@ func buildClient(connection map[string]string) (*redis.Client, error) {
 	}
 
 	// credential_blob JSON path.
-	blob, ok := connection["credential_blob"]
-	if !ok || blob == "" {
+	cred, err := plugin.ParseCredentialBlob(connection)
+	if err != nil {
 		return nil, fmt.Errorf("missing connection parameters")
 	}
 
-	var payload struct {
-		Form   string            `json:"form"`
-		Values map[string]string `json:"values"`
-	}
-	if err := json.Unmarshal([]byte(blob), &payload); err != nil {
-		return nil, fmt.Errorf("invalid credential blob: %w", err)
-	}
-
-	if u := payload.Values["url"]; u != "" {
+	if u := cred.Values["url"]; u != "" {
 		opts, err := redis.ParseURL(u)
 		if err != nil {
 			return nil, fmt.Errorf("invalid Redis URL: %w", err)
@@ -106,16 +97,16 @@ func buildClient(connection map[string]string) (*redis.Client, error) {
 		return redis.NewClient(opts), nil
 	}
 
-	host := payload.Values["host"]
+	host := cred.Values["host"]
 	if host == "" {
 		host = "127.0.0.1"
 	}
-	port := payload.Values["port"]
+	port := cred.Values["port"]
 	if port == "" {
 		port = "6379"
 	}
 	dbIndex := 0
-	if dbStr := payload.Values["db"]; dbStr != "" {
+	if dbStr := cred.Values["db"]; dbStr != "" {
 		if n, err := strconv.Atoi(dbStr); err == nil {
 			dbIndex = n
 		}
@@ -123,10 +114,10 @@ func buildClient(connection map[string]string) (*redis.Client, error) {
 
 	opts := &redis.Options{
 		Addr:     fmt.Sprintf("%s:%s", host, port),
-		Password: payload.Values["password"],
+		Password: cred.Values["password"],
 		DB:       dbIndex,
 	}
-	if payload.Values["tls"] == "true" {
+	if cred.Values["tls"] == "true" {
 		pool, _ := certs.RootCertPool()
 		opts.TLSConfig = &tls.Config{RootCAs: pool}
 	}
@@ -353,12 +344,8 @@ func getRedisExplicitDB(connection map[string]string) (int, bool) {
 		}
 	}
 	if blob, ok := connection["credential_blob"]; ok && blob != "" {
-		var payload struct {
-			Form   string            `json:"form"`
-			Values map[string]string `json:"values"`
-		}
-		if err := json.Unmarshal([]byte(blob), &payload); err == nil {
-			if idxStr := payload.Values["db"]; idxStr != "" {
+		if cred, err := plugin.ParseCredentialBlob(connection); err == nil {
+			if idxStr := cred.Values["db"]; idxStr != "" {
 				if n, err := strconv.Atoi(idxStr); err == nil {
 					return n, true
 				}

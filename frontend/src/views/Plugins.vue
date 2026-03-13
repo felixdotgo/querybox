@@ -5,8 +5,7 @@ import { ClosePluginsWindow } from '@/bindings/github.com/felixdotgo/querybox/se
 import { Rescan } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
 import { SafeZone } from '@/components/layout'
 import { usePlugins } from '@/composables/usePlugins'
-
-const TYPE_LABELS = { 1: 'Driver', 2: 'Transformer', 3: 'Formatter' }
+import { PLUGIN_TYPE_LABELS } from '@/lib/enums'
 
 const { plugins, reload: reloadPlugins } = usePlugins()
 const filter = ref('')
@@ -70,7 +69,7 @@ function handleClose() {
 }
 
 function typeLabel(type) {
-  return TYPE_LABELS[type] || (type ? `Type ${type}` : '—')
+  return PLUGIN_TYPE_LABELS[type] || (type ? `Type ${type}` : '—')
 }
 </script>
 

@@ -5,13 +5,14 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { CloseConnectionsWindow } from '@/bindings/github.com/felixdotgo/querybox/services/app'
 import { CreateConnection } from '@/bindings/github.com/felixdotgo/querybox/services/connectionservice'
 import {
-  GetPluginAuthForms,
   TestConnection,
 } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
 import { AuthFormRenderer } from '@/components/connections'
 import DbIcon from '@/components/DbIcon.vue'
 import { SafeZone } from '@/components/layout'
 import { usePlugins } from '@/composables/usePlugins'
+import { useAuthForms } from '@/composables/useAuthForms'
+import { PluginType } from '@/lib/enums'
 
 const notification = useNotification()
 
@@ -23,22 +24,17 @@ const testingConnection = ref(false)
 const testResult = ref(null) // null | { ok: boolean, message: string }
 
 // AuthForms state
-const authForms = ref({})
-const selectedAuthForm = ref('')
-const authValues = ref({})
+const {
+  authForms, selectedAuthForm, authValues,
+  resetAuthState, loadAuthForms, serializeCredential,
+} = useAuthForms()
 
 const form = ref({ name: '', driver: '', cred: '' })
-
-function resetAuthState() {
-  authForms.value = {}
-  selectedAuthForm.value = ''
-  authValues.value = {}
-}
 
 const drivers = computed(() => {
   // PluginInfo.type follows PluginV1.Type enum where DRIVER = 1
   // always return a sorted list so the UI is predictable
-  return sortPlugins((plugins.value || []).filter(p => p && p.type === 1))
+  return sortPlugins((plugins.value || []).filter(p => p && p.type === PluginType.DRIVER))
 })
 
 const filteredDrivers = computed(() => {
@@ -95,7 +91,7 @@ watch(plugins, async (list) => {
   // reset search filter so new drivers become visible
   pluginFilter.value = ''
   if (!selectedDriver.value) {
-    const firstDriver = (list || []).find(p => p && p.type === 1)
+    const firstDriver = (list || []).find(p => p && p.type === PluginType.DRIVER)
     if (firstDriver) {
       await selectPlugin(firstDriver)
     }
@@ -108,45 +104,8 @@ async function selectPlugin(p) {
   testResult.value = null
 
   // probe plugin for auth forms (graceful fallback to DSN input)
-  resetAuthState()
-  try {
-    const resp = await GetPluginAuthForms(p.id)
-    if (resp && Object.keys(resp).length > 0) {
-      authForms.value = resp || {}
-      const keys = Object.keys(authForms.value)
-      selectedAuthForm.value = keys[0]
-      // initialize values object for selected form
-      authValues.value = {}
-      for (const f of authForms.value[selectedAuthForm.value].fields || []) {
-        authValues.value[f.name] = f.value || ''
-      }
-      // pre-fill credential field with serialized blob for convenience (not required)
-      // leave `form.cred` empty — CreateConnection will serialize current form values
-    }
-  }
-  catch (err) {
-    // missing plugin during dev restart is normal; debug level avoids alarming
-    // the user while still allowing inspection if necessary.
-    console.debug('GetPluginAuthForms (ignored):', err)
-  }
+  await loadAuthForms(p.id)
 }
-
-// Keep authValues in sync when the user switches auth form tabs.
-// Only initialise fields that have no value yet — this preserves values
-// the user already typed (common fields between tabs) and correctly
-// applies per-field defaults without wiping the parent's manual init.
-watch(selectedAuthForm, (newKey) => {
-  if (!newKey)
-    return
-  const def = authForms.value[newKey]
-  if (!def)
-    return
-  for (const f of def.fields || []) {
-    if (authValues.value[f.name] === undefined || authValues.value[f.name] === null) {
-      authValues.value[f.name] = f.value ?? ''
-    }
-  }
-})
 
 function clearForm() {
   form.value = { name: '', driver: '', cred: '' }
@@ -165,10 +124,8 @@ async function testConnection() {
   testResult.value = null
   try {
     let cred = form.value.cred
-    if (Object.keys(authForms.value || {}).length > 0) {
-      const blob = { form: selectedAuthForm.value, values: authValues.value }
-      cred = JSON.stringify(blob)
-    }
+    const serialized = serializeCredential()
+    if (serialized) cred = serialized
     const params = { credential_blob: cred }
     const res = await TestConnection(form.value.driver.trim(), params)
     if (res) {
@@ -195,9 +152,9 @@ async function saveConnection() {
     statusText.value = 'Connecting...'
 
     // if authForms in use, serialize the selected form values into credential_blob
-    if (Object.keys(authForms.value || {}).length > 0) {
-      const blob = { form: selectedAuthForm.value, values: authValues.value }
-      form.value.cred = JSON.stringify(blob)
+    const serializedCred = serializeCredential()
+    if (serializedCred) {
+      form.value.cred = serializedCred
     }
 
     await CreateConnection(
@@ -225,7 +182,7 @@ onMounted(async () => {
     resetAuthState()
 
     // Re-select first driver if available
-    const firstDriver = (plugins.value || []).find(p => p && p.type === 1)
+    const firstDriver = (plugins.value || []).find(p => p && p.type === PluginType.DRIVER)
     if (firstDriver) {
       await selectPlugin(firstDriver)
     }

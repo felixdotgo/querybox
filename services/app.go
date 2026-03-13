@@ -20,52 +20,41 @@ func NewAppService() *App {
 	return &App{}
 }
 
-// NewConnectionsWindow creates a new connections window with specific options and event handlers to manage its behavior.
-// The window is initially hidden and configured to prevent resizing, maximising, and minimising.
-// It also includes OS-specific options for the title bar and backdrop.
-func (a *App) NewConnectionsWindow() *application.WebviewWindow {
+// newModalWindow creates a reusable hidden modal window with the shared options
+// used by connections, edit-connection, and plugins windows.  The onClose
+// callback is invoked when the user attempts to close the window (the close
+// event is cancelled so the window is hidden rather than destroyed).
+func (a *App) newModalWindow(name, title, url string, minWidth int, onClose func()) *application.WebviewWindow {
 	w := a.App.Window.NewWithOptions(application.WebviewWindowOptions{
-		// Required options
-		Name:  "connections",
-		Title: "Connections",
-		URL:   "/#/connections",
-
-		// Optional options
+		Name:          name,
+		Title:         title,
+		URL:           url,
 		Frameless:     false,
 		DisableResize: true,
 		Hidden:        true,
 		HideOnEscape:  true,
-		MinWidth:      1024,
-
-		// OS-specific options
+		MinWidth:      minWidth,
 		Mac: application.MacWindow{
 			InvisibleTitleBarHeight: 50,
 			Backdrop:                application.MacBackdropTranslucent,
 			TitleBar:                application.MacTitleBarHiddenInset,
 		},
-
 		CloseButtonState: application.ButtonDisabled,
 	})
-
-	// Intercept the window close event to hide the window instead of closing it.
 	w.OnWindowEvent(events.Common.WindowClosing, func(e *application.WindowEvent) {
-		// Cancel the close event to prevent the window from being destroyed
 		e.Cancel()
-		// Instead of closing the window, we hide it and send it to the back.
-		// This allows us to reuse the same window instance
-		a.CloseConnectionsWindow()
+		onClose()
 	})
-
-	// Intercept maximise and minimise events to prevent the connections window from being maximised or minimised.
-	w.OnWindowEvent(events.Common.WindowMaximise, func(e *application.WindowEvent) {
-		e.Cancel()
-	})
-
-	w.OnWindowEvent(events.Common.WindowMinimise, func(e *application.WindowEvent) {
-		e.Cancel()
-	})
-
+	w.OnWindowEvent(events.Common.WindowMaximise, func(e *application.WindowEvent) { e.Cancel() })
+	w.OnWindowEvent(events.Common.WindowMinimise, func(e *application.WindowEvent) { e.Cancel() })
 	return w
+}
+
+// NewConnectionsWindow creates a new connections window with specific options and event handlers to manage its behavior.
+// The window is initially hidden and configured to prevent resizing, maximising, and minimising.
+// It also includes OS-specific options for the title bar and backdrop.
+func (a *App) NewConnectionsWindow() *application.WebviewWindow {
+	return a.newModalWindow("connections", "Connections", "/#/connections", 1024, a.CloseConnectionsWindow)
 }
 
 // NewMainWindow creates a new main application window with specific options and returns it.
@@ -161,35 +150,7 @@ func (a *App) ShowConnectionsWindow() {
 // NewEditConnectionWindow creates a new edit-connection window, initially hidden.
 // The window mirrors the connections window options and is reused across sessions.
 func (a *App) NewEditConnectionWindow() *application.WebviewWindow {
-	w := a.App.Window.NewWithOptions(application.WebviewWindowOptions{
-		Name:  "edit-connection",
-		Title: "Edit Connection",
-		URL:   "/#/edit-connection",
-
-		Frameless:     false,
-		DisableResize: true,
-		Hidden:        true,
-		HideOnEscape:  true,
-		MinWidth:      800,
-
-		Mac: application.MacWindow{
-			InvisibleTitleBarHeight: 50,
-			Backdrop:                application.MacBackdropTranslucent,
-			TitleBar:                application.MacTitleBarHiddenInset,
-		},
-
-		CloseButtonState: application.ButtonDisabled,
-	})
-
-	w.OnWindowEvent(events.Common.WindowClosing, func(e *application.WindowEvent) {
-		e.Cancel()
-		a.CloseEditConnectionWindow()
-	})
-
-	w.OnWindowEvent(events.Common.WindowMaximise, func(e *application.WindowEvent) { e.Cancel() })
-	w.OnWindowEvent(events.Common.WindowMinimise, func(e *application.WindowEvent) { e.Cancel() })
-
-	return w
+	return a.newModalWindow("edit-connection", "Edit Connection", "/#/edit-connection", 800, a.CloseEditConnectionWindow)
 }
 
 // ShowEditConnectionWindow emits the opened event (carrying the connection ID)
@@ -220,37 +181,7 @@ func (a *App) CloseEditConnectionWindow() {
 // connections window.  The window is initially hidden and will be reused rather
 // than re-created each time it is shown.
 func (a *App) NewPluginsWindow() *application.WebviewWindow {
-	w := a.App.Window.NewWithOptions(application.WebviewWindowOptions{
-		Name:  "plugins",
-		Title: "Plugins",
-		URL:   "/#/plugins",
-
-		Frameless:     false,
-		DisableResize: true,
-		Hidden:        true,
-		HideOnEscape:  true,
-		MinWidth:      1024,
-
-		Mac: application.MacWindow{
-			InvisibleTitleBarHeight: 50,
-			Backdrop:                application.MacBackdropTranslucent,
-			TitleBar:                application.MacTitleBarHiddenInset,
-		},
-
-		CloseButtonState: application.ButtonDisabled,
-	})
-
-	// Intercept the close event and hide instead of destroying.
-	w.OnWindowEvent(events.Common.WindowClosing, func(e *application.WindowEvent) {
-		e.Cancel()
-		a.ClosePluginsWindow()
-	})
-
-	// Prevent maximise/minimise just like the connections window.
-	w.OnWindowEvent(events.Common.WindowMaximise, func(e *application.WindowEvent) { e.Cancel() })
-	w.OnWindowEvent(events.Common.WindowMinimise, func(e *application.WindowEvent) { e.Cancel() })
-
-	return w
+	return a.newModalWindow("plugins", "Plugins", "/#/plugins", 1024, a.ClosePluginsWindow)
 }
 
 // ShowPluginsWindow shows the plugins window, constructing it if necessary.

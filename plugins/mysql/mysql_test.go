@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 	"testing"
 
@@ -10,14 +9,7 @@ import (
 )
 
 func TestGetDatabaseFromConn(t *testing.T) {
-    makeBlob := func(vals map[string]string) string {
-        payload := struct {
-            Form   string            `json:"form"`
-            Values map[string]string `json:"values"`
-        }{Form: "basic", Values: vals}
-        b, _ := json.Marshal(payload)
-        return string(b)
-    }
+    makeBlob := plugin.MakeTestBlob
 
     tests := []struct {
         name       string
@@ -43,14 +35,7 @@ func TestGetDatabaseFromConn(t *testing.T) {
 }
 
 func TestBuildDSNTLSParam(t *testing.T) {
-    conn := map[string]string{"credential_blob": ""}
-    // build a blob with host/database and tls parameter
-    payload := struct {
-        Form   string            `json:"form"`
-        Values map[string]string `json:"values"`
-    }{Form: "basic", Values: map[string]string{"host": "localhost", "database": "db1", "tls": "true"}}
-    b, _ := json.Marshal(payload)
-    conn["credential_blob"] = string(b)
+    conn := map[string]string{"credential_blob": plugin.MakeTestBlob(map[string]string{"host": "localhost", "database": "db1", "tls": "true"})}
 
     dsn, err := buildDSN(conn)
     if err != nil {

@@ -36,16 +36,16 @@ func TestDataDir(t *testing.T) {
 // operations. This behaviour is relied on by the application when terminating
 // so that background goroutines aren't able to touch the closed database.
 func TestConnectionService_Shutdown(t *testing.T) {
-	svc := NewConnectionService()
-	if !svc.closeable() {
+	svc, err := NewConnectionService()
+	if err != nil {
 		t.Skip("database not available, skipping test")
 	}
 
 	// perform a simple operation before shutdown to ensure the service is
 	// working.
-	_, err := svc.ListConnections(context.Background())
-	if err != nil {
-		t.Fatalf("initial ListConnections failed: %v", err)
+	_, lerr := svc.ListConnections(context.Background())
+	if lerr != nil {
+		t.Fatalf("initial ListConnections failed: %v", lerr)
 	}
 
 	// now shut it down and verify state changes
@@ -63,8 +63,8 @@ func TestConnectionService_Shutdown(t *testing.T) {
 }
 
 func TestConnectionService_UpdateConnection(t *testing.T) {
-	svc := NewConnectionService()
-	if !svc.closeable() {
+	svc, err := NewConnectionService()
+	if err != nil {
 		t.Skip("database not available, skipping test")
 	}
 	defer svc.Shutdown()
@@ -107,14 +107,14 @@ func TestConnectionService_UpdateConnection(t *testing.T) {
 }
 
 func TestConnectionService_UpdateConnection_UnknownID(t *testing.T) {
-	svc := NewConnectionService()
-	if !svc.closeable() {
+	svc, err := NewConnectionService()
+	if err != nil {
 		t.Skip("database not available, skipping test")
 	}
 	defer svc.Shutdown()
 
-	_, err := svc.UpdateConnection(context.Background(), "does-not-exist", "newname", "cred")
-	if err == nil {
+	_, uerr := svc.UpdateConnection(context.Background(), "does-not-exist", "newname", "cred")
+	if uerr == nil {
 		t.Fatal("expected error for unknown connection ID, got nil")
 	}
 }
@@ -123,8 +123,8 @@ func TestConnectionService_UpdateConnection_UnknownID(t *testing.T) {
 // stored and returned in normalized form.  This guards against Windows saving
 // "mysql.exe" which would break across other platforms and confuse the UI.
 func TestConnectionService_DriverTypeNormalization(t *testing.T) {
-	svc := NewConnectionService()
-	if !svc.closeable() {
+	svc, err := NewConnectionService()
+	if err != nil {
 		t.Skip("database not available, skipping test")
 	}
 	defer svc.Shutdown()

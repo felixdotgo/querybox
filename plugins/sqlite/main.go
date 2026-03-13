@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"runtime"
 	"strings"
@@ -62,22 +61,15 @@ func (m *sqlitePlugin) AuthForms(ctx context.Context, _ *plugin.AuthFormsRequest
 	return &plugin.AuthFormsResponse{Forms: map[string]*plugin.AuthForm{"basic": &basic, "turso-cloud": &turso}}, nil
 }
 
-type credential struct {
-	Form   string            `json:"form"`
-	Values map[string]string `json:"values"`
-}
-
-func parseCredential(connection map[string]string) credential {
-	if blob, ok := connection["credential_blob"]; ok && blob != "" {
-		var c credential
-		if err := json.Unmarshal([]byte(blob), &c); err == nil {
-			return c
-		}
+func parseCredential(connection map[string]string) plugin.CredentialBlob {
+	cred, err := plugin.ParseCredentialBlob(connection)
+	if err != nil {
+		return plugin.CredentialBlob{}
 	}
-	return credential{}
+	return cred
 }
 
-func tursoURL(c credential) string {
+func tursoURL(c plugin.CredentialBlob) string {
 	url := c.Values["database_url"]
 	if url == "" {
 		return ""
@@ -89,7 +81,7 @@ func tursoURL(c credential) string {
 }
 
 // driverDSN resolves the SQL driver name and DSN from the credential form.
-func driverDSN(c credential) (driver, dsn string, err error) {
+func driverDSN(c plugin.CredentialBlob) (driver, dsn string, err error) {
 	if c.Form == "turso-cloud" {
 		dsn = tursoURL(c)
 		if dsn == "" {

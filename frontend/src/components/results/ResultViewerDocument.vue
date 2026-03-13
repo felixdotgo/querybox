@@ -3,8 +3,8 @@ import { NButton, NIcon } from 'naive-ui'
 import { computed, ref } from 'vue'
 import { Pencil, Trash } from '@/lib/icons'
 import JsonNode from './JsonNode.vue'
-
 import RowEditorModal from './RowEditorModal.vue'
+import { useRowEditorModal } from '@/composables/useRowEditorModal'
 
 const props = defineProps({
   // Already-unwrapped document payload: either
@@ -21,35 +21,14 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['mutated'])
-const showEditor = ref(false)
-const editorOperation = ref('update')
-const editorDoc = ref(null)
-const editorFilter = ref('')
-const editorSource = ref('')
 
-function defaultFilterForDoc(doc) {
-  // no real filter generator for document; leave blank
-  return ''
-}
+const {
+  showEditor, editorOperation, editorRow: editorDoc, editorFilter, editorSource,
+  openEditor, closeEditor, performMutation,
+} = useRowEditorModal()
 
-function openEditor(op, doc) {
-  editorOperation.value = op
-  editorDoc.value = doc
-  editorFilter.value = defaultFilterForDoc(doc)
-  editorSource.value = ''
-  showEditor.value = true
-}
-
-async function performMutation(params) {
-  const { mutateRow } = await import('@/composables/useRowMutation')
-  const conn = props.connection
-  try {
-    await mutateRow(conn, params.operation === 'delete' ? 3 : 2, params.source, params.values || {}, params.filter)
-    emit('mutated')
-  }
-  catch (err) {
-    console.error('mutation failed', err)
-  }
+async function handleMutation(params) {
+  await performMutation(props.connection, params, () => emit('mutated'))
 }
 
 // Normalised list of document payloads — always an array
@@ -102,8 +81,8 @@ const docs = computed(() => {
       :row="editorDoc"
       :filter="editorFilter"
       :source="editorSource"
-      @submit="performMutation"
-      @cancel="showEditor = false"
+      @submit="handleMutation"
+      @cancel="closeEditor"
     />
   </div>
 </template>

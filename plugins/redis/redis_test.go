@@ -2,21 +2,13 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
 	"github.com/felixdotgo/querybox/pkg/plugin"
 )
 
 func TestGetRedisExplicitDB(t *testing.T) {
-    makeBlob := func(vals map[string]string) string {
-        payload := struct {
-            Form   string            `json:"form"`
-            Values map[string]string `json:"values"`
-        }{Form: "basic", Values: vals}
-        b, _ := json.Marshal(payload)
-        return string(b)
-    }
+    makeBlob := plugin.MakeTestBlob
 
     tests := []struct {
         name     string
@@ -44,11 +36,7 @@ func TestBuildClientTLS(t *testing.T) {
     // we only check that TLSConfig is set when tls=true
     conn := map[string]string{"credential_blob": "{}"}
     // first without tls
-    conn["credential_blob"] = func() string {
-        p := struct{ Form string `json:"form"`; Values map[string]string `json:"values"`}{Form: "basic", Values: map[string]string{"host": "127.0.0.1"}}
-        b, _ := json.Marshal(p)
-        return string(b)
-    }()
+    conn["credential_blob"] = plugin.MakeTestBlob(map[string]string{"host": "127.0.0.1"})
     cli, err := buildClient(conn)
     if err != nil {
         t.Fatalf("unexpected error: %v", err)
@@ -58,11 +46,7 @@ func TestBuildClientTLS(t *testing.T) {
     }
 
     // now request TLS
-    conn["credential_blob"] = func() string {
-        p := struct{ Form string `json:"form"`; Values map[string]string `json:"values"`}{Form: "basic", Values: map[string]string{"host": "127.0.0.1", "tls": "true"}}
-        b, _ := json.Marshal(p)
-        return string(b)
-    }()
+    conn["credential_blob"] = plugin.MakeTestBlob(map[string]string{"host": "127.0.0.1", "tls": "true"})
     cli, err = buildClient(conn)
     if err != nil {
         t.Fatalf("unexpected error: %v", err)

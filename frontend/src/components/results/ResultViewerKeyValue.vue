@@ -3,6 +3,7 @@ import { NButton, NIcon } from 'naive-ui'
 import { computed, defineEmits, ref } from 'vue'
 import { Pencil, Trash } from '@/lib/icons'
 import RowEditorModal from './RowEditorModal.vue'
+import { useRowEditorModal } from '@/composables/useRowEditorModal'
 
 const props = defineProps({
   // Already-unwrapped KV payload: { data: { key: value, ... } }
@@ -21,31 +22,17 @@ const emit = defineEmits(['mutated'])
 // Normalise: payload may be { data: {...} } or a flat object of k/v pairs.
 const entries = computed(() => props.payload.data || props.payload || {})
 
-// modal state
-const showEditor = ref(false)
-const editorOperation = ref('update')
-const editorRow = ref(null)
-const editorFilter = ref('')
-const editorSource = ref('')
+const {
+  showEditor, editorOperation, editorRow, editorFilter, editorSource,
+  openEditor: _openEditor, closeEditor, performMutation,
+} = useRowEditorModal()
 
 function openEditor(op, row) {
-  editorOperation.value = op
-  editorRow.value = { ...row }
-  editorFilter.value = ''
-  editorSource.value = ''
-  showEditor.value = true
+  _openEditor(op, { ...row })
 }
 
-async function performMutation(params) {
-  const { mutateRow } = await import('@/composables/useRowMutation')
-  const conn = props.connection
-  try {
-    await mutateRow(conn, params.operation === 'delete' ? 3 : 2, params.source, params.values || {}, params.filter)
-    emit('mutated')
-  }
-  catch (err) {
-    console.error('mutation failed', err)
-  }
+async function handleMutation(params) {
+  await performMutation(props.connection, params, () => emit('mutated'))
 }
 </script>
 
@@ -81,7 +68,7 @@ async function performMutation(params) {
     :row="editorRow"
     :filter="editorFilter"
     :source="editorSource"
-    @submit="performMutation"
-    @cancel="showEditor = false"
+    @submit="handleMutation"
+    @cancel="closeEditor"
   />
 </template>

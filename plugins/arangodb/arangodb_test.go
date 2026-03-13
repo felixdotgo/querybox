@@ -1,22 +1,15 @@
 package main
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/felixdotgo/querybox/pkg/certs"
 	_ "github.com/felixdotgo/querybox/pkg/certs"
+	"github.com/felixdotgo/querybox/pkg/plugin"
 )
 
 func TestExplicitDatabase(t *testing.T) {
-    makeBlob := func(vals map[string]string) string {
-        payload := struct {
-            Form   string            `json:"form"`
-            Values map[string]string `json:"values"`
-        }{Form: "basic", Values: vals}
-        b, _ := json.Marshal(payload)
-        return string(b)
-    }
+    makeBlob := plugin.MakeTestBlob
 
     tests := []struct {
         name   string
@@ -40,14 +33,7 @@ func TestExplicitDatabase(t *testing.T) {
 }
 
 func TestParseConnParamsTLS(t *testing.T) {
-    blob := func(vals map[string]string) string {
-        payload := struct {
-            Form   string            `json:"form"`
-            Values map[string]string `json:"values"`
-        }{Form: "basic", Values: vals}
-        b, _ := json.Marshal(payload)
-        return string(b)
-    }
+    blob := plugin.MakeTestBlob
 
     tests := []struct {
         name string

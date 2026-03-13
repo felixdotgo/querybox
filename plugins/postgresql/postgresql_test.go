@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -78,14 +77,7 @@ func TestBuildConnStringBlobDSN(t *testing.T) {
 }
 
 // Helpers for constructing blobs used across multiple tests.
-func makeBlob(vals map[string]string) string {
-    payload := struct {
-        Form   string            `json:"form"`
-        Values map[string]string `json:"values"`
-    }{Form: "basic", Values: vals}
-    b, _ := json.Marshal(payload)
-    return string(b)
-}
+var makeBlob = plugin.MakeTestBlob
 
 func TestEnsureSSLModeDefaults(t *testing.T) {
     // keyword style without sslmode should get disable appended

@@ -81,8 +81,8 @@ func parseConnParams(connection map[string]string) (connParams, error) {
 		database: "_system",
 	}
 
-	blob, ok := connection["credential_blob"]
-	if !ok || blob == "" {
+	blob := connection["credential_blob"]
+	if blob == "" {
 		// Try direct keys as fallback (legacy).
 		if h := connection["host"]; h != "" {
 			p.host = h
@@ -98,28 +98,25 @@ func parseConnParams(connection map[string]string) (connParams, error) {
 		return p, nil
 	}
 
-	var payload struct {
-		Form   string            `json:"form"`
-		Values map[string]string `json:"values"`
-	}
-	if err := json.Unmarshal([]byte(blob), &payload); err != nil {
+	cred, err := plugin.ParseCredentialBlob(connection)
+	if err != nil {
 		return p, fmt.Errorf("invalid credential blob: %w", err)
 	}
 
-	if h := payload.Values["host"]; h != "" {
+	if h := cred.Values["host"]; h != "" {
 		p.host = h
 	}
-	if port := payload.Values["port"]; port != "" {
+	if port := cred.Values["port"]; port != "" {
 		p.port = port
 	}
-	if u := payload.Values["user"]; u != "" {
+	if u := cred.Values["user"]; u != "" {
 		p.user = u
 	}
-	p.password = payload.Values["password"]
-	if db := payload.Values["database"]; db != "" {
+	p.password = cred.Values["password"]
+	if db := cred.Values["database"]; db != "" {
 		p.database = db
 	}
-	p.tls = payload.Values["tls"] == "true"
+	p.tls = cred.Values["tls"] == "true"
 	return p, nil
 }
 
@@ -383,12 +380,8 @@ func explicitDatabase(conn map[string]string) string {
 		return db
 	}
 	if blob, ok := conn["credential_blob"]; ok && blob != "" {
-		var payload struct {
-			Form   string            `json:"form"`
-			Values map[string]string `json:"values"`
-		}
-		if err := json.Unmarshal([]byte(blob), &payload); err == nil {
-			if db := payload.Values["database"]; db != "" {
+		if cred, err := plugin.ParseCredentialBlob(conn); err == nil {
+			if db := cred.Values["database"]; db != "" {
 				return db
 			}
 		}

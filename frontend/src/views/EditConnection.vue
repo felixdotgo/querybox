@@ -9,11 +9,11 @@ import {
   UpdateConnection,
 } from '@/bindings/github.com/felixdotgo/querybox/services/connectionservice'
 import {
-  GetPluginAuthForms,
   TestConnection,
 } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
 import { AuthFormRenderer } from '@/components/connections'
 import { SafeZone } from '@/components/layout'
+import { useAuthForms } from '@/composables/useAuthForms'
 
 const notification = useNotification()
 
@@ -22,9 +22,10 @@ const connectionDriverType = ref('')
 const connectionDriverName = ref('')
 const form = ref({ name: '' })
 
-const authForms = ref({})
-const selectedAuthForm = ref('')
-const authValues = ref({})
+const {
+  authForms, selectedAuthForm, authValues,
+  resetAuthState, loadAuthForms, serializeCredential,
+} = useAuthForms()
 const rawCred = ref('')
 
 const testResult = ref(null)
@@ -36,9 +37,7 @@ function resetForm() {
   connectionDriverType.value = ''
   connectionDriverName.value = ''
   form.value = { name: '' }
-  authForms.value = {}
-  selectedAuthForm.value = ''
-  authValues.value = {}
+  resetAuthState()
   rawCred.value = ''
   testResult.value = null
 }
@@ -62,17 +61,7 @@ const canSave = computed(() => {
 })
 
 // Keep authValues in sync when the user switches auth form tabs.
-watch(selectedAuthForm, (newKey) => {
-  if (!newKey)
-    return
-  const def = authForms.value[newKey]
-  if (!def)
-    return
-  for (const f of def.fields || []) {
-    if (authValues.value[f.name] === undefined || authValues.value[f.name] === null)
-      authValues.value[f.name] = f.value ?? ''
-  }
-})
+// (handled by useAuthForms internally)
 
 async function loadConnection(id) {
   try {
@@ -87,40 +76,18 @@ async function loadConnection(id) {
     connectionDriverName.value = conn.driver_type
     form.value = { name: conn.name }
 
-    // Load auth forms for this driver
+    // Load auth forms for this driver, pre-filling saved credential
+    let saved
     try {
-      const resp = await GetPluginAuthForms(conn.driver_type)
-      if (resp && Object.keys(resp).length > 0) {
-        authForms.value = resp
-        // Parse existing credential blob to pre-fill form
-        let parsedForm = ''
-        let parsedValues = {}
-        try {
-          const blob = JSON.parse(cred)
-          parsedForm = blob.form || ''
-          parsedValues = blob.values || {}
-        }
-        catch {
-          rawCred.value = cred
-        }
-
-        const formKeys = Object.keys(authForms.value)
-        // Use the saved form tab if it still exists, otherwise fall back to first tab
-        selectedAuthForm.value = (parsedForm && authForms.value[parsedForm]) ? parsedForm : formKeys[0]
-
-        // Initialize all fields with defaults then overwrite with saved values
-        authValues.value = {}
-        for (const f of authForms.value[selectedAuthForm.value]?.fields || []) {
-          authValues.value[f.name] = f.value ?? ''
-        }
-        Object.assign(authValues.value, parsedValues)
-      }
-      else {
-        rawCred.value = cred
-      }
+      const blob = JSON.parse(cred)
+      saved = { form: blob.form || '', values: blob.values || {} }
     }
-    catch (err) {
-      console.debug('GetPluginAuthForms (edit, ignored):', err)
+    catch {
+      rawCred.value = cred
+    }
+
+    const loaded = await loadAuthForms(conn.driver_type, saved)
+    if (!loaded) {
       rawCred.value = cred
     }
   }
@@ -139,9 +106,8 @@ async function testConnection() {
   testResult.value = null
   try {
     let cred = rawCred.value
-    if (Object.keys(authForms.value || {}).length > 0) {
-      cred = JSON.stringify({ form: selectedAuthForm.value, values: authValues.value })
-    }
+    const serialized = serializeCredential()
+    if (serialized) cred = serialized
     const res = await TestConnection(connectionDriverType.value, { credential_blob: cred })
     if (res) {
       testResult.value = { ok: res.ok, message: res.message || (res.ok ? 'Connection successful' : 'Connection failed') }
@@ -166,9 +132,8 @@ async function saveConnection() {
   saving.value = true
   try {
     let cred = rawCred.value
-    if (Object.keys(authForms.value || {}).length > 0) {
-      cred = JSON.stringify({ form: selectedAuthForm.value, values: authValues.value })
-    }
+    const serialized = serializeCredential()
+    if (serialized) cred = serialized
     await UpdateConnection(connectionId.value, form.value.name.trim(), cred)
     await CloseEditConnectionWindow()
   }

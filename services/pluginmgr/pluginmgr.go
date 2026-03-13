@@ -104,6 +104,12 @@ func (m *Manager) emitLog(level services.LogLevel, message string) {
 	})
 }
 
+// Plugin command timeout constants.
+const (
+	defaultPluginTimeout = 30 * time.Second
+	fastPluginTimeout    = 15 * time.Second
+)
+
 // exec request/response used for CLI JSON interchange with plugins.
 // The CLI format mirrors the protobuf types so that authors can simply
 // marshal the generated messages. We no longer use a plain string result;
@@ -505,6 +511,79 @@ func (m *Manager) ListPlugins() []PluginInfo {
 	return ret
 }
 
+// runPluginCommand resolves the named plugin, spawns its binary with the given
+// sub-command, writes reqBytes to stdin, and returns the raw stdout output.
+// It handles plugin lookup, executable validation, pipe management, timeout
+// detection, and error logging.  Callers are responsible for marshaling the
+// request and unmarshaling the response.
+//
+// The `caller` parameter is a label used in log/error messages (e.g.
+// "ExecPlugin", "GetConnectionTree") so that each call site produces
+// recognisable diagnostics.
+func (m *Manager) runPluginCommand(caller, name, command string, timeout time.Duration, reqBytes []byte) ([]byte, error) {
+	name = strings.TrimSuffix(name, filepath.Ext(name))
+	m.mu.Lock()
+	info, ok := m.plugins[name]
+	m.mu.Unlock()
+	if !ok {
+		m.emitLog(services.LogLevelError, fmt.Sprintf("%s: plugin '%s' not found", caller, name))
+		return nil, fmt.Errorf("%s: plugin %s not found", caller, name)
+	}
+	full := info.Path
+	if !isExecutable(full) {
+		m.emitLog(services.LogLevelError, fmt.Sprintf("%s: plugin '%s' is not executable", caller, name))
+		return nil, fmt.Errorf("%s: plugin %s is not executable", caller, name)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, full, command)
+	hideWindow(cmd)
+	cmd.Env = append(os.Environ(), "QUERYBOX_PLUGIN_NAME="+name)
+
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		m.emitLog(services.LogLevelError, fmt.Sprintf("%s: stdin pipe error for plugin '%s': %v", caller, name, err))
+		return nil, fmt.Errorf("%s: stdin pipe error: %w", caller, err)
+	}
+	stdoutPipe, err := cmd.StdoutPipe()
+	if err != nil {
+		m.emitLog(services.LogLevelError, fmt.Sprintf("%s: stdout pipe error for plugin '%s': %v", caller, name, err))
+		return nil, fmt.Errorf("%s: stdout pipe error: %w", caller, err)
+	}
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
+		m.emitLog(services.LogLevelError, fmt.Sprintf("%s: stderr pipe error for plugin '%s': %v", caller, name, err))
+		return nil, fmt.Errorf("%s: stderr pipe error: %w", caller, err)
+	}
+
+	if err := cmd.Start(); err != nil {
+		m.emitLog(services.LogLevelError, fmt.Sprintf("%s: failed to start plugin '%s': %v", caller, name, err))
+		return nil, fmt.Errorf("%s: start error: %w", caller, err)
+	}
+
+	if _, werr := stdin.Write(reqBytes); werr != nil {
+		m.emitLog(services.LogLevelError, fmt.Sprintf("%s: stdin write error for plugin '%s': %v", caller, name, werr))
+	}
+	if cerr := stdin.Close(); cerr != nil {
+		m.emitLog(services.LogLevelError, fmt.Sprintf("%s: stdin close error for plugin '%s': %v", caller, name, cerr))
+	}
+
+	outB, _ := io.ReadAll(stdoutPipe)
+	errB, _ := io.ReadAll(stderrPipe)
+
+	if err := cmd.Wait(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			m.emitLog(services.LogLevelError, fmt.Sprintf("%s: plugin '%s' timed out after %s", caller, name, timeout))
+			return nil, fmt.Errorf("%s: plugin timed out after %s", caller, timeout)
+		}
+		m.emitLog(services.LogLevelError, fmt.Sprintf("%s: plugin '%s' exited with error: %v", caller, name, err))
+		return nil, fmt.Errorf("%s: plugin exited: %w - stderr: %s", caller, err, string(errB))
+	}
+
+	return outB, nil
+}
+
 // ExecPlugin runs the named plugin with the provided connection info, query
 // and optional options map.  Under the hood the manager spawns the binary,
 // writes a protobuf-JSON `PluginV1_ExecRequest` to stdin, and reads a
@@ -514,23 +593,6 @@ func (m *Manager) ListPlugins() []PluginInfo {
 // type) or an error.  Historically this returned a raw string; callers may need
 // to examine the `Result` field to access rows, documents, or key/value data.
 func (m *Manager) ExecPlugin(name string, connection map[string]string, query string, options map[string]string) (*plugin.ExecResponse, error) {
-	// callers may include platform-specific extensions; strip them so the
-	// lookup against m.plugins (which already uses normalized keys) succeeds.
-	name = strings.TrimSuffix(name, filepath.Ext(name))
-	m.mu.Lock()
-	info, ok := m.plugins[name]
-	m.mu.Unlock()
-	if !ok {
-		m.emitLog(services.LogLevelError, fmt.Sprintf("ExecPlugin: plugin '%s' not found", name))
-		return nil, fmt.Errorf("ExecPlugin: plugin %s not found\n", name)
-	}
-	full := info.Path
-	if !isExecutable(full) {
-		fmt.Printf("ExecPlugin: path %s not executable\n", full)
-		m.emitLog(services.LogLevelError, fmt.Sprintf("ExecPlugin: plugin '%s' is not executable", name))
-		return nil, fmt.Errorf("ExecPlugin: plugin %s is not executable\n", name)
-	}
-
 	// Truncate long queries in log output to keep messages readable
 	logQuery := query
 	if len(logQuery) > 80 {
@@ -546,49 +608,9 @@ func (m *Manager) ExecPlugin(name string, connection map[string]string, query st
 	req := execRequest{Connection: connection, Query: query, Options: options}
 	b, _ := json.Marshal(&req)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, full, "exec")
-	hideWindow(cmd)
-	cmd.Env = append(os.Environ(), "QUERYBOX_PLUGIN_NAME="+name)
-	stdin, err := cmd.StdinPipe()
+	outB, err := m.runPluginCommand("ExecPlugin", name, "exec", defaultPluginTimeout, b)
 	if err != nil {
-		m.emitLog(services.LogLevelError, fmt.Sprintf("ExecPlugin: stdin pipe error for plugin '%s': %v", name, err))
-		return nil, fmt.Errorf("ExecPlugin: stdin pipe error: %w", err)
-	}
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		m.emitLog(services.LogLevelError, fmt.Sprintf("ExecPlugin: stdout pipe error for plugin '%s': %v", name, err))
-		return nil, fmt.Errorf("ExecPlugin: stdout pipe error: %w", err)
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		m.emitLog(services.LogLevelError, fmt.Sprintf("ExecPlugin: stderr pipe error for plugin '%s': %v", name, err))
-		return nil, fmt.Errorf("ExecPlugin: stderr pipe error: %w", err)
-	}
-
-	if err := cmd.Start(); err != nil {
-		fmt.Printf("ExecPlugin: start error: %v\n", err)
-		m.emitLog(services.LogLevelError, fmt.Sprintf("ExecPlugin: failed to start plugin '%s': %v", name, err))
-		return nil, fmt.Errorf("ExecPlugin: start error: %w", err)
-	}
-
-	// send request
-	_, _ = stdin.Write(b)
-	_ = stdin.Close()
-
-	// read stdout
-	outB, _ := io.ReadAll(stdout)
-	errB, _ := io.ReadAll(stderr)
-
-	if err := cmd.Wait(); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			// the context will have killed the process after 30s
-			m.emitLog(services.LogLevelError, fmt.Sprintf("ExecPlugin: plugin '%s' timed out after 30s", name))
-			return nil, fmt.Errorf("ExecPlugin: plugin timed out after 30s")
-		}
-		m.emitLog(services.LogLevelError, fmt.Sprintf("ExecPlugin: plugin '%s' exited with error: %v", name, err))
-		return nil, fmt.Errorf("ExecPlugin: plugin exited: %w - stderr: %s", err, string(errB))
+		return nil, err
 	}
 
 	// if the plugin didn't emit JSON we still want to return something useful
@@ -668,62 +690,14 @@ func (m *Manager) Rescan() error {
 // request contains only the connection map; the plugin defines node structure
 // and actions.  A timeout guards misbehaving plugins.
 func (m *Manager) GetConnectionTree(name string, connection map[string]string) (*plugin.ConnectionTreeResponse, error) {
-	m.mu.Lock()
-	info, ok := m.plugins[name]
-	m.mu.Unlock()
-	if !ok {
-		m.emitLog(services.LogLevelError, fmt.Sprintf("GetConnectionTree: plugin '%s' not found", name))
-		return nil, fmt.Errorf("GetConnectionTree: plugin %s not found", name)
-	}
-	full := info.Path
-	if !isExecutable(full) {
-		m.emitLog(services.LogLevelError, fmt.Sprintf("GetConnectionTree: plugin '%s' is not executable", name))
-		return nil, fmt.Errorf("GetConnectionTree: plugin %s is not executable", name)
-	}
 	m.emitLog(services.LogLevelInfo, fmt.Sprintf("GetConnectionTree: fetching tree (driver: %s)", name))
 
 	req := plugin.ConnectionTreeRequest{Connection: connection}
 	b, _ := json.Marshal(&req)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, full, "connection-tree")
-	hideWindow(cmd)
-	cmd.Env = append(os.Environ(), "QUERYBOX_PLUGIN_NAME="+name)
-	stdin, err := cmd.StdinPipe()
+	outB, err := m.runPluginCommand("GetConnectionTree", name, "connection-tree", defaultPluginTimeout, b)
 	if err != nil {
-		m.emitLog(services.LogLevelError, fmt.Sprintf("GetConnectionTree: stdin pipe error for plugin '%s': %v", name, err))
-		return nil, fmt.Errorf("GetConnectionTree: stdin pipe error: %w", err)
-	}
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		m.emitLog(services.LogLevelError, fmt.Sprintf("GetConnectionTree: stdout pipe error for plugin '%s': %v", name, err))
-		return nil, fmt.Errorf("GetConnectionTree: stdout pipe error: %w", err)
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		m.emitLog(services.LogLevelError, fmt.Sprintf("GetConnectionTree: stderr pipe error for plugin '%s': %v", name, err))
-		return nil, fmt.Errorf("GetConnectionTree: stderr pipe error: %w", err)
-	}
-
-	if err := cmd.Start(); err != nil {
-		m.emitLog(services.LogLevelError, fmt.Sprintf("GetConnectionTree: failed to start plugin '%s': %v", name, err))
-		return nil, fmt.Errorf("GetConnectionTree: start error: %w", err)
-	}
-
-	_, _ = stdin.Write(b)
-	_ = stdin.Close()
-
-	outB, _ := io.ReadAll(stdout)
-	errB, _ := io.ReadAll(stderr)
-
-	if err := cmd.Wait(); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			m.emitLog(services.LogLevelError, fmt.Sprintf("GetConnectionTree: plugin '%s' timed out after 30s", name))
-			return nil, fmt.Errorf("GetConnectionTree: plugin timed out after 30s")
-		}
-		m.emitLog(services.LogLevelError, fmt.Sprintf("GetConnectionTree: plugin '%s' exited with error: %v", name, err))
-		return nil, fmt.Errorf("GetConnectionTree: plugin exited: %w - stderr: %s", err, string(errB))
+		return nil, err
 	}
 
 	resp := &plugin.ConnectionTreeResponse{}
@@ -752,64 +726,14 @@ func (m *Manager) ExecTreeAction(name string, connection map[string]string, acti
 // is described by the OperationType enum.  A 30-second timeout guards
 // against misbehaving plugins.
 func (m *Manager) MutateRow(name string, connection map[string]string, operation plugin.OperationType, source string, values map[string]string, filter string) (*plugin.MutateRowResponse, error) {
-	name = strings.TrimSuffix(name, filepath.Ext(name))
-	m.mu.Lock()
-	info, ok := m.plugins[name]
-	m.mu.Unlock()
-	if !ok {
-		m.emitLog(services.LogLevelError, fmt.Sprintf("MutateRow: plugin '%s' not found", name))
-		return nil, fmt.Errorf("MutateRow: plugin %s not found", name)
-	}
-	full := info.Path
-	if !isExecutable(full) {
-		m.emitLog(services.LogLevelError, fmt.Sprintf("MutateRow: plugin '%s' is not executable", name))
-		return nil, fmt.Errorf("MutateRow: plugin %s is not executable", name)
-	}
 	m.emitLog(services.LogLevelInfo, fmt.Sprintf("MutateRow: (driver: %s) op=%v source=%q filter=%q", name, operation, source, filter))
 
 	req := mutateRowRequest{Connection: connection, Operation: operation, Source: source, Values: values, Filter: filter}
 	b, _ := json.Marshal(&req)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, full, "mutate-row")
-	hideWindow(cmd)
-	cmd.Env = append(os.Environ(), "QUERYBOX_PLUGIN_NAME="+name)
-	stdin, err := cmd.StdinPipe()
+	outB, err := m.runPluginCommand("MutateRow", name, "mutate-row", defaultPluginTimeout, b)
 	if err != nil {
-		m.emitLog(services.LogLevelError, fmt.Sprintf("MutateRow: stdin pipe error for plugin '%s': %v", name, err))
-		return nil, fmt.Errorf("MutateRow: stdin pipe error: %w", err)
-	}
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		m.emitLog(services.LogLevelError, fmt.Sprintf("MutateRow: stdout pipe error for plugin '%s': %v", name, err))
-		return nil, fmt.Errorf("MutateRow: stdout pipe error: %w", err)
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		m.emitLog(services.LogLevelError, fmt.Sprintf("MutateRow: stderr pipe error for plugin '%s': %v", name, err))
-		return nil, fmt.Errorf("MutateRow: stderr pipe error: %w", err)
-	}
-
-	if err := cmd.Start(); err != nil {
-		m.emitLog(services.LogLevelError, fmt.Sprintf("MutateRow: failed to start plugin '%s': %v", name, err))
-		return nil, fmt.Errorf("MutateRow: start error: %w", err)
-	}
-
-	// send request
-	_, _ = stdin.Write(b)
-	_ = stdin.Close()
-
-	outB, _ := io.ReadAll(stdout)
-	errB, _ := io.ReadAll(stderr)
-
-	if err := cmd.Wait(); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			m.emitLog(services.LogLevelError, fmt.Sprintf("MutateRow: plugin '%s' timed out after 30s", name))
-			return nil, fmt.Errorf("MutateRow: plugin timed out after 30s")
-		}
-		m.emitLog(services.LogLevelError, fmt.Sprintf("MutateRow: plugin '%s' exited with error: %v", name, err))
-		return nil, fmt.Errorf("MutateRow: plugin exited: %w - stderr: %s", err, string(errB))
+		return nil, err
 	}
 
 	resp := &plugin.MutateRowResponse{}
@@ -828,63 +752,14 @@ func (m *Manager) MutateRow(name string, connection map[string]string, operation
 // given connection.  The optional database/table arguments may be empty;
 // plugins are free to ignore them.  A 30-second timeout prevents hangs.
 func (m *Manager) DescribeSchema(name string, connection map[string]string, database, table string) (*plugin.DescribeSchemaResponse, error) {
-	name = strings.TrimSuffix(name, filepath.Ext(name))
-	m.mu.Lock()
-	info, ok := m.plugins[name]
-	m.mu.Unlock()
-	if !ok {
-		m.emitLog(services.LogLevelError, fmt.Sprintf("DescribeSchema: plugin '%s' not found", name))
-		return nil, fmt.Errorf("DescribeSchema: plugin %s not found", name)
-	}
-	full := info.Path
-	if !isExecutable(full) {
-		m.emitLog(services.LogLevelError, fmt.Sprintf("DescribeSchema: plugin '%s' is not executable", name))
-		return nil, fmt.Errorf("DescribeSchema: plugin %s is not executable", name)
-	}
 	m.emitLog(services.LogLevelInfo, fmt.Sprintf("DescribeSchema: fetching schema (driver: %s)", name))
 
 	req := plugin.DescribeSchemaRequest{Connection: connection, Database: database, Table: table}
 	b, _ := json.Marshal(&req)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, full, "describe-schema")
-	hideWindow(cmd)
-	cmd.Env = append(os.Environ(), "QUERYBOX_PLUGIN_NAME="+name)
-	stdin, err := cmd.StdinPipe()
+	outB, err := m.runPluginCommand("DescribeSchema", name, "describe-schema", defaultPluginTimeout, b)
 	if err != nil {
-		m.emitLog(services.LogLevelError, fmt.Sprintf("DescribeSchema: stdin pipe error for plugin '%s': %v", name, err))
-		return nil, fmt.Errorf("DescribeSchema: stdin pipe error: %w", err)
-	}
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		m.emitLog(services.LogLevelError, fmt.Sprintf("DescribeSchema: stdout pipe error for plugin '%s': %v", name, err))
-		return nil, fmt.Errorf("DescribeSchema: stdout pipe error: %w", err)
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		m.emitLog(services.LogLevelError, fmt.Sprintf("DescribeSchema: stderr pipe error for plugin '%s': %v", name, err))
-		return nil, fmt.Errorf("DescribeSchema: stderr pipe error: %w", err)
-	}
-
-	if err := cmd.Start(); err != nil {
-		m.emitLog(services.LogLevelError, fmt.Sprintf("DescribeSchema: failed to start plugin '%s': %v", name, err))
-		return nil, fmt.Errorf("DescribeSchema: start error: %w", err)
-	}
-
-	_, _ = stdin.Write(b)
-	_ = stdin.Close()
-
-	outB, _ := io.ReadAll(stdout)
-	errB, _ := io.ReadAll(stderr)
-
-	if err := cmd.Wait(); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			m.emitLog(services.LogLevelError, fmt.Sprintf("DescribeSchema: plugin '%s' timed out after 30s", name))
-			return nil, fmt.Errorf("DescribeSchema: plugin timed out after 30s")
-		}
-		m.emitLog(services.LogLevelError, fmt.Sprintf("DescribeSchema: plugin '%s' exited with error: %v", name, err))
-		return nil, fmt.Errorf("DescribeSchema: plugin exited: %w - stderr: %s", err, string(errB))
+		return nil, err
 	}
 
 	resp := &plugin.DescribeSchemaResponse{}
@@ -907,57 +782,14 @@ func (m *Manager) DescribeSchema(name string, connection map[string]string, data
 // case TestConnection returns an error rather than a failed response so the
 // caller can distinguish "unsupported" from "tested and failed".
 func (m *Manager) TestConnection(name string, connection map[string]string) (*plugin.TestConnectionResponse, error) {
-	name = strings.TrimSuffix(name, filepath.Ext(name))
-	m.mu.Lock()
-	info, ok := m.plugins[name]
-	m.mu.Unlock()
-	if !ok {
-		return nil, fmt.Errorf("TestConnection: plugin %s not found", name)
-	}
-	full := info.Path
-	if !isExecutable(full) {
-		return nil, fmt.Errorf("TestConnection: plugin %s is not executable", name)
-	}
 	m.emitLog(services.LogLevelInfo, fmt.Sprintf("TestConnection: testing (driver: %s)", name))
 
 	req := plugin.TestConnectionRequest{Connection: connection}
 	b, _ := json.Marshal(&req)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, full, "test-connection")
-	hideWindow(cmd)
-	cmd.Env = append(os.Environ(), "QUERYBOX_PLUGIN_NAME="+name)
-	stdin, err := cmd.StdinPipe()
+	outB, err := m.runPluginCommand("TestConnection", name, "test-connection", fastPluginTimeout, b)
 	if err != nil {
-		return nil, fmt.Errorf("TestConnection: stdin pipe error: %w", err)
-	}
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, fmt.Errorf("TestConnection: stdout pipe error: %w", err)
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return nil, fmt.Errorf("TestConnection: stderr pipe error: %w", err)
-	}
-
-	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("TestConnection: start error: %w", err)
-	}
-
-	_, _ = stdin.Write(b)
-	_ = stdin.Close()
-
-	outB, _ := io.ReadAll(stdout)
-	errB, _ := io.ReadAll(stderr)
-
-	if err := cmd.Wait(); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			m.emitLog(services.LogLevelError, fmt.Sprintf("TestConnection: plugin '%s' timed out", name))
-			return nil, fmt.Errorf("TestConnection: plugin timed out")
-		}
-		m.emitLog(services.LogLevelError, fmt.Sprintf("TestConnection: plugin '%s' exited with error: %v", name, err))
-		return nil, fmt.Errorf("TestConnection: plugin exited: %w - stderr: %s", err, string(errB))
+		return nil, err
 	}
 
 	var resp plugin.TestConnectionResponse
@@ -1041,55 +873,13 @@ func (m *Manager) Shutdown() {}
 // feature.  Plugins that don't implement the CompletionFieldsProvider interface
 // return an empty response.  A 15-second timeout guards misbehaving plugins.
 func (m *Manager) GetCompletionFields(name string, connection map[string]string, database, collection string) (*plugin.GetCompletionFieldsResponse, error) {
-	m.mu.Lock()
-	info, ok := m.plugins[name]
-	m.mu.Unlock()
-	if !ok {
-		return nil, fmt.Errorf("GetCompletionFields: plugin %s not found", name)
-	}
-	full := info.Path
-	if !isExecutable(full) {
-		return nil, fmt.Errorf("GetCompletionFields: plugin %s is not executable", name)
-	}
 	m.emitLog(services.LogLevelInfo, fmt.Sprintf("GetCompletionFields: fetching fields (driver: %s, collection: %s)", name, collection))
 
 	req := plugin.GetCompletionFieldsRequest{Connection: connection, Database: database, Collection: collection}
 	b, _ := json.Marshal(&req)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, full, "completion-fields")
-	hideWindow(cmd)
-	cmd.Env = append(os.Environ(), "QUERYBOX_PLUGIN_NAME="+name)
-	stdin, err := cmd.StdinPipe()
+	outB, err := m.runPluginCommand("GetCompletionFields", name, "completion-fields", fastPluginTimeout, b)
 	if err != nil {
-		return nil, fmt.Errorf("GetCompletionFields: stdin pipe error: %w", err)
-	}
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, fmt.Errorf("GetCompletionFields: stdout pipe error: %w", err)
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return nil, fmt.Errorf("GetCompletionFields: stderr pipe error: %w", err)
-	}
-
-	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("GetCompletionFields: start error: %w", err)
-	}
-
-	_, _ = stdin.Write(b)
-	_ = stdin.Close()
-
-	outB, _ := io.ReadAll(stdout)
-	errB, _ := io.ReadAll(stderr)
-
-	if err := cmd.Wait(); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			m.emitLog(services.LogLevelError, fmt.Sprintf("GetCompletionFields: plugin '%s' timed out", name))
-			return nil, fmt.Errorf("GetCompletionFields: plugin timed out")
-		}
-		m.emitLog(services.LogLevelError, fmt.Sprintf("GetCompletionFields: plugin '%s' exited with error: %v, stderr: %s", name, err, string(errB)))
 		// Non-zero exit is expected for older plugins that don't implement this
 		// command — return empty response rather than an error so callers don't
 		// have to handle the unsupported case specially.

@@ -76,18 +76,18 @@ func dataDir() string {
 }
 
 // NewConnectionService constructs a ConnectionService and initializes the
-// underlying SQLite database and credential manager. It performs the same
-// migrations and schema setup that existed previously in the manager.
-func NewConnectionService() *ConnectionService {
+// underlying SQLite database and credential manager. It returns an error if
+// the database cannot be opened or initialized.
+func NewConnectionService() (*ConnectionService, error) {
 	dir := dataDir()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return &ConnectionService{cred: credmanager.New()}
+		return nil, fmt.Errorf("create data directory: %w", err)
 	}
 	dbPath := filepath.Join(dir, "connections.db")
 
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
-		return &ConnectionService{cred: credmanager.New()}
+		return nil, fmt.Errorf("open connections database: %w", err)
 	}
 
 	// Embedded DB is local — limit connections and lifetime.
@@ -104,12 +104,12 @@ func NewConnectionService() *ConnectionService {
 	);`
 	if _, err := db.Exec(create); err != nil {
 		_ = db.Close()
-		return &ConnectionService{cred: credmanager.New()}
+		return nil, fmt.Errorf("initialize connections schema: %w", err)
 	}
 
 	svc := &ConnectionService{db: db, cred: credmanager.New()}
 
-	return svc
+	return svc, nil
 }
 
 func (s *ConnectionService) closeable() bool { return s.db != nil }

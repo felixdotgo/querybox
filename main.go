@@ -38,7 +38,10 @@ func main() {
 	app := &services.App{}
 
 	// Construct services before application.New so we can call SetApp afterwards.
-	connSvc := services.NewConnectionService()
+	connSvc, err := services.NewConnectionService()
+	if err != nil {
+		log.Fatalf("failed to initialize connection service: %v", err)
+	}
 	mgr := pluginmgr.New()
 
 	// Create a new Wails application by providing the necessary options.
@@ -86,7 +89,7 @@ func main() {
 	}
 
 	// Run the application. This blocks until the application has been exited.
-	err := app.App.Run()
+	err = app.App.Run()
 
 	// If an error occurred while running the application, log it and exit.
 	if err != nil {

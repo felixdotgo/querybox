@@ -3,6 +3,7 @@ import { NButton, NIcon, NTag } from 'naive-ui'
 import { computed, defineEmits, h, onBeforeUnmount, onMounted, ref } from 'vue'
 import { getDataTypeColor, Key, Pencil, Pin, Trash } from '@/lib/icons'
 import RowEditorModal from './RowEditorModal.vue'
+import { useRowEditorModal } from '@/composables/useRowEditorModal'
 
 const props = defineProps({
   // Already-unwrapped RDBMS payload: { columns: [...], rows: [...] }
@@ -205,15 +206,6 @@ const tableData = computed(() => {
   })
 })
 
-// modal state for editing/deleting rows
-const showEditor = ref(false)
-const editorOperation = ref('update') // 'update' or 'delete'
-const editorRow = ref(null)
-const editorFilter = ref('')
-const editorSource = ref('')
-
-const rowKeyFunction = row => row && row.key
-
 // compute a default filter string equality comparison from a row object
 function defaultFilterFor(row) {
   if (!row)
@@ -229,28 +221,15 @@ function defaultFilterFor(row) {
   return parts.join(' AND ')
 }
 
-function openEditor(op, row) {
-  editorOperation.value = op
-  editorRow.value = row
-  editorFilter.value = defaultFilterFor(row)
-  // source could be derived from schema or left blank; leave blank for now
-  editorSource.value = ''
-  showEditor.value = true
-}
+const {
+  showEditor, editorOperation, editorRow, editorFilter, editorSource,
+  openEditor, closeEditor, performMutation,
+} = useRowEditorModal(defaultFilterFor)
 
-async function performMutation(params) {
-  // This composable will be implemented separately; to avoid circular
-  // imports we load lazily here.
-  const { mutateRow } = await import('@/composables/useRowMutation')
-  const conn = props.connection
-  try {
-    await mutateRow(conn, params.operation === 'delete' ? 3 : 2, params.source, params.values, params.filter)
-    // emit event for parent to refresh
-    emit('mutated')
-  }
-  catch (err) {
-    console.error('mutation failed', err)
-  }
+const rowKeyFunction = row => row && row.key
+
+async function handleMutation(params) {
+  await performMutation(props.connection, params, () => emit('mutated'))
 }
 </script>
 
@@ -277,8 +256,8 @@ async function performMutation(params) {
       :row="editorRow"
       :filter="editorFilter"
       :source="editorSource"
-      @submit="performMutation"
-      @cancel="showEditor = false"
+      @submit="handleMutation"
+      @cancel="closeEditor"
     />
   </div>
 </template>
