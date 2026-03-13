@@ -166,9 +166,11 @@ export function useConnectionTree(connRef?: Ref<any | null>) {
     }
     catch (err) {
       console.error('useConnectionTree load', id, err)
-      treeCache[id] = []
+      throw err
     }
-    updateLocal()
+    finally {
+      updateLocal()
+    }
   }
 
   function getTableNames(): string[] {

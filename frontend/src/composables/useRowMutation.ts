@@ -24,6 +24,15 @@ export async function mutateRow(conn: { id: string, driver_type: string }, opera
     params.credential_blob = cred
   }
 
+  // When the source is a qualified name (e.g. "employees.users"), extract the
+  // database prefix and forward it so the plugin can select the correct
+  // database even when no default database is saved in the credential.
+  if (source && source.includes('.')) {
+    const dbName = source.split('.')[0]
+    if (dbName)
+      params.database = dbName
+  }
+
   // the binding expects the connection map followed by the other parameters
   return await MutateRow(conn.driver_type, params, operation, source, values, filter)
 }

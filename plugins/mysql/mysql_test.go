@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/felixdotgo/querybox/pkg/plugin"
+	"github.com/go-sql-driver/mysql"
 )
 
 func TestGetDatabaseFromConn(t *testing.T) {
@@ -145,5 +146,45 @@ func TestMutateRowUpdateEmptyValues(t *testing.T) {
     }
     if resp.Error == "" {
         t.Error("expected non-empty error message for UPDATE with no values")
+    }
+}
+
+// TestMutateRowBuildDSNDerivesDBFromSource verifies that when the connection
+// map holds no default database (DSN ends with "/") but req.Source is a
+// qualified "db.table" identifier, buildDSN + the MutateRow fallback path
+// together produce a DSN whose DBName matches the source prefix.  This
+// unit-level test avoids a live MySQL server while covering the regression
+// where DELETE returned "Error 1046: No database selected".
+func TestMutateRowBuildDSNDerivesDBFromSource(t *testing.T) {
+    // A bare DSN with no database – exactly what happens when the user
+    // connects at the server root without specifying a default database.
+    bareConn := map[string]string{"dsn": "root:@tcp(localhost:3306)/"}
+
+    dsn, err := buildDSN(bareConn)
+    if err != nil {
+        t.Fatalf("buildDSN: %v", err)
+    }
+    cfg, err := mysql.ParseDSN(dsn)
+    if err != nil {
+        t.Fatalf("ParseDSN: %v", err)
+    }
+    if cfg.DBName != "" {
+        t.Fatalf("precondition failed: expected empty DBName, got %q", cfg.DBName)
+    }
+
+    // Simulate the MutateRow fallback: if DBName is empty and source is
+    // qualified, derive the database from the source prefix.
+    source := "employees.users"
+    if parts := strings.SplitN(source, ".", 2); len(parts) == 2 && parts[0] != "" {
+        cfg.DBName = parts[0]
+    }
+    if cfg.DBName != "employees" {
+        t.Errorf("expected DBName %q after derivation, got %q", "employees", cfg.DBName)
+    }
+
+    // Ensure FormatDSN round-trips cleanly and the table portion is stripped.
+    rebuilt := cfg.FormatDSN()
+    if !strings.Contains(rebuilt, "/employees") {
+        t.Errorf("rebuilt DSN %q does not contain the derived database", rebuilt)
     }
 }

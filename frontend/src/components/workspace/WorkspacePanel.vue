@@ -1,5 +1,5 @@
 <script setup>
-import { NButton, NIcon } from 'naive-ui'
+import { NButton, NIcon, useNotification } from 'naive-ui'
 import { computed, onMounted, ref, toRef, watch } from 'vue'
 import { ResultViewer } from '@/components/results'
 import { useConnectionTree } from '@/composables/useConnectionTree'
@@ -17,6 +17,7 @@ const emit = defineEmits(['tab-closed', 'active-connection-changed', 'refresh-ta
 // allow lookup of cached schemas; provide selectedConnection ref so
 // schema-related helpers know which connection to query.
 const { getSchema, fetchSchema } = useConnectionTree(toRef(props, 'selectedConnection'))
+const notification = useNotification()
 
 const currentSchema = computed(() => {
   // eslint-disable-next-line ts/no-use-before-define
@@ -30,11 +31,15 @@ const currentSchema = computed(() => {
     key = key.slice((`${tab.context.conn.id}:`).length)
   }
 
-  // previously we trimmed the first segment of a dotted identifier
-  // (e.g. "db.table") here.  that logic was brittle when plugins
-  // returned fully-qualified names; `getSchema` could not find the
-  // entry and the structure tab stayed hidden.  the helper now handles
-  // suffix lookups itself, so just pass the raw key through.
+  // Deep tree plugins (e.g. PostgreSQL: db→schema→"Tables"→table) build
+  // hierarchical keys like "mydb:public:public.Tables:public.users".
+  // Extract only the last colon-separated segment so getSchema receives
+  // the actual node key (e.g. "public.users") regardless of depth.
+  const lastColon = key ? key.lastIndexOf(':') : -1
+  if (lastColon !== -1) {
+    key = key.slice(lastColon + 1)
+  }
+
   if (!key || typeof key !== 'string')
     return null
   const schema = getSchema(key, tab.context.conn)
@@ -94,6 +99,12 @@ function extractTableName(tab) {
   let key = tab.context.node.key
   if (key && typeof key === 'string' && key.startsWith(`${tab.context.conn?.id}:`)) {
     key = key.slice((`${tab.context.conn.id}:`).length)
+  }
+  // For deep-hierarchy plugins (e.g. PostgreSQL) the remaining key still
+  // contains parent-path segments; keep only the last colon-segment.
+  const lastColon = key ? key.lastIndexOf(':') : -1
+  if (lastColon !== -1) {
+    key = key.slice(lastColon + 1)
   }
   if (!key || typeof key !== 'string')
     return null
@@ -184,6 +195,10 @@ function openTab(title, result, error, tabKey, version, context) {
     loading: false,
     query: context?.action?.query || '',
     language: getMonacoLanguage(context?.conn?.driver_type),
+  }
+
+  if (error) {
+    notification.error({ title: 'Query error', content: typeof error === 'string' ? error : String(error), duration: 6000 })
   }
 
   if (context && context.explain) {

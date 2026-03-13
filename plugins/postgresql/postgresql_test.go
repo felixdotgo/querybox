@@ -521,3 +521,142 @@ func TestConnectionTreeSchemaGroups(t *testing.T) {
         t.Errorf("unmet expectations: %v", err)
     }
 }
+
+// --- MutateRow tests ---
+
+func TestMutateRowPGMissingSource(t *testing.T) {
+    p := &postgresqlPlugin{}
+    resp, err := p.MutateRow(context.Background(), &pluginpb.PluginV1_MutateRowRequest{
+        Connection: map[string]string{"dsn": "host=localhost sslmode=disable"},
+        Operation:  pluginpb.PluginV1_MutateRowRequest_DELETE,
+        Filter:     "id = 1",
+    })
+    if err != nil {
+        t.Fatalf("unexpected error: %v", err)
+    }
+    if resp.Success {
+        t.Error("expected failure when source is empty")
+    }
+}
+
+func TestMutateRowPGMissingFilter(t *testing.T) {
+    p := &postgresqlPlugin{}
+    resp, err := p.MutateRow(context.Background(), &pluginpb.PluginV1_MutateRowRequest{
+        Connection: map[string]string{"dsn": "host=localhost sslmode=disable"},
+        Operation:  pluginpb.PluginV1_MutateRowRequest_DELETE,
+        Source:     "users",
+    })
+    if err != nil {
+        t.Fatalf("unexpected error: %v", err)
+    }
+    if resp.Success {
+        t.Error("expected failure when filter is empty")
+    }
+}
+
+func TestMutateRowPGUnsupportedOperation(t *testing.T) {
+    orig := openPostgresDB
+    defer func() { openPostgresDB = orig }()
+
+    db, _, err := sqlmock.New()
+    if err != nil {
+        t.Fatalf("failed to create mock: %v", err)
+    }
+    openPostgresDB = func(dsn string) (*sql.DB, error) { return db, nil }
+
+    p := &postgresqlPlugin{}
+    resp, err := p.MutateRow(context.Background(), &pluginpb.PluginV1_MutateRowRequest{
+        Connection: map[string]string{"dsn": "host=localhost sslmode=disable"},
+        Operation:  pluginpb.PluginV1_MutateRowRequest_INSERT,
+        Source:     "users",
+        Filter:     "id = 1",
+    })
+    if err != nil {
+        t.Fatalf("unexpected error: %v", err)
+    }
+    if resp.Success {
+        t.Error("expected failure for INSERT (unsupported)")
+    }
+}
+
+func TestMutateRowPGUpdate(t *testing.T) {
+    orig := openPostgresDB
+    defer func() { openPostgresDB = orig }()
+
+    db, mock, err := sqlmock.New()
+    if err != nil {
+        t.Fatalf("failed to create mock: %v", err)
+    }
+    openPostgresDB = func(dsn string) (*sql.DB, error) { return db, nil }
+
+    // keys are sorted alphabetically: age then name
+    mock.ExpectExec(`UPDATE "users" SET "age"=\$1, "name"=\$2 WHERE id = 1`).
+        WithArgs("25", "Bob").
+        WillReturnResult(sqlmock.NewResult(1, 1))
+
+    p := &postgresqlPlugin{}
+    resp, err := p.MutateRow(context.Background(), &pluginpb.PluginV1_MutateRowRequest{
+        Connection: map[string]string{"dsn": "host=localhost sslmode=disable"},
+        Operation:  pluginpb.PluginV1_MutateRowRequest_UPDATE,
+        Source:     "users",
+        Values:     map[string]string{"name": "Bob", "age": "25"},
+        Filter:     "id = 1",
+    })
+    if err != nil {
+        t.Fatalf("MutateRow error: %v", err)
+    }
+    if !resp.Success {
+        t.Fatalf("expected success, got error: %s", resp.Error)
+    }
+    if err := mock.ExpectationsWereMet(); err != nil {
+        t.Errorf("unmet expectations: %v", err)
+    }
+}
+
+func TestMutateRowPGDelete(t *testing.T) {
+    orig := openPostgresDB
+    defer func() { openPostgresDB = orig }()
+
+    db, mock, err := sqlmock.New()
+    if err != nil {
+        t.Fatalf("failed to create mock: %v", err)
+    }
+    openPostgresDB = func(dsn string) (*sql.DB, error) { return db, nil }
+
+    mock.ExpectExec(`DELETE FROM "users" WHERE id = 1`).
+        WillReturnResult(sqlmock.NewResult(1, 1))
+
+    p := &postgresqlPlugin{}
+    resp, err := p.MutateRow(context.Background(), &pluginpb.PluginV1_MutateRowRequest{
+        Connection: map[string]string{"dsn": "host=localhost sslmode=disable"},
+        Operation:  pluginpb.PluginV1_MutateRowRequest_DELETE,
+        Source:     "users",
+        Filter:     "id = 1",
+    })
+    if err != nil {
+        t.Fatalf("MutateRow error: %v", err)
+    }
+    if !resp.Success {
+        t.Fatalf("expected success, got error: %s", resp.Error)
+    }
+    if err := mock.ExpectationsWereMet(); err != nil {
+        t.Errorf("unmet expectations: %v", err)
+    }
+}
+
+func TestQuoteSourcePG(t *testing.T) {
+    cases := []struct {
+        input string
+        want  string
+    }{
+        {"users", `"users"`},
+        {"public.users", `"public"."users"`},
+        {`has"quote`, `"has""quote"`},
+    }
+    for _, c := range cases {
+        got := quoteSourcePG(c.input)
+        if got != c.want {
+            t.Errorf("quoteSourcePG(%q) = %q, want %q", c.input, got, c.want)
+        }
+    }
+}

@@ -87,20 +87,127 @@ func TestDescribeSchema(t *testing.T) {
     }
 }
 
-func TestMutateRowStub(t *testing.T) {
-    plugin := &sqlitePlugin{}
-    req := &pluginpb.PluginV1_MutateRowRequest{
-        Connection: map[string]string{},
-        Operation:  pluginpb.PluginV1_MutateRowRequest_DELETE,
-        Source:     "users",
-        Values:     map[string]string{"id": "1"},
-        Filter:     "id=1",
+// makeConn builds the connection map that MutateRow / DescribeSchema expect.
+func makeConn(t *testing.T, fname string) map[string]string {
+    t.Helper()
+    payload := struct {
+        Form   string            `json:"form"`
+        Values map[string]string `json:"values"`
+    }{Form: "basic", Values: map[string]string{"file": fname}}
+    b, _ := json.Marshal(payload)
+    return map[string]string{"credential_blob": string(b)}
+}
+
+func TestMutateRowUpdate(t *testing.T) {
+    fname, cleanup := prepareDB(t)
+    defer cleanup()
+
+    // seed a row
+    db, err := sql.Open("sqlite", fname)
+    if err != nil {
+        t.Fatalf("open db: %v", err)
     }
-    resp, err := plugin.MutateRow(context.Background(), req)
+    if _, err := db.Exec(`INSERT INTO users(id, name, age) VALUES (1, 'Alice', 30)`); err != nil {
+        db.Close()
+        t.Fatalf("seed: %v", err)
+    }
+    db.Close()
+
+    p := &sqlitePlugin{}
+    resp, err := p.MutateRow(context.Background(), &pluginpb.PluginV1_MutateRowRequest{
+        Connection: makeConn(t, fname),
+        Operation:  pluginpb.PluginV1_MutateRowRequest_UPDATE,
+        Source:     "users",
+        Values:     map[string]string{"name": "Bob", "age": "25"},
+        Filter:     "id = 1",
+    })
     if err != nil {
         t.Fatalf("MutateRow error: %v", err)
     }
     if !resp.Success {
-        t.Errorf("expected success response, got %+v", resp)
+        t.Fatalf("expected success, got error: %s", resp.Error)
+    }
+
+    // verify the change persisted
+    db2, _ := sql.Open("sqlite", fname)
+    defer db2.Close()
+    var name string
+    var age int
+    if err := db2.QueryRow(`SELECT name, age FROM users WHERE id = 1`).Scan(&name, &age); err != nil {
+        t.Fatalf("select: %v", err)
+    }
+    if name != "Bob" || age != 25 {
+        t.Errorf("expected Bob/25, got %s/%d", name, age)
+    }
+}
+
+func TestMutateRowDelete(t *testing.T) {
+    fname, cleanup := prepareDB(t)
+    defer cleanup()
+
+    // seed two rows
+    db, err := sql.Open("sqlite", fname)
+    if err != nil {
+        t.Fatalf("open db: %v", err)
+    }
+    if _, err := db.Exec(`INSERT INTO users(id, name, age) VALUES (1, 'Alice', 30), (2, 'Bob', 25)`); err != nil {
+        db.Close()
+        t.Fatalf("seed: %v", err)
+    }
+    db.Close()
+
+    p := &sqlitePlugin{}
+    resp, err := p.MutateRow(context.Background(), &pluginpb.PluginV1_MutateRowRequest{
+        Connection: makeConn(t, fname),
+        Operation:  pluginpb.PluginV1_MutateRowRequest_DELETE,
+        Source:     "users",
+        Filter:     "id = 1",
+    })
+    if err != nil {
+        t.Fatalf("MutateRow error: %v", err)
+    }
+    if !resp.Success {
+        t.Fatalf("expected success, got error: %s", resp.Error)
+    }
+
+    // verify only one row remains
+    db2, _ := sql.Open("sqlite", fname)
+    defer db2.Close()
+    var count int
+    if err := db2.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&count); err != nil {
+        t.Fatalf("count: %v", err)
+    }
+    if count != 1 {
+        t.Errorf("expected 1 row after delete, got %d", count)
+    }
+}
+
+func TestMutateRowMissingSource(t *testing.T) {
+    p := &sqlitePlugin{}
+    resp, err := p.MutateRow(context.Background(), &pluginpb.PluginV1_MutateRowRequest{
+        Connection: map[string]string{},
+        Operation:  pluginpb.PluginV1_MutateRowRequest_DELETE,
+        Filter:     "id = 1",
+    })
+    if err != nil {
+        t.Fatalf("unexpected error: %v", err)
+    }
+    if resp.Success {
+        t.Error("expected failure when source is empty")
+    }
+}
+
+func TestMutateRowMissingFilter(t *testing.T) {
+    p := &sqlitePlugin{}
+    resp, err := p.MutateRow(context.Background(), &pluginpb.PluginV1_MutateRowRequest{
+        Connection: map[string]string{},
+        Operation:  pluginpb.PluginV1_MutateRowRequest_DELETE,
+        Source:     "users",
+    })
+    if err != nil {
+        t.Fatalf("unexpected error: %v", err)
+    }
+    if resp.Success {
+        t.Error("expected failure when filter is empty")
     }
 }

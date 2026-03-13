@@ -529,6 +529,20 @@ func (m *mysqlPlugin) MutateRow(ctx context.Context, req *plugin.MutateRowReques
 		return &plugin.MutateRowResponse{Success: false, Error: "invalid connection"}, nil
 	}
 
+	// Defense-in-depth: if the DSN has no default database selected but the
+	// source is a qualified "db.table" reference, derive the database from
+	// the source so the connection targets the correct schema.  This covers
+	// the case where the frontend omits the database key in the connection map
+	// (e.g. when the credential was saved without a default database).
+	if cfg, parseErr := mysql.ParseDSN(dsn); parseErr == nil && cfg.DBName == "" {
+		if parts := strings.SplitN(req.Source, ".", 2); len(parts) == 2 && parts[0] != "" {
+			cfg.DBName = parts[0]
+			if rebuilt := cfg.FormatDSN(); rebuilt != "" {
+				dsn = rebuilt
+			}
+		}
+	}
+
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		return &plugin.MutateRowResponse{Success: false, Error: fmt.Sprintf("open error: %v", err)}, nil

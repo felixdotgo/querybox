@@ -4,6 +4,8 @@ import ResultViewerDocument from './ResultViewerDocument.vue'
 import ResultViewerKeyValue from './ResultViewerKeyValue.vue'
 import ResultViewerRdbms from './ResultViewerRdbms.vue'
 
+defineEmits(['mutated'])
+
 const props = defineProps({
   result: {
     type: Object,
@@ -99,9 +101,10 @@ const viewType = computed(() => {
       :payload="payload"
       :schema="props.schema"
       :connection="props.connection"
+      @mutated="$emit('mutated')"
     />
-    <ResultViewerDocument v-else-if="viewType === 'document'" :payload="payload" />
-    <ResultViewerKeyValue v-else-if="viewType === 'kv'" :payload="payload" />
+    <ResultViewerDocument v-else-if="viewType === 'document'" :payload="payload" @mutated="$emit('mutated')" />
+    <ResultViewerKeyValue v-else-if="viewType === 'kv'" :payload="payload" @mutated="$emit('mutated')" />
     <div v-else class="text-gray-500">
       No Results
     </div>

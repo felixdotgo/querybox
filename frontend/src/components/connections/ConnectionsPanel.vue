@@ -1,6 +1,6 @@
 <script setup>
 import { Events } from '@wailsio/runtime'
-import { NButton, NIcon, NSpin, useDialog } from 'naive-ui'
+import { NButton, NIcon, NSpin, useDialog, useNotification } from 'naive-ui'
 import { computed, h, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
@@ -141,6 +141,7 @@ const connecting = ref({})
 const filter = ref('')
 // connectionTrees replaced by shared cache from composable
 const { cache: connectionTrees, load: loadConnectionTree, schemaCache } = useConnectionTree()
+const notification = useNotification()
 const selectedConnection = ref(null)
 const expandedKeys = ref([])
 const deleteModal = ref({ visible: false, conn: null })
@@ -532,6 +533,7 @@ async function runTreeAction(conn, action, node, extras = {}) {
       const res = await ExecTreeAction(conn.driver_type, params, action.query || '', extras.options || (extras.explain ? { 'explain-query': 'yes' } : {}))
       if (res.error) {
         console.error('runTreeAction [hidden]', action.type, res.error)
+        notification.error({ title: 'Action failed', content: res.error, duration: 5000 })
       }
       else {
         console.debug('runTreeAction [hidden] ok', action.type)
@@ -543,6 +545,7 @@ async function runTreeAction(conn, action, node, extras = {}) {
     }
     catch (err) {
       console.error('runTreeAction [hidden] error', action.type, err?.message || err)
+      notification.error({ title: 'Action failed', content: err?.message || String(err), duration: 5000 })
     }
     return
   }
@@ -657,6 +660,10 @@ async function fetchTreeFor(conn) {
     if (!expandedKeys.value.includes(conn.id)) {
       expandedKeys.value = [...expandedKeys.value, conn.id]
     }
+  }
+  catch (err) {
+    console.error('fetchTreeFor', conn.id, err)
+    notification.error({ title: 'Connection failed', content: err?.message || String(err), duration: 5000 })
   }
   finally {
     delete connecting.value[conn.id]

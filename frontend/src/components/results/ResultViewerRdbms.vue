@@ -1,6 +1,8 @@
 <script setup>
 import { NButton, NIcon, NTag } from 'naive-ui'
 import { computed, defineEmits, h, onBeforeUnmount, onMounted, ref } from 'vue'
+import { GetCredential } from '@/bindings/github.com/felixdotgo/querybox/services/connectionservice'
+import { ExecPlugin } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
 import { useRowEditorModal } from '@/composables/useRowEditorModal'
 import { getDataTypeColor, Key, Pencil, Pin, Trash } from '@/lib/icons'
 import RowEditorModal from './RowEditorModal.vue'
@@ -97,6 +99,13 @@ const {
   closeEditor,
   performMutation,
 } = useRowEditorModal()
+
+// rowKey of the row currently open in the editor (used for targeted refresh)
+const editorRowKey = ref(null)
+
+// Override map: rowKey (integer index) → { col0: val, col1: val, … }
+// Populated after a successful UPDATE to patch the row in-place.
+const rowOverrides = ref(new Map())
 
 const tableColumns = computed(() => {
   let cols = props.payload.columns || []
@@ -205,6 +214,7 @@ const tableColumns = computed(() => {
         onClick: (e) => {
           e.stopPropagation()
           const named = namedRow(row)
+          editorRowKey.value = row.key
           openEditor('update', named, sourceFrom(), pkFilterFor(named))
         },
         tertiary: true,
@@ -216,6 +226,7 @@ const tableColumns = computed(() => {
         onClick: (e) => {
           e.stopPropagation()
           const named = namedRow(row)
+          editorRowKey.value = row.key
           openEditor('delete', named, sourceFrom(), pkFilterFor(named))
         },
         tertiary: true,
@@ -269,14 +280,69 @@ const tableData = computed(() => {
     ;(vals || []).forEach((v, i) => {
       obj[`col${i}`] = v
     })
+    // apply any in-place overrides from a targeted row refresh after UPDATE
+    const overrides = rowOverrides.value.get(rowIdx)
+    if (overrides)
+      Object.assign(obj, overrides)
     return obj
   })
 })
 
 const rowKeyFunction = row => row && row.key
 
+// refreshRow fetches a single updated row and patches it in-place so the
+// result viewer shows the new values without a full tab reload.
+async function refreshRow(rowKey, source, filter) {
+  if (!props.connection || !props.connection.driver_type) {
+    emit('mutated')
+    return
+  }
+  try {
+    const connMap = {}
+    const cred = await GetCredential(props.connection.id)
+    if (cred)
+      connMap.credential_blob = cred
+    // forward database prefix derived from the qualified source name
+    if (source && source.includes('.')) {
+      const dbName = source.split('.')[0]
+      if (dbName)
+        connMap.database = dbName
+    }
+    const selectSQL = `SELECT * FROM ${source} WHERE ${filter} LIMIT 1`
+    const res = await ExecPlugin(props.connection.driver_type, connMap, selectSQL, {})
+    // Unwrap the ExecPlugin response: result.Payload.Sql (uppercase, protojson)
+    let payload = res?.result?.Payload ?? {}
+    if (payload.Sql)
+      payload = payload.Sql
+    const rows = Array.isArray(payload.Rows) ? payload.Rows : []
+    if (rows.length === 0) {
+      // row no longer exists or fetch failed — fall back to full refresh
+      emit('mutated')
+      return
+    }
+    // map returned column values back to col0/col1/… keys
+    const freshVals = rows[0].Values ?? rows[0].values ?? []
+    const patch = {}
+    freshVals.forEach((v, i) => { patch[`col${i}`] = v })
+    rowOverrides.value = new Map(rowOverrides.value).set(rowKey, patch)
+  }
+  catch {
+    // on any error fall back to full refresh
+    emit('mutated')
+  }
+}
+
 async function handleMutation(params) {
-  await performMutation(props.connection, params, () => emit('mutated'))
+  const capturedRowKey = editorRowKey.value
+  await performMutation(props.connection, params, ({ operation, source, filter } = {}) => {
+    if (operation === 'delete') {
+      emit('mutated')
+    }
+    else {
+      // UPDATE: refresh only the affected row in-place
+      refreshRow(capturedRowKey, source, filter)
+    }
+  })
 }
 </script>
 

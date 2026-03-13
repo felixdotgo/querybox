@@ -18,7 +18,7 @@ const themeOverrides = {
   <n-config-provider :theme-overrides="themeOverrides">
     <n-dialog-provider>
       <n-message-provider>
-        <n-notification-provider>
+        <n-notification-provider placement="bottom-left">
           <router-view />
         </n-notification-provider>
       </n-message-provider>

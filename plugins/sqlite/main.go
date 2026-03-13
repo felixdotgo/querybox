@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"runtime"
+	"sort"
 	"strings"
 
 	"github.com/felixdotgo/querybox/pkg/plugin"
@@ -367,10 +368,77 @@ func (m *sqlitePlugin) GetCompletionFields(ctx context.Context, req *plugin.GetC
 }
 
 // MutateRow implements the optional mutation RPC for sqlite.  This stub
-// simply returns success and does not modify the database.  Real drivers
-// could open a connection and execute an INSERT/UPDATE/DELETE derived
-// from the parameters.
+// escapeDoubleQuoteSQLite doubles any double-quote characters in s so it can
+// be safely embedded between standard SQL double-quote identifier delimiters.
+func escapeDoubleQuoteSQLite(s string) string {
+	return strings.ReplaceAll(s, `"`, `""`)
+}
+
+// quoteSourceSQLite wraps a table reference in double-quotes, handling the
+// optional "schema.table" form (e.g. "main.users" becomes "main"."users").
+func quoteSourceSQLite(source string) string {
+	parts := strings.SplitN(source, ".", 2)
+	if len(parts) == 2 {
+		return fmt.Sprintf(`"%s"."%s"`, escapeDoubleQuoteSQLite(parts[0]), escapeDoubleQuoteSQLite(parts[1]))
+	}
+	return fmt.Sprintf(`"%s"`, escapeDoubleQuoteSQLite(source))
+}
+
+// MutateRow executes an UPDATE or DELETE against the SQLite database
+// identified by req.Connection.  req.Source must be the unquoted table name
+// and req.Filter must be a non-empty SQL WHERE expression; both are supplied
+// by the frontend modal.  Column values are passed as query parameters so
+// they cannot alter the statement structure.
 func (m *sqlitePlugin) MutateRow(ctx context.Context, req *plugin.MutateRowRequest) (*plugin.MutateRowResponse, error) {
+	if req.Source == "" {
+		return &plugin.MutateRowResponse{Success: false, Error: "source (table name) is required"}, nil
+	}
+	if req.Filter == "" {
+		return &plugin.MutateRowResponse{Success: false, Error: "filter (WHERE clause) is required"}, nil
+	}
+
+	c := parseCredential(req.Connection)
+	driver, dsn, err := driverDSN(c)
+	if err != nil || dsn == "" {
+		return &plugin.MutateRowResponse{Success: false, Error: "invalid connection"}, nil
+	}
+
+	db, err := sql.Open(driver, dsn)
+	if err != nil {
+		return &plugin.MutateRowResponse{Success: false, Error: fmt.Sprintf("open error: %v", err)}, nil
+	}
+	defer db.Close()
+
+	var query string
+	var args []interface{}
+
+	switch req.Operation {
+	case pluginpb.PluginV1_MutateRowRequest_UPDATE:
+		if len(req.Values) == 0 {
+			return &plugin.MutateRowResponse{Success: false, Error: "values are required for UPDATE"}, nil
+		}
+		// Collect column names in sorted order so the SET clause is deterministic.
+		keys := make([]string, 0, len(req.Values))
+		for k := range req.Values {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		setParts := make([]string, 0, len(keys))
+		for _, k := range keys {
+			setParts = append(setParts, fmt.Sprintf(`"%s"=?`, escapeDoubleQuoteSQLite(k)))
+			args = append(args, req.Values[k])
+		}
+		query = fmt.Sprintf("UPDATE %s SET %s WHERE %s",
+			quoteSourceSQLite(req.Source), strings.Join(setParts, ", "), req.Filter)
+	case pluginpb.PluginV1_MutateRowRequest_DELETE:
+		query = fmt.Sprintf("DELETE FROM %s WHERE %s", quoteSourceSQLite(req.Source), req.Filter)
+	default:
+		return &plugin.MutateRowResponse{Success: false, Error: "operation not supported"}, nil
+	}
+
+	if _, err := db.ExecContext(ctx, query, args...); err != nil {
+		return &plugin.MutateRowResponse{Success: false, Error: err.Error()}, nil
+	}
 	return &plugin.MutateRowResponse{Success: true}, nil
 }
 

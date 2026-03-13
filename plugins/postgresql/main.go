@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/felixdotgo/querybox/pkg/certs"
@@ -988,10 +989,95 @@ func (m *postgresqlPlugin) TestConnection(ctx context.Context, req *plugin.TestC
 	return &plugin.TestConnectionResponse{Ok: true, Message: "Connection successful"}, nil
 }
 
-// MutateRow is a simple no-op implementation provided as a placeholder.
-// Plugins wanting to support row mutations should execute the necessary
-// INSERT/UPDATE/DELETE logic based on the provided request parameters.
+// escapeDoubleQuote doubles any double-quote characters in s so it can be
+// safely embedded between standard SQL double-quote identifier delimiters.
+func escapeDoubleQuote(s string) string {
+	return strings.ReplaceAll(s, `"`, `""`)
+}
+
+// quoteSourcePG wraps a table reference in double-quotes, handling the
+// optional "schema.table" form produced by DescribeSchema (e.g.
+// "public.users" becomes "public"."users").
+func quoteSourcePG(source string) string {
+	parts := strings.SplitN(source, ".", 2)
+	if len(parts) == 2 {
+		return fmt.Sprintf(`"%s"."%s"`, escapeDoubleQuote(parts[0]), escapeDoubleQuote(parts[1]))
+	}
+	return fmt.Sprintf(`"%s"`, escapeDoubleQuote(source))
+}
+
+// MutateRow executes an UPDATE or DELETE against the PostgreSQL database
+// identified by req.Connection.  req.Source must be the unquoted table name
+// and req.Filter must be a non-empty SQL WHERE expression; both are supplied
+// by the frontend modal.  Column values are passed as query parameters so
+// they cannot alter the statement structure; source and filter are
+// double-quote-escaped and forwarded verbatim, which is appropriate for a
+// developer-facing tool where the user controls those fields directly.
 func (m *postgresqlPlugin) MutateRow(ctx context.Context, req *plugin.MutateRowRequest) (*plugin.MutateRowResponse, error) {
+	if req.Source == "" {
+		return &plugin.MutateRowResponse{Success: false, Error: "source (table name) is required"}, nil
+	}
+	if req.Filter == "" {
+		return &plugin.MutateRowResponse{Success: false, Error: "filter (WHERE clause) is required"}, nil
+	}
+
+	dsn, err := buildConnString(req.Connection)
+	if err != nil || dsn == "" {
+		return &plugin.MutateRowResponse{Success: false, Error: "invalid connection"}, nil
+	}
+
+	// Defense-in-depth: if the DSN has no explicit database but the source is
+	// a qualified "schema.table" reference, derive the database from the
+	// source so the connection targets the correct schema.
+	if !strings.Contains(dsn, "dbname=") {
+		if u, parseErr := url.Parse(dsn); parseErr == nil &&
+			(u.Scheme == "postgres" || u.Scheme == "postgresql") &&
+			(u.Path == "" || u.Path == "/") {
+			if parts := strings.SplitN(req.Source, ".", 2); len(parts) == 2 && parts[0] != "" {
+				if rebuilt, oErr := overrideDatabaseInDSN(dsn, parts[0]); oErr == nil {
+					dsn = rebuilt
+				}
+			}
+		}
+	}
+
+	db, err := openPostgresDB(dsn)
+	if err != nil {
+		return &plugin.MutateRowResponse{Success: false, Error: fmt.Sprintf("open error: %v", err)}, nil
+	}
+	defer db.Close()
+
+	var query string
+	var args []interface{}
+
+	switch req.Operation {
+	case pluginpb.PluginV1_MutateRowRequest_UPDATE:
+		if len(req.Values) == 0 {
+			return &plugin.MutateRowResponse{Success: false, Error: "values are required for UPDATE"}, nil
+		}
+		// Collect column names in sorted order so the SET clause is deterministic.
+		keys := make([]string, 0, len(req.Values))
+		for k := range req.Values {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		setParts := make([]string, 0, len(keys))
+		for i, k := range keys {
+			// PostgreSQL uses $1, $2, … positional placeholders.
+			setParts = append(setParts, fmt.Sprintf(`"%s"=$%d`, escapeDoubleQuote(k), i+1))
+			args = append(args, req.Values[k])
+		}
+		query = fmt.Sprintf("UPDATE %s SET %s WHERE %s",
+			quoteSourcePG(req.Source), strings.Join(setParts, ", "), req.Filter)
+	case pluginpb.PluginV1_MutateRowRequest_DELETE:
+		query = fmt.Sprintf("DELETE FROM %s WHERE %s", quoteSourcePG(req.Source), req.Filter)
+	default:
+		return &plugin.MutateRowResponse{Success: false, Error: "operation not supported"}, nil
+	}
+
+	if _, err := db.ExecContext(ctx, query, args...); err != nil {
+		return &plugin.MutateRowResponse{Success: false, Error: err.Error()}, nil
+	}
 	return &plugin.MutateRowResponse{Success: true}, nil
 }
 
