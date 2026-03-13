@@ -305,8 +305,7 @@ export function useConnectionTree(connRef?: Ref<any | null>) {
     }
 
     try {
-      console.debug('useConnectionTree.fetchSchema', id, 'table', table, 'dbFilter', dbFilter, 'tblFilter', tblFilter)
-      // @ts-expect-error: may be generated later
+      console.debug('useConnectionTree.fetchSchema', id, 'table', table, 'dbFilter', dbFilter, 'tblFilter', tblFilter, 'database', database)
       const schemaResp = await DescribeSchema(conn.driver_type, params, dbFilter, tblFilter)
       console.debug('useConnectionTree.fetchSchema: raw response', id, table, schemaResp)
       const tableMap: Record<string, any> = {}
