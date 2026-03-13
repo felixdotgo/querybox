@@ -79,7 +79,7 @@ graph LR
 | `ExecTreeAction(name, conn, query, opts)` | Delegates to `ExecPlugin` with action query |
 | `TestConnection(name, conn)` | Run `plugin test-connection`, **15s** timeout → `TestConnectionResponse` |
 | `DescribeSchema(name, conn, db, table)` | Run `plugin describe-schema`, 30s timeout → `DescribeSchemaResponse` |
-| `GetCompletionFields(name, conn, db?, collection?)` | Run `plugin get-completion-fields`, 5s timeout → `{fields:[{name,type?}]}` |
+| `GetCompletionFields(name, conn, db?, collection?)` | Run `plugin completion-fields`, 5s timeout → `{fields:[{name,type?}]}` |
 | `MutateRow(name, conn, operation, source, values, filter)` | Run `plugin mutate-row` (CLI command); request is JSON‑encoded (enum as numeric value), 30s timeout → `{success:bool,error?:string}`. Plugins that lack the optional RPC or capability should return failure/empty result, and the UI hides the icons. |
 
 
@@ -141,7 +141,7 @@ graph LR
 ### Auto‑complete Fields
 1. User types in a query editor tab; frontend determines active connection, database and collection/table context.
 2. Frontend → `PluginManager.GetCompletionFields(pluginName, connParams, database, collection)`
-3. Spawns `plugin get-completion-fields`, 5s timeout; stdin: `{"connection": {...}, "database": "...", "collection": "..."}`
+3. Spawns `plugin completion-fields`, 5s timeout; stdin: `{"connection": {...}, "database": "...", "collection": "..."}`
 4. Plugin returns `{fields:[{name:"col1",type:"text"},...]}` or `{}` when metadata is unavailable.
 5. Frontend merges results with built‑in keywords/commands and shows ranked suggestions in the editor.
 6. Plugin process exits

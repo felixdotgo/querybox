@@ -9,7 +9,7 @@ with fewer errors. Auto‑completion combines three sources:
    (`\copy`, `\exec`, etc.), and common functions are always available.
 2. **Tab‑specific schema metadata.** When a connection is active the editor calls
    the backend, which in turn probes the associated plugin for field/column names
-   using the optional `get-completion-fields` RPC. The result is cached per tab
+   using the optional `completion-fields` RPC. The result is cached per tab
    to avoid excessive plugin invocations.
 3. **Smart ranking.** The composable `useTabCompletion` ranks suggestions based
    on the current query context, recently used tables, and the selected node in

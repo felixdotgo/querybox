@@ -22,4 +22,4 @@
 | **TestConnectionResponse** | Proto message `{ok: bool, message: string}` returned by `plugin test-connection`. |
 | **Wails Bindings** | Auto-generated TypeScript interfaces enabling type-safe frontend calls to Go services. |
 | **Auto‑completion** | In‑editor feature that suggests keywords, commands, or database field names while typing; driven by frontend logic and optional plugin metadata. |
-| **Completion Fields** | Metadata returned by the `get-completion-fields` RPC; a list of field/column names (and optional types) sampled from the target database/collection. |
+| **Completion Fields** | Metadata returned by the `completion-fields` RPC; a list of field/column names (and optional types) sampled from the target database/collection. |
