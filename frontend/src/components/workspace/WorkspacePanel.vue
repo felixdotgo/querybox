@@ -111,6 +111,26 @@ function extractTableName(tab) {
   return key
 }
 
+// Extract the actual database name from a PostgreSQL-style node key.
+// After stripping the conn prefix the first colon-separated segment is the
+// database name (e.g. "mydb" from "<connId>:mydb:public:public.Tables:public.users").
+// Returns null for flat-hierarchy drivers (MySQL, SQLite) where no colon remains.
+function extractDatabaseFromTab(tab) {
+  if (!tab || !tab.context || !tab.context.node)
+    return null
+  let key = tab.context.node.key
+  if (!key || typeof key !== 'string')
+    return null
+  const connId = tab.context.conn?.id
+  if (connId && key.startsWith(`${connId}:`))
+    key = key.slice(connId.length + 1)
+  const col = key.indexOf(':')
+  if (col === -1)
+    return null
+  const db = key.slice(0, col)
+  return db || null
+}
+
 watch(activeTabKey, (key) => {
   console.debug('activeTabKey changed to', key)
   // tabKey format: conn.id + ":" + node.key — extract the connection ID
@@ -126,8 +146,9 @@ watch(activeTabKey, (key) => {
   console.debug('activeTabKey watcher table', tbl, 'cached?', tbl ? !!getSchema(tbl, tab.context?.conn) : null)
   if (tbl) {
     if (!getSchema(tbl, tab.context?.conn)) {
-      console.debug('activeTabKey watcher invoking fetchSchema for', tbl, 'conn', tab.context?.conn?.id)
-      fetchSchema(tbl, tab.context?.conn).catch(err => console.error('fetchSchema failed', err))
+      const db = extractDatabaseFromTab(tab)
+      console.debug('activeTabKey watcher invoking fetchSchema for', tbl, 'conn', tab.context?.conn?.id, 'db', db)
+      fetchSchema(tbl, tab.context?.conn, db).catch(err => console.error('fetchSchema failed', err))
     }
     else {
       console.debug('schema already cached for', tbl, 'conn', tab.context?.conn?.id)
@@ -227,8 +248,9 @@ function openTab(title, result, error, tabKey, version, context) {
     else {
       // still initiate a fetch so the structure data will be available if the
       // user clicks the tab later.
-      console.debug('openTab triggering fetchSchema for', prefetchTable, 'conn', newTab.context?.conn?.id)
-      fetchSchema(prefetchTable, newTab.context?.conn).catch(err => console.error('fetchSchema failed', err))
+      const db = extractDatabaseFromTab(newTab)
+      console.debug('openTab triggering fetchSchema for', prefetchTable, 'conn', newTab.context?.conn?.id, 'db', db)
+      fetchSchema(prefetchTable, newTab.context?.conn, db).catch(err => console.error('fetchSchema failed', err))
     }
   }
 

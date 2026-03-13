@@ -270,7 +270,13 @@ export function useConnectionTree(connRef?: Ref<any | null>) {
   // fetch schema metadata for the specified table only and merge the results
   // into the cache.  called lazily when the user selects a table that hasn't
   // been previously described.
-  async function fetchSchema(table?: string, overrideConn?: { id: string, driver_type: string }) {
+  //
+  // `database` is the actual database name to connect to (e.g. "mydb" for
+  // PostgreSQL multi-DB setups).  When provided it is forwarded in params so
+  // that buildConnString on the backend opens the correct database.  This is
+  // distinct from the schema/dbFilter derived from the table name, which is
+  // used as the DescribeSchema filter argument.
+  async function fetchSchema(table?: string, overrideConn?: { id: string, driver_type: string }, database?: string) {
     // choose connection info from override or reactive ref
     const conn = overrideConn || connRef?.value
     const id = conn?.id
@@ -280,8 +286,11 @@ export function useConnectionTree(connRef?: Ref<any | null>) {
     const params: Record<string, any> = {}
     if (cred)
       params.credential_blob = cred
+    // forward the actual database name so the backend DSN targets the right DB
+    if (database)
+      params.database = database
 
-    // split a qualified table name into database and table filters
+    // split a qualified table name into schema and table filters
     let dbFilter = ''
     let tblFilter = ''
     if (table) {
@@ -338,7 +347,7 @@ export function useConnectionTree(connRef?: Ref<any | null>) {
     getSchema,
     getAllSchemas,
     fetchSchema,
-    cache: treeCache,
     schemaCache,
+    cache: treeCache,
   }
 }

@@ -29,7 +29,7 @@ func (m *postgresqlPlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRe
 		Description: "PostgreSQL database driver",
 		Url:         "https://www.postgresql.org/",
 		Author:      "PostgreSQL Global Development Group",
-		Capabilities: []string{"query", "explain-query", "mutate-row"},
+		Capabilities: []string{"query", "explain-query", "mutate-row", "describe-schema"},
 		Tags:        []string{"sql", "relational"},
 		License:     "PostgreSQL",
 		IconUrl:     "https://www.postgresql.org/media/img/about/press/elephant.png",
@@ -378,12 +378,12 @@ WHERE t.table_type='BASE TABLE'
   )`
     args := []interface{}{}
     if req.Database != "" {
-        query += " AND table_catalog = ?"
         args = append(args, req.Database)
+        query += fmt.Sprintf(" AND t.table_schema = $%d", len(args))
     }
     if req.Table != "" {
-        query += " AND table_name = ?"
         args = append(args, req.Table)
+        query += fmt.Sprintf(" AND t.table_name = $%d", len(args))
     }
     rows, err := db.Query(query, args...)
     if err != nil {

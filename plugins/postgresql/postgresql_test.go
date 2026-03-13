@@ -278,6 +278,94 @@ func TestDescribeSchemaFiltersPartitions(t *testing.T) {
     }
 }
 
+// TestDescribeSchemaWithSchemaFilter verifies that passing Database= (a
+// postgres schema name like "public") appends a $1-style predicate against
+// t.table_schema, not table_catalog.
+func TestDescribeSchemaWithSchemaFilter(t *testing.T) {
+    orig := openPostgresDB
+    defer func() { openPostgresDB = orig }()
+
+    db, mock, err := sqlmock.New()
+    if err != nil {
+        t.Fatalf("failed to create mock: %v", err)
+    }
+    openPostgresDB = func(dsn string) (*sql.DB, error) { return db, nil }
+
+    // The query must contain "table_schema = $1" – not table_catalog or "?"
+    mock.ExpectQuery(`(?i)table_schema\s*=\s*\$1`).
+        WithArgs("public").
+        WillReturnRows(sqlmock.NewRows([]string{"table_schema", "table_name"}).
+            AddRow("public", "users"))
+    // column query for "public"."users"
+    mock.ExpectQuery(`(?i)information_schema\.columns`).
+        WithArgs("public", "users").
+        WillReturnRows(sqlmock.NewRows([]string{"column_name", "data_type", "is_nullable", "ordinal_position", "column_default"}).
+            AddRow("id", "integer", "NO", 1, nil))
+    // index query
+    mock.ExpectQuery(`(?i)pg_indexes`).
+        WithArgs("public", "users").
+        WillReturnRows(sqlmock.NewRows([]string{"indexname", "indexdef"}))
+
+    m := &postgresqlPlugin{}
+    resp, err := m.DescribeSchema(context.Background(), &plugin.DescribeSchemaRequest{
+        Connection: map[string]string{"dsn": "postgres://localhost/test?sslmode=disable"},
+        Database:   "public",
+    })
+    if err != nil {
+        t.Fatalf("DescribeSchema error: %v", err)
+    }
+    if len(resp.Tables) != 1 || resp.Tables[0].Name != "public.users" {
+        t.Errorf("expected public.users, got %+v", resp.Tables)
+    }
+    if len(resp.Tables[0].Columns) != 1 || resp.Tables[0].Columns[0].Name != "id" {
+        t.Errorf("expected column id, got %+v", resp.Tables[0].Columns)
+    }
+    if err := mock.ExpectationsWereMet(); err != nil {
+        t.Errorf("unmet expectations: %v", err)
+    }
+}
+
+// TestDescribeSchemaWithTableFilter verifies that passing both Database and
+// Table appends two numbered $1/$2 predicates.
+func TestDescribeSchemaWithTableFilter(t *testing.T) {
+    orig := openPostgresDB
+    defer func() { openPostgresDB = orig }()
+
+    db, mock, err := sqlmock.New()
+    if err != nil {
+        t.Fatalf("failed to create mock: %v", err)
+    }
+    openPostgresDB = func(dsn string) (*sql.DB, error) { return db, nil }
+
+    // Expect both $1 (schema) and $2 (table) predicates
+    mock.ExpectQuery(`(?i)table_schema\s*=\s*\$1[\s\S]*table_name\s*=\s*\$2`).
+        WithArgs("public", "orders").
+        WillReturnRows(sqlmock.NewRows([]string{"table_schema", "table_name"}).
+            AddRow("public", "orders"))
+    mock.ExpectQuery(`(?i)information_schema\.columns`).
+        WithArgs("public", "orders").
+        WillReturnRows(sqlmock.NewRows([]string{"column_name", "data_type", "is_nullable", "ordinal_position", "column_default"}))
+    mock.ExpectQuery(`(?i)pg_indexes`).
+        WithArgs("public", "orders").
+        WillReturnRows(sqlmock.NewRows([]string{"indexname", "indexdef"}))
+
+    m := &postgresqlPlugin{}
+    resp, err := m.DescribeSchema(context.Background(), &plugin.DescribeSchemaRequest{
+        Connection: map[string]string{"dsn": "postgres://localhost/test?sslmode=disable"},
+        Database:   "public",
+        Table:      "orders",
+    })
+    if err != nil {
+        t.Fatalf("DescribeSchema error: %v", err)
+    }
+    if len(resp.Tables) != 1 || resp.Tables[0].Name != "public.orders" {
+        t.Errorf("expected public.orders, got %+v", resp.Tables)
+    }
+    if err := mock.ExpectationsWereMet(); err != nil {
+        t.Errorf("unmet expectations: %v", err)
+    }
+}
+
 func TestGetDatabaseFromConn(t *testing.T) {
     // explicit field
     if got := getDatabaseFromConn(map[string]string{"database": "foo"}); got != "foo" {
