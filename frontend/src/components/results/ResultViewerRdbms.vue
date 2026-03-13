@@ -1,9 +1,9 @@
 <script setup>
 import { NButton, NIcon, NTag } from 'naive-ui'
 import { computed, defineEmits, h, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRowEditorModal } from '@/composables/useRowEditorModal'
 import { getDataTypeColor, Key, Pencil, Pin, Trash } from '@/lib/icons'
 import RowEditorModal from './RowEditorModal.vue'
-import { useRowEditorModal } from '@/composables/useRowEditorModal'
 
 const props = defineProps({
   // Already-unwrapped RDBMS payload: { columns: [...], rows: [...] }
@@ -38,6 +38,32 @@ function togglePin(key) {
     pinnedColumns.value = [...pinnedColumns.value, key]
   }
 }
+
+// compute a default filter string equality comparison from a row object
+function defaultFilterFor(row) {
+  if (!row)
+    return ''
+  const parts = []
+  for (const key in row) {
+    if (key === 'key')
+      continue
+    const val = row[key]
+    // simple quoting; frontend-sanitization is responsibility of plugin/driver
+    parts.push(`${key} = '${val}'`)
+  }
+  return parts.join(' AND ')
+}
+
+const {
+  showEditor,
+  editorOperation,
+  editorRow,
+  editorFilter,
+  editorSource,
+  openEditor,
+  closeEditor,
+  performMutation,
+} = useRowEditorModal(defaultFilterFor)
 
 const tableColumns = computed(() => {
   let cols = props.payload.columns || []
@@ -205,26 +231,6 @@ const tableData = computed(() => {
     return obj
   })
 })
-
-// compute a default filter string equality comparison from a row object
-function defaultFilterFor(row) {
-  if (!row)
-    return ''
-  const parts = []
-  for (const key in row) {
-    if (key === 'key')
-      continue
-    const val = row[key]
-    // simple quoting; frontend-sanitization is responsibility of plugin/driver
-    parts.push(`${key} = '${val}'`)
-  }
-  return parts.join(' AND ')
-}
-
-const {
-  showEditor, editorOperation, editorRow, editorFilter, editorSource,
-  openEditor, closeEditor, performMutation,
-} = useRowEditorModal(defaultFilterFor)
 
 const rowKeyFunction = row => row && row.key
 
