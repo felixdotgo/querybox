@@ -23,7 +23,7 @@ func (m *mongoPlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRequest
         Description:  "MongoDB document database driver",
         Url:          "https://www.mongodb.com/",
         Author:       "MongoDB Inc.",
-        Capabilities: []string{"query", "mutate-row"},
+        Capabilities: []string{"query"},
         Tags:         []string{"nosql", "document"},
         License:      "Apache-2.0",
         IconUrl:      "https://www.mongodb.com/assets/images/global/favicon.ico",

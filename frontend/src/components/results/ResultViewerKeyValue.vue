@@ -15,9 +15,26 @@ const props = defineProps({
     type: Object,
     required: false,
   },
+  capabilities: {
+    type: Array,
+    default: () => [],
+  },
 })
 
 const emit = defineEmits(['mutated'])
+
+// Capability-gated visibility — backward-compat: "mutate-row" alone shows both buttons.
+const showActions = computed(() => props.capabilities.includes('mutate-row'))
+const showEdit = computed(() => {
+  if (!showActions.value) return false
+  const hasSub = props.capabilities.includes('mutate-row::edit') || props.capabilities.includes('mutate-row::delete')
+  return !hasSub || props.capabilities.includes('mutate-row::edit')
+})
+const showDelete = computed(() => {
+  if (!showActions.value) return false
+  const hasSub = props.capabilities.includes('mutate-row::edit') || props.capabilities.includes('mutate-row::delete')
+  return !hasSub || props.capabilities.includes('mutate-row::delete')
+})
 
 // Normalise: payload may be { data: {...} } or a flat object of k/v pairs.
 const entries = computed(() => props.payload.data || props.payload || {})
@@ -43,15 +60,15 @@ async function handleMutation(params) {
       :key="k"
       :label="String(k)"
     >
-      <div class="flex justify-end gap-2 mb-1">
-        <NButton size="small" tertiary title="Edit entry" @click.stop.prevent="openEditor('update', { [k]: v })">
+      <div v-if="showEdit || showDelete" class="flex justify-end gap-2 mb-1">
+        <NButton v-if="showEdit" size="small" tertiary title="Edit entry" @click.stop.prevent="openEditor('update', { [k]: v })">
           <template #icon>
             <NIcon :size="16">
               <Pencil />
             </NIcon>
           </template>
         </NButton>
-        <NButton size="small" tertiary title="Delete entry" @click.stop.prevent="openEditor('delete', { [k]: v })">
+        <NButton v-if="showDelete" size="small" tertiary title="Delete entry" @click.stop.prevent="openEditor('delete', { [k]: v })">
           <template #icon>
             <NIcon :size="16">
               <Trash />

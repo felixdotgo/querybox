@@ -21,9 +21,30 @@ const props = defineProps({
     type: Object,
     required: false,
   },
+  capabilities: {
+    type: Array,
+    default: () => [],
+  },
 })
 
 const emit = defineEmits(['mutated'])
+
+// Derive which action buttons are permitted by the plugin's declared capabilities.
+// Backward-compat: a plugin that declares only "mutate-row" (no sub-capabilities)
+// is treated as supporting both edit and delete.
+const showActions = computed(() => props.capabilities.includes('mutate-row'))
+const showEdit = computed(() => {
+  if (!showActions.value)
+    return false
+  const hasSub = props.capabilities.includes('mutate-row::edit') || props.capabilities.includes('mutate-row::delete')
+  return !hasSub || props.capabilities.includes('mutate-row::edit')
+})
+const showDelete = computed(() => {
+  if (!showActions.value)
+    return false
+  const hasSub = props.capabilities.includes('mutate-row::edit') || props.capabilities.includes('mutate-row::delete')
+  return !hasSub || props.capabilities.includes('mutate-row::delete')
+})
 
 const COL_MIN_WIDTH = 120
 const COL_CHAR_WIDTH = 9 // approximate px per character for column title
@@ -197,42 +218,51 @@ const tableColumns = computed(() => {
   // Pinned columns first (in pin order), then the rest in original order
   const pinned = pinnedColumns.value.map(k => colMap.get(k)).filter(Boolean)
   const unpinned = [...colMap.values()].filter(c => !c.fixed)
-  // add actions column at end
+  // add actions column at end only when the plugin supports mutate-row
+  if (!showActions.value)
+    return [...pinned, ...unpinned]
+
   const actionsCol = {
     className: 'shadow-md bg-slate-50 w-[120px]',
     title: 'Actions',
     key: 'actions',
     align: 'center',
-    width: 120, // fixed pixel width
-    minWidth: 120, // prevent shrinking
-    resizable: false, // user may not adjust size
+    width: 120,
+    minWidth: 120,
+    resizable: false,
     fixed: 'right',
-    render: row => h('div', { class: 'flex gap-1 justify-center' }, [
-      h(NButton, {
-        class: 'cursor-pointer',
-        title: 'Edit row',
-        onClick: (e) => {
-          e.stopPropagation()
-          const named = namedRow(row)
-          editorRowKey.value = row.key
-          openEditor('update', named, sourceFrom(), pkFilterFor(named))
-        },
-        tertiary: true,
-        size: 'small',
-      }, h(NIcon, { size: 16 }, { default: () => h(Pencil) })),
-      h(NButton, {
-        class: 'cursor-pointer',
-        title: 'Delete row',
-        onClick: (e) => {
-          e.stopPropagation()
-          const named = namedRow(row)
-          editorRowKey.value = row.key
-          openEditor('delete', named, sourceFrom(), pkFilterFor(named))
-        },
-        tertiary: true,
-        size: 'small',
-      }, h(NIcon, { size: 16 }, { default: () => h(Trash) })),
-    ]),
+    render: (row) => {
+      const btns = []
+      if (showEdit.value) {
+        btns.push(h(NButton, {
+          class: 'cursor-pointer',
+          title: 'Edit row',
+          onClick: (e) => {
+            e.stopPropagation()
+            const named = namedRow(row)
+            editorRowKey.value = row.key
+            openEditor('update', named, sourceFrom(), pkFilterFor(named))
+          },
+          tertiary: true,
+          size: 'small',
+        }, h(NIcon, { size: 16 }, { default: () => h(Pencil) })))
+      }
+      if (showDelete.value) {
+        btns.push(h(NButton, {
+          class: 'cursor-pointer',
+          title: 'Delete row',
+          onClick: (e) => {
+            e.stopPropagation()
+            const named = namedRow(row)
+            editorRowKey.value = row.key
+            openEditor('delete', named, sourceFrom(), pkFilterFor(named))
+          },
+          tertiary: true,
+          size: 'small',
+        }, h(NIcon, { size: 16 }, { default: () => h(Trash) })))
+      }
+      return h('div', { class: 'flex gap-1 justify-center' }, btns)
+    },
   }
   return [...pinned, ...unpinned, actionsCol]
 })

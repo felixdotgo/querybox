@@ -18,9 +18,26 @@ const props = defineProps({
     type: Object,
     required: false,
   },
+  capabilities: {
+    type: Array,
+    default: () => [],
+  },
 })
 
 const emit = defineEmits(['mutated'])
+
+// Capability-gated visibility — backward-compat: "mutate-row" alone shows both buttons.
+const showActions = computed(() => props.capabilities.includes('mutate-row'))
+const showEdit = computed(() => {
+  if (!showActions.value) return false
+  const hasSub = props.capabilities.includes('mutate-row::edit') || props.capabilities.includes('mutate-row::delete')
+  return !hasSub || props.capabilities.includes('mutate-row::edit')
+})
+const showDelete = computed(() => {
+  if (!showActions.value) return false
+  const hasSub = props.capabilities.includes('mutate-row::edit') || props.capabilities.includes('mutate-row::delete')
+  return !hasSub || props.capabilities.includes('mutate-row::delete')
+})
 
 const {
   showEditor, editorOperation, editorRow: editorDoc, editorFilter, editorSource,
@@ -53,15 +70,15 @@ const docs = computed(() => {
         :key="idx"
         class="doc-row"
       >
-        <div class="flex justify-end gap-2 mb-1">
-          <NButton size="small" tertiary title="Edit document" @click.stop.prevent="openEditor('update', doc)">
+        <div v-if="showEdit || showDelete" class="flex justify-end gap-2 mb-1">
+          <NButton v-if="showEdit" size="small" tertiary title="Edit document" @click.stop.prevent="openEditor('update', doc)">
             <template #icon>
               <NIcon :size="16">
                 <Pencil />
               </NIcon>
             </template>
           </NButton>
-          <NButton size="small" tertiary title="Delete document" @click.stop.prevent="openEditor('delete', doc)">
+          <NButton v-if="showDelete" size="small" tertiary title="Delete document" @click.stop.prevent="openEditor('delete', doc)">
             <template #icon>
               <NIcon :size="16">
                 <Trash />

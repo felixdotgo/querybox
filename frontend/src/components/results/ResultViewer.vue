@@ -21,6 +21,11 @@ const props = defineProps({
     type: Object,
     required: false,
   },
+  // plugin capabilities array forwarded from the tab context.
+  capabilities: {
+    type: Array,
+    default: () => [],
+  },
 })
 
 const payload = computed(() => {
@@ -101,10 +106,11 @@ const viewType = computed(() => {
       :payload="payload"
       :schema="props.schema"
       :connection="props.connection"
+      :capabilities="props.capabilities"
       @mutated="$emit('mutated')"
     />
-    <ResultViewerDocument v-else-if="viewType === 'document'" :payload="payload" @mutated="$emit('mutated')" />
-    <ResultViewerKeyValue v-else-if="viewType === 'kv'" :payload="payload" @mutated="$emit('mutated')" />
+    <ResultViewerDocument v-else-if="viewType === 'document'" :payload="payload" :connection="props.connection" :capabilities="props.capabilities" @mutated="$emit('mutated')" />
+    <ResultViewerKeyValue v-else-if="viewType === 'kv'" :payload="payload" :connection="props.connection" :capabilities="props.capabilities" @mutated="$emit('mutated')" />
     <div v-else class="text-gray-500">
       No Results
     </div>
