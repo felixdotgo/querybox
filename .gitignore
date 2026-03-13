@@ -3,6 +3,8 @@ bin
 frontend/dist
 frontend/node_modules
 build/linux/appimage/build
+build/linux/appimage/querybox
+build/linux/appimage/querybox.png
 build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
 data
 !data/.gitkeep
