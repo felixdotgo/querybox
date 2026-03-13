@@ -1,5 +1,5 @@
 <script setup>
-import { NButton, NForm, NFormItem, NInput, NModal } from 'naive-ui'
+import { NButton, NFlex, NForm, NFormItem, NInput, NModal } from 'naive-ui'
 import { computed, ref, watch } from 'vue'
 
 const props = defineProps({
@@ -10,6 +10,15 @@ const props = defineProps({
   source: String,
 })
 const emit = defineEmits(['update:show', 'submit', 'cancel'])
+
+// Writable computed so NModal's built-in close button (closable) correctly
+// propagates update:show back to the parent rather than attempting a direct
+// prop mutation (which is a Vue 3 readonly-prop violation and would leave the
+// parent's showEditor ref stuck at true, preventing subsequent openings).
+const visible = computed({
+  get: () => props.show,
+  set: val => emit('update:show', val),
+})
 
 // local copies so editing doesn't mutate props directly
 const localValues = ref({})
@@ -40,7 +49,7 @@ function handleCancel() {
 </script>
 
 <template>
-  <NModal v-model:show="props.show" :title="props.operation === 'delete' ? 'Confirm Delete' : 'Edit Row'" closable>
+  <NModal v-model:show="visible" preset="card" :style="{ width: '560px', maxWidth: '92vw' }" :title="props.operation === 'delete' ? 'Confirm Delete' : 'Edit Row'" closable>
     <div v-if="props.operation === 'update'">
       <NForm>
         <NFormItem v-for="(v, k) in localValues" :key="k" :label="k">
@@ -51,23 +60,15 @@ function handleCancel() {
     <div v-else>
       <p>Are you sure you want to delete this row?</p>
     </div>
-    <div class="mt-4">
-      <NForm>
-        <NFormItem label="Source">
-          <NInput v-model:value="localSource" placeholder="(optional)" />
-        </NFormItem>
-        <NFormItem label="Filter">
-          <NInput v-model:value="localFilter" />
-        </NFormItem>
-      </NForm>
-    </div>
     <template #footer>
-      <NButton @click="handleCancel">
-        Cancel
-      </NButton>
-      <NButton type="primary" @click="handleSubmit">
-        {{ props.operation === 'delete' ? 'Delete' : 'Save' }}
-      </NButton>
+      <NFlex justify="space-between" align="center">
+        <NButton class="w-28" quaternary @click="handleCancel">
+          Cancel
+        </NButton>
+        <NButton class="w-28" type="primary" @click="handleSubmit">
+          {{ props.operation === 'delete' ? 'Delete' : 'Save' }}
+        </NButton>
+      </NFlex>
     </template>
   </NModal>
 </template>

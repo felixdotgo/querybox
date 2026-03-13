@@ -54,6 +54,39 @@ function defaultFilterFor(row) {
   return parts.join(' AND ')
 }
 
+// Build a WHERE filter using only primary-key columns when schema provides
+// them; falls back to all columns (via defaultFilterFor) when no PKs are known.
+function pkFilterFor(row) {
+  const schemaCols = (props.schema && Array.isArray(props.schema.columns)) ? props.schema.columns : []
+  const pkNames = schemaCols.filter(c => c.primary_key).map(c => c.name)
+  if (pkNames.length === 0)
+    return defaultFilterFor(row)
+  const parts = []
+  for (const key in row) {
+    if (!pkNames.includes(key))
+      continue
+    parts.push(`${key} = '${row[key]}'`)
+  }
+  return parts.join(' AND ')
+}
+
+// Derive the source table name from the schema prop (e.g. "employees.users").
+function sourceFrom() {
+  return (props.schema && props.schema.name) ? props.schema.name : ''
+}
+function namedRow(row) {
+  let cols = props.payload.columns || []
+  if (!Array.isArray(cols)) {
+    cols = Array.from(cols)
+  }
+  const obj = {}
+  cols.forEach((c, i) => {
+    const name = c.name || `col${i}`
+    obj[name] = row[`col${i}`]
+  })
+  return obj
+}
+
 const {
   showEditor,
   editorOperation,
@@ -63,7 +96,7 @@ const {
   openEditor,
   closeEditor,
   performMutation,
-} = useRowEditorModal(defaultFilterFor)
+} = useRowEditorModal()
 
 const tableColumns = computed(() => {
   let cols = props.payload.columns || []
@@ -169,14 +202,22 @@ const tableColumns = computed(() => {
       h(NButton, {
         class: 'cursor-pointer',
         title: 'Edit row',
-        onClick: (e) => { e.stopPropagation(); openEditor('update', row) },
+        onClick: (e) => {
+          e.stopPropagation()
+          const named = namedRow(row)
+          openEditor('update', named, sourceFrom(), pkFilterFor(named))
+        },
         tertiary: true,
         size: 'small',
       }, h(NIcon, { size: 16 }, { default: () => h(Pencil) })),
       h(NButton, {
         class: 'cursor-pointer',
         title: 'Delete row',
-        onClick: (e) => { e.stopPropagation(); openEditor('delete', row) },
+        onClick: (e) => {
+          e.stopPropagation()
+          const named = namedRow(row)
+          openEditor('delete', named, sourceFrom(), pkFilterFor(named))
+        },
         tertiary: true,
         size: 'small',
       }, h(NIcon, { size: 16 }, { default: () => h(Trash) })),

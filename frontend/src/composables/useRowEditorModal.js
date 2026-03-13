@@ -14,11 +14,11 @@ export function useRowEditorModal(buildFilter) {
   const editorFilter = ref('')
   const editorSource = ref('')
 
-  function openEditor(op, row) {
+  function openEditor(op, row, source = '', filter = null) {
     editorOperation.value = op
     editorRow.value = row
-    editorFilter.value = buildFilter ? buildFilter(row) : ''
-    editorSource.value = ''
+    editorFilter.value = filter !== null ? filter : (buildFilter ? buildFilter(row) : '')
+    editorSource.value = source
     showEditor.value = true
   }
 

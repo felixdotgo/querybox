@@ -74,3 +74,76 @@ func TestBuildDSNDatabaseOverrideWithColon(t *testing.T) {
         t.Errorf("override not applied, dsn=%q", dsn)
     }
 }
+
+func TestMutateRowEmptySource(t *testing.T) {
+    m := &mysqlPlugin{}
+    resp, err := m.MutateRow(context.Background(), &plugin.MutateRowRequest{
+        Source:    "",
+        Filter:    "id = 1",
+        Operation: 2, // UPDATE
+    })
+    if err != nil {
+        t.Fatalf("unexpected error: %v", err)
+    }
+    if resp.Success {
+        t.Error("expected success=false for empty source")
+    }
+    if resp.Error == "" {
+        t.Error("expected non-empty error message for empty source")
+    }
+}
+
+func TestMutateRowEmptyFilter(t *testing.T) {
+    m := &mysqlPlugin{}
+    resp, err := m.MutateRow(context.Background(), &plugin.MutateRowRequest{
+        Source:    "users",
+        Filter:    "",
+        Operation: 3, // DELETE
+    })
+    if err != nil {
+        t.Fatalf("unexpected error: %v", err)
+    }
+    if resp.Success {
+        t.Error("expected success=false for empty filter")
+    }
+    if resp.Error == "" {
+        t.Error("expected non-empty error message for empty filter")
+    }
+}
+
+func TestMutateRowUnsupportedOperation(t *testing.T) {
+    m := &mysqlPlugin{}
+    resp, err := m.MutateRow(context.Background(), &plugin.MutateRowRequest{
+        Source:    "users",
+        Filter:    "id = 1",
+        Operation: 1, // INSERT – not yet supported
+    })
+    if err != nil {
+        t.Fatalf("unexpected error: %v", err)
+    }
+    if resp.Success {
+        t.Error("expected success=false for unsupported operation")
+    }
+    if resp.Error == "" {
+        t.Error("expected non-empty error message for unsupported operation")
+    }
+}
+
+func TestMutateRowUpdateEmptyValues(t *testing.T) {
+    m := &mysqlPlugin{}
+    resp, err := m.MutateRow(context.Background(), &plugin.MutateRowRequest{
+        Source:    "users",
+        Filter:    "id = 1",
+        Operation: 2, // UPDATE
+        Values:    map[string]string{},
+    })
+    if err != nil {
+        t.Fatalf("unexpected error: %v", err)
+    }
+    if resp.Success {
+        t.Error("expected success=false for UPDATE with no values")
+    }
+    if resp.Error == "" {
+        t.Error("expected non-empty error message for UPDATE with no values")
+    }
+}

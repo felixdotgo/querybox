@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/url"
+	"sort"
 	"strings"
 
 	"github.com/felixdotgo/querybox/pkg/certs"
@@ -491,10 +492,79 @@ func (m *mysqlPlugin) TestConnection(ctx context.Context, req *plugin.TestConnec
 	return &plugin.TestConnectionResponse{Ok: true, Message: "Connection successful"}, nil
 }
 
-// MutateRow is a placeholder implementation for the MySQL driver.  It does
-// not actually perform any database operations and always reports success.
-// Future work will flesh out real insert/update/delete behaviour.
+// escapeBacktick doubles any backtick characters in s so it can be safely
+// embedded between MySQL backtick identifier delimiters.
+func escapeBacktick(s string) string {
+	return strings.ReplaceAll(s, "`", "``")
+}
+
+// quoteSource wraps a table reference in backticks, handling the optional
+// "database.table" form produced by DescribeSchema (e.g. "employees.users"
+// becomes `employees`.`users`).
+func quoteSource(source string) string {
+	parts := strings.SplitN(source, ".", 2)
+	if len(parts) == 2 {
+		return fmt.Sprintf("`%s`.`%s`", escapeBacktick(parts[0]), escapeBacktick(parts[1]))
+	}
+	return fmt.Sprintf("`%s`", escapeBacktick(source))
+}
+
+// MutateRow executes an UPDATE or DELETE against the MySQL database identified
+// by req.Connection.  req.Source must be the unquoted table name and
+// req.Filter must be a non-empty SQL WHERE expression; both are supplied by
+// the frontend modal.  Column values are passed as query parameters so they
+// cannot alter the statement structure; source and filter are backtick-quoted
+// and forwarded verbatim, which is appropriate for a developer-facing tool
+// where the user controls those fields directly.
 func (m *mysqlPlugin) MutateRow(ctx context.Context, req *plugin.MutateRowRequest) (*plugin.MutateRowResponse, error) {
+	if req.Source == "" {
+		return &plugin.MutateRowResponse{Success: false, Error: "source (table name) is required"}, nil
+	}
+	if req.Filter == "" {
+		return &plugin.MutateRowResponse{Success: false, Error: "filter (WHERE clause) is required"}, nil
+	}
+
+	dsn, err := buildDSN(req.Connection)
+	if err != nil || dsn == "" {
+		return &plugin.MutateRowResponse{Success: false, Error: "invalid connection"}, nil
+	}
+
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		return &plugin.MutateRowResponse{Success: false, Error: fmt.Sprintf("open error: %v", err)}, nil
+	}
+	defer db.Close()
+
+	var query string
+	var args []interface{}
+
+	switch req.Operation {
+	case pluginpb.PluginV1_MutateRowRequest_UPDATE:
+		if len(req.Values) == 0 {
+			return &plugin.MutateRowResponse{Success: false, Error: "values are required for UPDATE"}, nil
+		}
+		// Collect column names in sorted order so the SET clause is deterministic.
+		keys := make([]string, 0, len(req.Values))
+		for k := range req.Values {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		setParts := make([]string, 0, len(keys))
+		for _, k := range keys {
+			setParts = append(setParts, fmt.Sprintf("`%s`=?", escapeBacktick(k)))
+			args = append(args, req.Values[k])
+		}
+		query = fmt.Sprintf("UPDATE %s SET %s WHERE %s",
+			quoteSource(req.Source), strings.Join(setParts, ", "), req.Filter)
+	case pluginpb.PluginV1_MutateRowRequest_DELETE:
+		query = fmt.Sprintf("DELETE FROM %s WHERE %s", quoteSource(req.Source), req.Filter)
+	default:
+		return &plugin.MutateRowResponse{Success: false, Error: "operation not supported"}, nil
+	}
+
+	if _, err := db.ExecContext(ctx, query, args...); err != nil {
+		return &plugin.MutateRowResponse{Success: false, Error: err.Error()}, nil
+	}
 	return &plugin.MutateRowResponse{Success: true}, nil
 }
 
