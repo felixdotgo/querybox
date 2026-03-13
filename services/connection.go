@@ -107,7 +107,9 @@ func NewConnectionService() (*ConnectionService, error) {
 		return nil, fmt.Errorf("initialize connections schema: %w", err)
 	}
 
-	svc := &ConnectionService{db: db, cred: credmanager.New()}
+	// Use the same directory as connections.db so both databases land in the
+	// same per-user config location regardless of the working directory.
+	svc := &ConnectionService{db: db, cred: credmanager.NewWithPath(filepath.Join(dir, "credentials.db"))}
 
 	return svc, nil
 }
@@ -125,6 +127,10 @@ func (s *ConnectionService) Shutdown() {
 
 // hasColumn reports whether the `connections` table contains a column named
 // `col`.
+//
+// MIGRATION DEBT: this per-column probe is an ad-hoc schema migration
+// mechanism. Future schema changes should use a `schema_version` table and
+// explicit up-migrations rather than adding more hasColumn calls here.
 func (s *ConnectionService) hasColumn(col string) (bool, error) {
 	if !s.closeable() {
 		return false, errors.New("connections database not initialized")

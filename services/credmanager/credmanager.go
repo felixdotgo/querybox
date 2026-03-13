@@ -59,11 +59,16 @@ func probeKeyring() bool {
 	return err == nil
 }
 
-// New constructs a credential manager using the default database path
-// (`data/credentials.db`).
+// New constructs a credential manager using the per-user configuration
+// directory (e.g. ~/.config/querybox/credentials.db on Linux). It falls back
+// to the legacy relative path "data/credentials.db" only when
+// os.UserConfigDir() is unavailable.
 func New() *CredManager {
-	path := filepath.Join(defaultDBDir, defaultDBFile)
-	return NewWithPath(path)
+	dir := defaultDBDir // legacy fallback (cwd-relative)
+	if cfgDir, err := os.UserConfigDir(); err == nil && cfgDir != "" {
+		dir = filepath.Join(cfgDir, "querybox")
+	}
+	return NewWithPath(filepath.Join(dir, defaultDBFile))
 }
 
 // NewWithPath constructs a credential manager. If the OS keyring probe

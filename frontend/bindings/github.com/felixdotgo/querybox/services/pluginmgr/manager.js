@@ -47,24 +47,6 @@ export function DescribeSchema(name, connection, database, table) {
 }
 
 /**
- * DisablePlugin is not applicable for on-demand execution model.
- * @param {string} name
- * @returns {$CancellablePromise<void>}
- */
-export function DisablePlugin(name) {
-    return $Call.ByID(2618184216, name);
-}
-
-/**
- * EnablePlugin is not applicable for on-demand execution model.
- * @param {string} name
- * @returns {$CancellablePromise<void>}
- */
-export function EnablePlugin(name) {
-    return $Call.ByID(3573057673, name);
-}
-
-/**
  * ExecPlugin runs the named plugin with the provided connection info, query
  * and optional options map.  Under the hood the manager spawns the binary,
  * writes a protobuf-JSON `PluginV1_ExecRequest` to stdin, and reads a

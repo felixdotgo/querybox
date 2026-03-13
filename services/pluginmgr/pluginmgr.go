@@ -258,16 +258,24 @@ func populateUserDir(userDir, bundle string) {
 		}
 		src := filepath.Join(bundle, e.Name())
 		dst := filepath.Join(userDir, e.Name())
-		info, err := os.Stat(src)
+		srcInfo, err := os.Stat(src)
 		if err != nil || !isExecutable(src) {
 			continue
+		}
+		// Skip overwrite when the destination already matches the source by
+		// size and modification time. This avoids replacing a plugin binary
+		// that may be in active use by another instance of the application.
+		if dstInfo, err := os.Stat(dst); err == nil {
+			if dstInfo.Size() == srcInfo.Size() && !dstInfo.ModTime().Before(srcInfo.ModTime()) {
+				continue
+			}
 		}
 		// read and write bytes; then explicitly chmod to ensure mode isn't
 		// stripped by the process umask (common issue on Unix).
 		if b, err := os.ReadFile(src); err == nil {
 			tmp := dst + ".tmp"
-			if werr := os.WriteFile(tmp, b, info.Mode()); werr == nil {
-				_ = os.Chmod(tmp, info.Mode())
+			if werr := os.WriteFile(tmp, b, srcInfo.Mode()); werr == nil {
+				_ = os.Chmod(tmp, srcInfo.Mode())
 				// rename into place; on Windows this will replace existing file only
 				_ = os.Rename(tmp, dst)
 			}
@@ -520,6 +528,14 @@ func (m *Manager) ListPlugins() []PluginInfo {
 // The `caller` parameter is a label used in log/error messages (e.g.
 // "ExecPlugin", "GetConnectionTree") so that each call site produces
 // recognisable diagnostics.
+//
+// Serialization contract: requests are serialized with encoding/json because
+// all request structs are plain Go types (no proto enums or oneofs). Responses
+// are parsed with protojson because plugins marshal proto messages with
+// protojson. Do NOT change request types to generated proto messages without
+// also switching request serialization to protojson.Marshal — encoding/json
+// would emit numeric enum values and Go field names instead of proto names,
+// causing parse errors on the plugin side.
 func (m *Manager) runPluginCommand(caller, name, command string, timeout time.Duration, reqBytes []byte) ([]byte, error) {
 	name = strings.TrimSuffix(name, filepath.Ext(name))
 	m.mu.Lock()
@@ -606,7 +622,10 @@ func (m *Manager) ExecPlugin(name string, connection map[string]string, query st
 
 	// build request envelope; include options map if supplied
 	req := execRequest{Connection: connection, Query: query, Options: options}
-	b, _ := json.Marshal(&req)
+	b, err := json.Marshal(&req)
+	if err != nil {
+		return nil, fmt.Errorf("ExecPlugin: marshal request: %w", err)
+	}
 
 	outB, err := m.runPluginCommand("ExecPlugin", name, "exec", defaultPluginTimeout, b)
 	if err != nil {
@@ -650,7 +669,7 @@ func (m *Manager) ExecPlugin(name string, connection map[string]string, query st
 				}
 			}
 		}
-		fmt.Printf("ExecPlugin: JSON unmarshal failed: %v\n", err)
+		m.emitLog(services.LogLevelError, fmt.Sprintf("ExecPlugin: JSON unmarshal failed for plugin '%s': %v", name, err))
 		// fallback to embedding the raw output in a KV map under "_".
 		return &plugin.ExecResponse{
 			Result: &pluginpb.PluginV1_ExecResult{
@@ -663,7 +682,6 @@ func (m *Manager) ExecPlugin(name string, connection map[string]string, query st
 		}, nil
 	}
 	if resp.Error != "" {
-		fmt.Printf("ExecPlugin: plugin returned error field: %s\n", resp.Error)
 		m.emitLog(services.LogLevelError, fmt.Sprintf("ExecPlugin: plugin '%s' returned error: %s", name, resp.Error))
 		return resp, fmt.Errorf("ExecPlugin: plugin error: %s", resp.Error)
 	}
@@ -693,7 +711,10 @@ func (m *Manager) GetConnectionTree(name string, connection map[string]string) (
 	m.emitLog(services.LogLevelInfo, fmt.Sprintf("GetConnectionTree: fetching tree (driver: %s)", name))
 
 	req := plugin.ConnectionTreeRequest{Connection: connection}
-	b, _ := json.Marshal(&req)
+	b, err := json.Marshal(&req)
+	if err != nil {
+		return nil, fmt.Errorf("GetConnectionTree: marshal request: %w", err)
+	}
 
 	outB, err := m.runPluginCommand("GetConnectionTree", name, "connection-tree", defaultPluginTimeout, b)
 	if err != nil {
@@ -729,7 +750,10 @@ func (m *Manager) MutateRow(name string, connection map[string]string, operation
 	m.emitLog(services.LogLevelInfo, fmt.Sprintf("MutateRow: (driver: %s) op=%v source=%q filter=%q", name, operation, source, filter))
 
 	req := mutateRowRequest{Connection: connection, Operation: operation, Source: source, Values: values, Filter: filter}
-	b, _ := json.Marshal(&req)
+	b, err := json.Marshal(&req)
+	if err != nil {
+		return nil, fmt.Errorf("MutateRow: marshal request: %w", err)
+	}
 
 	outB, err := m.runPluginCommand("MutateRow", name, "mutate-row", defaultPluginTimeout, b)
 	if err != nil {
@@ -755,7 +779,10 @@ func (m *Manager) DescribeSchema(name string, connection map[string]string, data
 	m.emitLog(services.LogLevelInfo, fmt.Sprintf("DescribeSchema: fetching schema (driver: %s)", name))
 
 	req := plugin.DescribeSchemaRequest{Connection: connection, Database: database, Table: table}
-	b, _ := json.Marshal(&req)
+	b, err := json.Marshal(&req)
+	if err != nil {
+		return nil, fmt.Errorf("DescribeSchema: marshal request: %w", err)
+	}
 
 	outB, err := m.runPluginCommand("DescribeSchema", name, "describe-schema", defaultPluginTimeout, b)
 	if err != nil {
@@ -785,7 +812,10 @@ func (m *Manager) TestConnection(name string, connection map[string]string) (*pl
 	m.emitLog(services.LogLevelInfo, fmt.Sprintf("TestConnection: testing (driver: %s)", name))
 
 	req := plugin.TestConnectionRequest{Connection: connection}
-	b, _ := json.Marshal(&req)
+	b, err := json.Marshal(&req)
+	if err != nil {
+		return nil, fmt.Errorf("TestConnection: marshal request: %w", err)
+	}
 
 	outB, err := m.runPluginCommand("TestConnection", name, "test-connection", fastPluginTimeout, b)
 	if err != nil {
@@ -793,6 +823,9 @@ func (m *Manager) TestConnection(name string, connection map[string]string) (*pl
 	}
 
 	var resp plugin.TestConnectionResponse
+	if len(outB) == 0 {
+		return &resp, nil
+	}
 	if err := json.Unmarshal(outB, &resp); err != nil {
 		return nil, fmt.Errorf("TestConnection: invalid response json: %w", err)
 	}
@@ -854,16 +887,6 @@ func (m *Manager) GetPluginAuthForms(name string) (map[string]*plugin.AuthForm, 
 	return ret, nil
 }
 
-// EnablePlugin is not applicable for on-demand execution model.
-func (m *Manager) EnablePlugin(name string) error {
-	return fmt.Errorf("EnablePlugin: enable/disable not supported for on-demand plugins")
-}
-
-// DisablePlugin is not applicable for on-demand execution model.
-func (m *Manager) DisablePlugin(name string) error {
-	return fmt.Errorf("DisablePlugin: enable/disable not supported for on-demand plugins")
-}
-
 // Shutdown is a no-op; there is no background scanner to stop.
 // It is kept so Wails can still call the lifecycle method without error.
 func (m *Manager) Shutdown() {}
@@ -876,7 +899,10 @@ func (m *Manager) GetCompletionFields(name string, connection map[string]string,
 	m.emitLog(services.LogLevelInfo, fmt.Sprintf("GetCompletionFields: fetching fields (driver: %s, collection: %s)", name, collection))
 
 	req := plugin.GetCompletionFieldsRequest{Connection: connection, Database: database, Collection: collection}
-	b, _ := json.Marshal(&req)
+	b, err := json.Marshal(&req)
+	if err != nil {
+		return &plugin.GetCompletionFieldsResponse{}, nil
+	}
 
 	outB, err := m.runPluginCommand("GetCompletionFields", name, "completion-fields", fastPluginTimeout, b)
 	if err != nil {
