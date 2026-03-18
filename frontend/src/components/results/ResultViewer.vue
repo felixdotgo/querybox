@@ -107,7 +107,6 @@ const viewType = computed(() => {
       :schema="props.schema"
       :connection="props.connection"
       :capabilities="props.capabilities"
-      display-directives="show:lazy"
       @mutated="$emit('mutated')"
     />
     <ResultViewerDocument
@@ -115,7 +114,6 @@ const viewType = computed(() => {
       :payload="payload"
       :connection="props.connection"
       :capabilities="props.capabilities"
-      display-directives="show:lazy"
       @mutated="$emit('mutated')"
     />
     <ResultViewerKeyValue
@@ -123,7 +121,6 @@ const viewType = computed(() => {
       :payload="payload"
       :connection="props.connection"
       :capabilities="props.capabilities"
-      display-directives="show:lazy"
       @mutated="$emit('mutated')"
     />
     <div v-else class="text-gray-500">

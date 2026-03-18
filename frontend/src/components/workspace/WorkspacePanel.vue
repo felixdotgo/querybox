@@ -320,6 +320,7 @@ defineExpose({ openTab })
         :name="tab.key"
         :tab="tab.title || 'Untitled'"
         class="!p-0"
+        display-directives="show:lazy"
         closable
       >
         <template #default>
@@ -383,7 +384,7 @@ defineExpose({ openTab })
               <template #prefix>
                 &nbsp;
               </template>
-              <n-tab-pane name="result" tab="Result">
+              <n-tab-pane name="result" tab="Result" display-directives="show:lazy">
                 <template #default>
                   <ResultViewer v-if="tab.result" :result="tab.result" :schema="currentSchema" :connection="tab.context?.conn" :capabilities="tab.context?.capabilities ?? []" @mutated="handleRefresh(tab)" />
                   <pre
@@ -397,7 +398,7 @@ defineExpose({ openTab })
                   </div>
                 </template>
               </n-tab-pane>
-              <n-tab-pane v-if="tab.explainResult || tab.explainError" name="explain" tab="Explain">
+              <n-tab-pane v-if="tab.explainResult || tab.explainError" name="explain" tab="Explain" display-directives="show:lazy">
                 <template #default>
                   <ResultViewer v-if="tab.explainResult" :result="tab.explainResult" class="pb-10" />
                   <pre
@@ -408,7 +409,7 @@ defineExpose({ openTab })
                   </pre>
                 </template>
               </n-tab-pane>
-              <n-tab-pane v-if="currentSchema" name="structure" tab="Structure">
+              <n-tab-pane v-if="currentSchema" name="structure" tab="Structure" display-directives="show:lazy">
                 <template #default>
                   <TableStructureViewer :schema="currentSchema" />
                 </template>
