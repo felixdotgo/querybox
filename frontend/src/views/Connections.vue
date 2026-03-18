@@ -10,8 +10,8 @@ import {
 import { AuthFormRenderer } from '@/components/connections'
 import DbIcon from '@/components/DbIcon.vue'
 import { SafeZone } from '@/components/layout'
-import { usePlugins } from '@/composables/usePlugins'
 import { useAuthForms } from '@/composables/useAuthForms'
+import { usePlugins } from '@/composables/usePlugins'
 import { PluginType } from '@/lib/enums'
 
 const notification = useNotification()
@@ -25,8 +25,12 @@ const testResult = ref(null) // null | { ok: boolean, message: string }
 
 // AuthForms state
 const {
-  authForms, selectedAuthForm, authValues,
-  resetAuthState, loadAuthForms, serializeCredential,
+  authForms,
+  selectedAuthForm,
+  authValues,
+  resetAuthState,
+  loadAuthForms,
+  serializeCredential,
 } = useAuthForms()
 
 const form = ref({ name: '', driver: '', cred: '' })
@@ -125,7 +129,8 @@ async function testConnection() {
   try {
     let cred = form.value.cred
     const serialized = serializeCredential()
-    if (serialized) cred = serialized
+    if (serialized)
+      cred = serialized
     const params = { credential_blob: cred }
     const res = await TestConnection(form.value.driver.trim(), params)
     if (res) {

@@ -4,7 +4,6 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ConnectionsPanel } from '@/components/connections'
 import { AppMenuBar, LogsPanel, SafeZone } from '@/components/layout'
 import { WorkspacePanel } from '@/components/workspace'
-import { ChevronDown, Terminal } from '@/lib/icons'
 
 const isMac = navigator.userAgent.includes('Mac')
 const menuBarRef = ref(null)

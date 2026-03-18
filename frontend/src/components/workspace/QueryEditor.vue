@@ -3,8 +3,14 @@ import { VueMonacoEditor } from '@guolao/vue-monaco-editor'
 import { onUnmounted, ref, watch } from 'vue'
 import { useTabCompletion } from '@/composables/useTabCompletion'
 import {
-  SQL_KEYWORDS, PGSQL_EXTRA, MYSQL_EXTRA, SQLITE_EXTRA,
-  AQL_KEYWORDS, REDIS_COMMANDS, SQL_FUNCTIONS, SQL_TYPES,
+  AQL_KEYWORDS,
+  MYSQL_EXTRA,
+  PGSQL_EXTRA,
+  REDIS_COMMANDS,
+  SQL_FUNCTIONS,
+  SQL_KEYWORDS,
+  SQL_TYPES,
+  SQLITE_EXTRA,
 } from '@/lib/languageDefinitions'
 
 const props = defineProps({

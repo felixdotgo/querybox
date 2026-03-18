@@ -22,7 +22,8 @@ export function useAuthForms() {
    */
   function initFieldDefaults(formKey) {
     const def = authForms.value[formKey]
-    if (!def) return
+    if (!def)
+      return
     for (const f of def.fields || []) {
       if (authValues.value[f.name] === undefined || authValues.value[f.name] === null) {
         authValues.value[f.name] = f.value ?? ''
@@ -32,7 +33,8 @@ export function useAuthForms() {
 
   // Keep authValues in sync when the user switches auth form tabs.
   watch(selectedAuthForm, (newKey) => {
-    if (!newKey) return
+    if (!newKey)
+      return
     initFieldDefaults(newKey)
   })
 
@@ -49,7 +51,8 @@ export function useAuthForms() {
     resetAuthState()
     try {
       const resp = await GetPluginAuthForms(driverType)
-      if (!resp || Object.keys(resp).length === 0) return false
+      if (!resp || Object.keys(resp).length === 0)
+        return false
 
       authForms.value = resp
       const formKeys = Object.keys(authForms.value)
@@ -57,7 +60,8 @@ export function useAuthForms() {
       // Select the appropriate form tab
       if (saved?.form && authForms.value[saved.form]) {
         selectedAuthForm.value = saved.form
-      } else {
+      }
+      else {
         selectedAuthForm.value = formKeys[0]
       }
 
@@ -71,7 +75,8 @@ export function useAuthForms() {
       }
 
       return true
-    } catch (err) {
+    }
+    catch (err) {
       console.debug('GetPluginAuthForms (ignored):', err)
       return false
     }
@@ -82,7 +87,8 @@ export function useAuthForms() {
    * Returns empty string if no auth forms are active.
    */
   function serializeCredential() {
-    if (Object.keys(authForms.value || {}).length === 0) return ''
+    if (Object.keys(authForms.value || {}).length === 0)
+      return ''
     return JSON.stringify({ form: selectedAuthForm.value, values: authValues.value })
   }
 

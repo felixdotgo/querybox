@@ -1,10 +1,10 @@
 <script setup>
 import { NButton, NIcon } from 'naive-ui'
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
+import { useRowEditorModal } from '@/composables/useRowEditorModal'
 import { Pencil, Trash } from '@/lib/icons'
 import JsonNode from './JsonNode.vue'
 import RowEditorModal from './RowEditorModal.vue'
-import { useRowEditorModal } from '@/composables/useRowEditorModal'
 
 const props = defineProps({
   // Already-unwrapped document payload: either
@@ -29,19 +29,27 @@ const emit = defineEmits(['mutated'])
 // Capability-gated visibility — backward-compat: "mutate-row" alone shows both buttons.
 const showActions = computed(() => props.capabilities.includes('mutate-row'))
 const showEdit = computed(() => {
-  if (!showActions.value) return false
+  if (!showActions.value)
+    return false
   const hasSub = props.capabilities.includes('mutate-row::edit') || props.capabilities.includes('mutate-row::delete')
   return !hasSub || props.capabilities.includes('mutate-row::edit')
 })
 const showDelete = computed(() => {
-  if (!showActions.value) return false
+  if (!showActions.value)
+    return false
   const hasSub = props.capabilities.includes('mutate-row::edit') || props.capabilities.includes('mutate-row::delete')
   return !hasSub || props.capabilities.includes('mutate-row::delete')
 })
 
 const {
-  showEditor, editorOperation, editorRow: editorDoc, editorFilter, editorSource,
-  openEditor, closeEditor, performMutation,
+  showEditor,
+  editorOperation,
+  editorRow: editorDoc,
+  editorFilter,
+  editorSource,
+  openEditor,
+  closeEditor,
+  performMutation,
 } = useRowEditorModal()
 
 async function handleMutation(params) {

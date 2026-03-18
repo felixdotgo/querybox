@@ -1,7 +1,7 @@
 <script setup>
 import { Events } from '@wailsio/runtime'
 import { useNotification } from 'naive-ui'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { CloseEditConnectionWindow } from '@/bindings/github.com/felixdotgo/querybox/services/app'
 import {
   GetConnection,
@@ -23,8 +23,12 @@ const connectionDriverName = ref('')
 const form = ref({ name: '' })
 
 const {
-  authForms, selectedAuthForm, authValues,
-  resetAuthState, loadAuthForms, serializeCredential,
+  authForms,
+  selectedAuthForm,
+  authValues,
+  resetAuthState,
+  loadAuthForms,
+  serializeCredential,
 } = useAuthForms()
 const rawCred = ref('')
 
@@ -107,7 +111,8 @@ async function testConnection() {
   try {
     let cred = rawCred.value
     const serialized = serializeCredential()
-    if (serialized) cred = serialized
+    if (serialized)
+      cred = serialized
     const res = await TestConnection(connectionDriverType.value, { credential_blob: cred })
     if (res) {
       testResult.value = { ok: res.ok, message: res.message || (res.ok ? 'Connection successful' : 'Connection failed') }
@@ -133,7 +138,8 @@ async function saveConnection() {
   try {
     let cred = rawCred.value
     const serialized = serializeCredential()
-    if (serialized) cred = serialized
+    if (serialized)
+      cred = serialized
     await UpdateConnection(connectionId.value, form.value.name.trim(), cred)
     await CloseEditConnectionWindow()
   }

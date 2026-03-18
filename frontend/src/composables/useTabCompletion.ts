@@ -6,7 +6,7 @@ import { useConnectionTree } from '@/composables/useConnectionTree'
 
 // Module-level cache: connId:collection -> FieldInfo[] so results survive
 // tab switches and aren't refetched for every editor keystroke.
-const completionFieldsCache = new Map<string, Array<{ name: string; type: string }>>()
+const completionFieldsCache = new Map<string, Array<{ name: string, type: string }>>()
 
 /**
  * Per-tab completion data composable.
@@ -69,7 +69,7 @@ export function useTabCompletion(tabRef: Ref<any>) {
    * @param {string} collection
    * @returns {Promise<Array<{name:string, type?:string}>>} cached or fetched completion fields
    */
-  async function getCompletionFields(collection: string): Promise<Array<{ name: string; type: string }>> {
+  async function getCompletionFields(collection: string): Promise<Array<{ name: string, type: string }>> {
     if (!collection)
       return []
     const key = cacheKey(collection)

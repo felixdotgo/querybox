@@ -1,9 +1,9 @@
 <script setup>
 import { NButton, NIcon } from 'naive-ui'
-import { computed, defineEmits, ref } from 'vue'
+import { computed, defineEmits } from 'vue'
+import { useRowEditorModal } from '@/composables/useRowEditorModal'
 import { Pencil, Trash } from '@/lib/icons'
 import RowEditorModal from './RowEditorModal.vue'
-import { useRowEditorModal } from '@/composables/useRowEditorModal'
 
 const props = defineProps({
   // Already-unwrapped KV payload: { data: { key: value, ... } }
@@ -26,12 +26,14 @@ const emit = defineEmits(['mutated'])
 // Capability-gated visibility — backward-compat: "mutate-row" alone shows both buttons.
 const showActions = computed(() => props.capabilities.includes('mutate-row'))
 const showEdit = computed(() => {
-  if (!showActions.value) return false
+  if (!showActions.value)
+    return false
   const hasSub = props.capabilities.includes('mutate-row::edit') || props.capabilities.includes('mutate-row::delete')
   return !hasSub || props.capabilities.includes('mutate-row::edit')
 })
 const showDelete = computed(() => {
-  if (!showActions.value) return false
+  if (!showActions.value)
+    return false
   const hasSub = props.capabilities.includes('mutate-row::edit') || props.capabilities.includes('mutate-row::delete')
   return !hasSub || props.capabilities.includes('mutate-row::delete')
 })
@@ -40,8 +42,14 @@ const showDelete = computed(() => {
 const entries = computed(() => props.payload.data || props.payload || {})
 
 const {
-  showEditor, editorOperation, editorRow, editorFilter, editorSource,
-  openEditor: _openEditor, closeEditor, performMutation,
+  showEditor,
+  editorOperation,
+  editorRow,
+  editorFilter,
+  editorSource,
+  openEditor: _openEditor,
+  closeEditor,
+  performMutation,
 } = useRowEditorModal()
 
 function openEditor(op, row) {

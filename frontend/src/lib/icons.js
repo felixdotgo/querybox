@@ -24,10 +24,10 @@ import {
   Folder,
   Grid,
   Key,
-  Pencil,
   // tree / navigation
   Layers,
   Library,
+  Pencil,
   Pin,
   Play,
   Refresh,
@@ -55,6 +55,7 @@ export {
   Key, // primary key indicator
   Layers, // driver group node
   Library, // node_type === "database"
+  Pencil, // generic edit/pencil icon for row‑mutation, etc.
   Pin, // pinned column indicator (filled)
   Play, // execute query button
   Refresh, // "Refresh" action on connection row
@@ -63,7 +64,6 @@ export {
   Terminal, // logs panel header
   Time, // planning time (clock)
   Trash, // "Delete" action on connection row
-  Pencil, // generic edit/pencil icon for row‑mutation, etc.
 }
 
 // colours used to style datatype badges in result viewer headers

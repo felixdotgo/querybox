@@ -4,8 +4,6 @@ import ResultViewerDocument from './ResultViewerDocument.vue'
 import ResultViewerKeyValue from './ResultViewerKeyValue.vue'
 import ResultViewerRdbms from './ResultViewerRdbms.vue'
 
-defineEmits(['mutated'])
-
 const props = defineProps({
   result: {
     type: Object,
@@ -27,6 +25,8 @@ const props = defineProps({
     default: () => [],
   },
 })
+
+defineEmits(['mutated'])
 
 const payload = computed(() => {
   // Unwrap the ExecResult envelope produced by core-service.
@@ -107,10 +107,25 @@ const viewType = computed(() => {
       :schema="props.schema"
       :connection="props.connection"
       :capabilities="props.capabilities"
+      display-directives="show:lazy"
       @mutated="$emit('mutated')"
     />
-    <ResultViewerDocument v-else-if="viewType === 'document'" :payload="payload" :connection="props.connection" :capabilities="props.capabilities" @mutated="$emit('mutated')" />
-    <ResultViewerKeyValue v-else-if="viewType === 'kv'" :payload="payload" :connection="props.connection" :capabilities="props.capabilities" @mutated="$emit('mutated')" />
+    <ResultViewerDocument
+      v-else-if="viewType === 'document'"
+      :payload="payload"
+      :connection="props.connection"
+      :capabilities="props.capabilities"
+      display-directives="show:lazy"
+      @mutated="$emit('mutated')"
+    />
+    <ResultViewerKeyValue
+      v-else-if="viewType === 'kv'"
+      :payload="payload"
+      :connection="props.connection"
+      :capabilities="props.capabilities"
+      display-directives="show:lazy"
+      @mutated="$emit('mutated')"
+    />
     <div v-else class="text-gray-500">
       No Results
     </div>
