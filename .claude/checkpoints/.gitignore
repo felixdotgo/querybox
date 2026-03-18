@@ -1,0 +1,3 @@
+# Checkpoint files are ephemeral session artifacts — do not commit
+*
+!.gitignore

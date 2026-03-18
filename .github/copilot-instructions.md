@@ -1,64 +1,46 @@
-# Global Copilot Instructions (Repository Entry Point)
+# AI Instructions
 
-This file is the universal baseline for all AI models in this repository.
+## Precedence
+Platform policies > User request > Core protocol > Language overlay > Project-specific
 
-## 1) Purpose
-- Provide one consistent instruction entrypoint for all tasks.
-- Route specialized behavior to layered instruction files.
-- Keep outputs precise, verifiable, and SDLC-aware.
+Conflict → follow higher precedence; state assumptions.
 
-## 2) Repository Instruction Map
-- `.github/instructions/core.copilot-instructions.md`
-  - Cross-language behavior, SDLC lifecycle gates, completion contract.
-- `.github/instructions/go.copilot-instructions.md`
-  - Go-specific coding standards.
-- `.github/instructions/js.copilot-instructions.md`
-  - JavaScript/TypeScript-specific coding standards.
-- `.github/instructions/php.copilot-instructions.md`
-  - Laravel/PHP-specific coding standards.
-- `.github/instructions/system-design.copilot-instructions.md`
-  - Architecture/system-design output constraints.
-- `.github/instructions/project-space-template.copilot-instructions.md`
-  - Placeholder template for project-specific customization.
-- `.github/skills/problem-decomposition/SKILL.md`
-  - AI-agent skill for execution-ready problem decomposition.
-- `.github/skills/debugging-root-cause/SKILL.md`
-  - AI-agent skill for evidence-based debugging and root-cause isolation.
-- `.github/skills/testing-verification/SKILL.md`
-  - AI-agent skill for layered verification and confidence building.
-- `.github/skills/clean-code-refactor/SKILL.md`
-  - AI-agent skill for safe, behavior-preserving refactoring.
-- `.github/skills/security-reliability/SKILL.md`
-  - AI-agent skill for trust-boundary security and reliability hardening.
-- `.github/skills/delivery-sdlc-execution/SKILL.md`
-  - AI-agent skill for end-to-end SDLC execution and handoff.
+## Communication
+- Default: **Vietnamese**; English only on explicit request
+- Code artifacts (identifiers, comments, tests, errors): **always English**
+- Clarify ambiguities before implementing; ask minimum questions needed
+- **Terminology preservation**: never translate technical terms or domain terms (Ubiquitous Language) — keep original English form in all contexts: docs translation, conversation, code review, domain modeling. Translating domain terms breaks shared understanding (DDD) and causes ambiguity. Translate surrounding prose only.
 
-Skills are complementary guidance and do not override core precedence rules.
+## Skills
+Reusable skill guides in `.claude/skills/`:
+- `problem-decomposition` — broad/ambiguous tasks, multi-file, multi-phase
+- `debugging-root-cause` — bugs, regressions, flaky tests, incidents
+- `testing-verification` — verification after non-trivial changes
+- `clean-code-refactor` — tech debt, readability, maintainability
+- `security-reliability` — trust boundaries, data handling, stability
+- `delivery-sdlc-execution` — multi-gate delivery with release + ops handoff
+- `failure-escalation` — auto-escalate from retry → re-plan → user when fixes fail repeatedly
+- `session-continuity` — checkpoint progress for long tasks; auto-resume across sessions
+- `docs-discovery` — fast documentation lookup; INDEX.md-first strategy
+- `domain-onboarding` — bootstrap domain knowledge from codebase for new projects
+- `code-review-pr` — structured PR/MR review with severity + actionable suggestions
+- `agent-orchestration` — multi-agent parallel execution for large independent tasks
+- `migration-upgrade` — safe database migrations, dependency upgrades, framework bumps
 
-## 3) Precedence and Conflict Resolution
-When multiple instructions apply, use this order:
-1. Platform/system safety policies
-2. User request requirements
-3. `.github/instructions/core.copilot-instructions.md`
-4. Relevant language/system-design overlay
-5. Project-specific custom instruction (if created from template)
+## Failure Escalation
+- Max 2 fix attempts per approach; then switch approach via `debugging-root-cause`
+- After 2 failed approaches: re-plan via `problem-decomposition`
+- After re-plan still fails: stop and escalate to user with full report
+- See `failure-escalation` skill for detailed protocol
 
-If rules conflict, follow higher precedence and state assumptions explicitly.
+## Session Continuity
+- Multi-slice tasks: auto-checkpoint to `.claude/checkpoints/` after each slice
+- At ~85% context budget: finalize, checkpoint, stop with resume instructions
+- On resume: read latest checkpoint, verify file state, continue
+- See `session-continuity` skill for detailed protocol
 
-## 4) Default Operating Rules
-- Match user response language unless user requests a different language.
-- Keep code identifiers/comments/tests in English.
-- Use evidence-based analysis; avoid inventing APIs, fields, routes, or dependencies.
-- For implementation tasks, design/review tasks, and completion artifacts, follow core protocol canonical rules.
-
-## 5) Token Efficiency Policy Routing
-- Global anti token-burning rules are defined in `.github/instructions/core.copilot-instructions.md`.
-- Language overlays and skills must not redefine global budgets or stop conditions.
-- If any lower-level guidance conflicts with token-efficiency policy, core policy wins.
-
-## 6) Canonical Source Matrix
-- SDLC lifecycle gates: `.github/instructions/core.copilot-instructions.md`
-- Completion contract and final checklist: `.github/instructions/core.copilot-instructions.md`
-- Token budgets and exploration stop conditions: `.github/instructions/core.copilot-instructions.md`
-- Language-specific coding rules: corresponding files under `.github/instructions/`
-- Specialized workflows: corresponding files under `.github/skills/`
+## Documentation Discovery
+- If project has `docs/` directory: check `docs/INDEX.md` first
+- If no index: suggest creating one after first doc search
+- For domain questions: search docs before searching code
+- See `docs-discovery` skill for detailed protocol
