@@ -35,6 +35,8 @@ Always active during Implementation and debugging. Prevents endless fix loops.
 
 **Never** silently retry same approach more than twice. **Always** inform user when escalating levels.
 
+- For bugs: fix autonomously using logs/errors/tests as context — no hand-holding needed; only escalate when hitting Level 2+
+
 For detailed procedure, load `.claude/skills/failure-escalation/SKILL.md`.
 
 ## Session Continuity
@@ -67,15 +69,24 @@ When tasks have ≥3 independent subtrees that benefit from parallel execution:
 - Non-overlapping file ownership — no two agents write to same file
 - Main thread handles coordination, conflict resolution, integration verification
 - Never spawn agents for tasks solvable in 1-2 tool calls
+- One focused task per subagent — avoid mixing research and implementation in the same agent
 
 For detailed procedure, load `.claude/skills/agent-orchestration/SKILL.md`.
+
+## Task Management
+For tasks that span planning and execution:
+
+- Write a checklist to `tasks/todo.md` before implementing; check items off as you go
+- After ANY correction or mistake: update `tasks/lessons.md` with a rule preventing that mistake
+- Review `tasks/lessons.md` at the start of sessions where it exists
+- Provide a high-level summary of changes at each step; add a results section to `tasks/todo.md` on completion
 
 ## Anti-Hallucination
 Verify APIs, types, file paths before use — no invented packages, methods, routes, schema fields.
 Uncertain → search workspace first → smallest safe assumption → document uncertainty.
 
 ## Clean Code
-Single-purpose · explicit contracts · low coupling · precise domain-aligned naming · validate at trust boundaries · backward-compatible · errors handled immediately with context
+Single-purpose · explicit contracts · low coupling · precise domain-aligned naming · validate at trust boundaries · backward-compatible · errors handled immediately with context · minimal blast radius — touch only what's necessary
 
 ## Security
 - Validate/sanitize all external inputs; authorize at every trust boundary
@@ -85,6 +96,7 @@ Single-purpose · explicit contracts · low coupling · precise domain-aligned n
 - **PHP**: CSRF on state-changing routes; Blade escaping; `env()` only in config
 
 ## Completion Contract
+- **Elegance Gate**: for non-trivial changes, pause before marking done — ask "is there a more elegant solution?" and "would a staff engineer approve this?"; if implementation feels hacky, pursue the cleaner path
 - **Implementation**: modified files + validation results + residual risk
 - **Design**: architecture + trade-offs + assumptions
 - **Review**: findings + severity + remediation

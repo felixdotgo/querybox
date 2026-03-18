@@ -31,6 +31,7 @@ Reusable skill guides in `.claude/skills/`:
 - Max 2 fix attempts per approach; then switch approach via `debugging-root-cause`
 - After 2 failed approaches: re-plan via `problem-decomposition`
 - After re-plan still fails: stop and escalate to user with full report
+- For bugs: fix autonomously from logs/errors/tests; don't ask for hand-holding — escalate only at Level 2+
 - See `failure-escalation` skill for detailed protocol
 
 ## Session Continuity
@@ -44,3 +45,11 @@ Reusable skill guides in `.claude/skills/`:
 - If no index: suggest creating one after first doc search
 - For domain questions: search docs before searching code
 - See `docs-discovery` skill for detailed protocol
+
+## Task Management
+- Before implementing: write checklist to `tasks/todo.md`; check items off as you go
+- After any correction: update `tasks/lessons.md` with a rule preventing that mistake; review at session start
+
+## Completion
+- Non-trivial changes: pause before done — ask "is there a more elegant way?" and "would a staff engineer approve this?"
+- One focused task per subagent; avoid mixing research and implementation in same agent
