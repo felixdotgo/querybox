@@ -35,7 +35,7 @@ Always active during Implementation and debugging. Prevents endless fix loops.
 
 **Never** silently retry same approach more than twice. **Always** inform user when escalating levels.
 
-For detailed procedure, load `.claude/skills/failure-escalation.md`.
+For detailed procedure, load `.claude/skills/failure-escalation/SKILL.md`.
 
 ## Session Continuity
 For tasks spanning multiple slices or approaching context limits:
@@ -46,7 +46,7 @@ For tasks spanning multiple slices or approaching context limits:
 - At ~85% context usage: finalize current step, write checkpoint, STOP with resume instructions
 - On "continue"/"resume": read latest checkpoint → verify file state → continue from next slice
 
-For detailed procedure, load `.claude/skills/session-continuity.md`.
+For detailed procedure, load `.claude/skills/session-continuity/SKILL.md`.
 
 ## Documentation Discovery
 When user request may require project/domain knowledge from docs:
@@ -57,7 +57,7 @@ When user request may require project/domain knowledge from docs:
 - After creating/modifying docs, update `docs/INDEX.md` if it exists
 - Suggest creating `docs/INDEX.md` when `docs/` exists but index doesn't
 
-For detailed procedure, load `.claude/skills/docs-discovery.md`.
+For detailed procedure, load `.claude/skills/docs-discovery/SKILL.md`.
 
 ## Agent Orchestration
 When tasks have ≥3 independent subtrees that benefit from parallel execution:
@@ -68,7 +68,7 @@ When tasks have ≥3 independent subtrees that benefit from parallel execution:
 - Main thread handles coordination, conflict resolution, integration verification
 - Never spawn agents for tasks solvable in 1-2 tool calls
 
-For detailed procedure, load `.claude/skills/agent-orchestration.md`.
+For detailed procedure, load `.claude/skills/agent-orchestration/SKILL.md`.
 
 ## Anti-Hallucination
 Verify APIs, types, file paths before use — no invented packages, methods, routes, schema fields.
@@ -94,7 +94,7 @@ Single-purpose · explicit contracts · low coupling · precise domain-aligned n
   - **Domain language (DDD)**: domain terms are Ubiquitous Language — always preserve them exactly as defined in the domain glossary (e.g. `domain-<project>.md`). Translating domain terms breaks shared understanding between code, docs, and team communication. If a domain term exists in the glossary or codebase, use it as-is regardless of output language
 
 ## Skills
-For specialized workflows, load `.claude/skills/<name>.md`:
+For specialized workflows, load `.claude/skills/<name>/SKILL.md`:
 
 | Skill | Activate when |
 |-------|--------------|
