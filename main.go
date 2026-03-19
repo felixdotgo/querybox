@@ -2,7 +2,6 @@ package main
 
 import (
 	"embed"
-	_ "embed"
 	"log"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -18,6 +17,9 @@ import (
 
 //go:embed all:frontend/dist
 var assets embed.FS
+
+//go:embed build/appicon.png
+var appIcon []byte
 
 func init() {
 	// Register a custom event whose associated data type is string.
@@ -51,6 +53,7 @@ func main() {
 	app.App = application.New(application.Options{
 		Name:        "querybox",
 		Description: "A lightweight database management tool for executing and managing queries.",
+		Icon:        appIcon,
 		Services: []application.Service{
 			application.NewService(connSvc),
 			application.NewService(mgr),
