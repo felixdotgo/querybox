@@ -8,3 +8,7 @@ build/linux/appimage/querybox.png
 build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
 data
 !data/.gitkeep
+
+.github
+.claude
+CLAUDE.md
