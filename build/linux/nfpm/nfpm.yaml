@@ -37,7 +37,7 @@ contents:
       mode: 0755
 
   - src: "./build/appicon.png"
-    dst: "/usr/share/icons/hicolor/128x128/apps/querybox.png"
+    dst: "/usr/share/icons/hicolor/512x512/apps/querybox.png"
   - src: "./build/linux/querybox.desktop"
     dst: "/usr/share/applications/querybox.desktop"
 
