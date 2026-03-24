@@ -262,10 +262,22 @@ func (m *mysqlPlugin) DescribeSchema(ctx context.Context, req *plugin.DescribeSc
     return resp, nil
 }
 
+func applySortMySQL(query, column, direction string) string {
+	query = strings.TrimRight(strings.TrimSpace(query), ";")
+	return fmt.Sprintf("SELECT * FROM (%s) AS _sort ORDER BY `%s` %s", query, column, direction)
+}
+
 func (m *mysqlPlugin) Exec(ctx context.Context, req *plugin.ExecRequest) (*plugin.ExecResponse, error) {
 	if req.Options != nil {
 		if v, ok := req.Options["explain-query"]; ok && v == "yes" {
 			req.Query = "EXPLAIN " + req.Query
+		}
+		if col, ok := req.Options["sort-column"]; ok && col != "" {
+			dir := "ASC"
+			if strings.ToUpper(req.Options["sort-direction"]) == "DESC" {
+				dir = "DESC"
+			}
+			req.Query = applySortMySQL(req.Query, col, dir)
 		}
 	}
 	dsn, err := buildDSN(req.Connection)

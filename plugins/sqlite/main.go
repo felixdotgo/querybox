@@ -97,6 +97,11 @@ func driverDSN(c plugin.CredentialBlob) (driver, dsn string, err error) {
 	return "sqlite", dsn, nil
 }
 
+func applySortSQLite(query, column, direction string) string {
+	query = strings.TrimRight(strings.TrimSpace(query), ";")
+	return fmt.Sprintf(`SELECT * FROM (%s) AS _sort ORDER BY "%s" %s`, query, column, direction)
+}
+
 func (m *sqlitePlugin) Exec(ctx context.Context, req *plugin.ExecRequest) (*plugin.ExecResponse, error) {
 	// honour explain-request flag by prefixing the query; plugins may
 	// interpret this differently but most SQL drivers simply prepend
@@ -104,6 +109,13 @@ func (m *sqlitePlugin) Exec(ctx context.Context, req *plugin.ExecRequest) (*plug
 	if req.Options != nil {
 		if v, ok := req.Options["explain-query"]; ok && v == "yes" {
 			req.Query = "EXPLAIN " + req.Query
+		}
+		if col, ok := req.Options["sort-column"]; ok && col != "" {
+			dir := "ASC"
+			if strings.ToUpper(req.Options["sort-direction"]) == "DESC" {
+				dir = "DESC"
+			}
+			req.Query = applySortSQLite(req.Query, col, dir)
 		}
 	}
 

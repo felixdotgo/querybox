@@ -386,7 +386,7 @@ defineExpose({ openTab })
               </template>
               <n-tab-pane name="result" tab="Result" display-directives="show:lazy">
                 <template #default>
-                  <ResultViewer v-if="tab.result" :result="tab.result" :schema="currentSchema" :connection="tab.context?.conn" :capabilities="tab.context?.capabilities ?? []" @mutated="handleRefresh(tab)" />
+                  <ResultViewer v-if="tab.result" :result="tab.result" :schema="currentSchema" :connection="tab.context?.conn" :capabilities="tab.context?.capabilities ?? []" :query="tab.query" @mutated="handleRefresh(tab)" />
                   <pre
                     v-else-if="tab.error"
                     class="whitespace-pre-wrap p-4 text-red-600 bg-red-50 flex-1 overflow-auto font-mono text-sm"

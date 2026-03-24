@@ -445,10 +445,22 @@ WHERE t.table_type='BASE TABLE'
     return resp, nil
 }
 
+func applySortPQ(query, column, direction string) string {
+	query = strings.TrimRight(strings.TrimSpace(query), ";")
+	return fmt.Sprintf(`SELECT * FROM (%s) AS _sort ORDER BY "%s" %s`, query, column, direction)
+}
+
 func (m *postgresqlPlugin) Exec(ctx context.Context, req *plugin.ExecRequest) (*plugin.ExecResponse, error) {
 	if req.Options != nil {
 		if v, ok := req.Options["explain-query"]; ok && v == "yes" {
 			req.Query = "EXPLAIN " + req.Query
+		}
+		if col, ok := req.Options["sort-column"]; ok && col != "" {
+			dir := "ASC"
+			if strings.ToUpper(req.Options["sort-direction"]) == "DESC" {
+				dir = "DESC"
+			}
+			req.Query = applySortPQ(req.Query, col, dir)
 		}
 	}
 	dsn, err := buildConnString(req.Connection)

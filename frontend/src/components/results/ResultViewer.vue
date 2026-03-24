@@ -24,6 +24,10 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  query: {
+    type: String,
+    default: '',
+  },
 })
 
 defineEmits(['mutated'])
@@ -107,6 +111,7 @@ const viewType = computed(() => {
       :schema="props.schema"
       :connection="props.connection"
       :capabilities="props.capabilities"
+      :query="props.query"
       @mutated="$emit('mutated')"
     />
     <ResultViewerDocument
@@ -114,6 +119,7 @@ const viewType = computed(() => {
       :payload="payload"
       :connection="props.connection"
       :capabilities="props.capabilities"
+      :query="props.query"
       @mutated="$emit('mutated')"
     />
     <ResultViewerKeyValue
@@ -121,6 +127,7 @@ const viewType = computed(() => {
       :payload="payload"
       :connection="props.connection"
       :capabilities="props.capabilities"
+      :query="props.query"
       @mutated="$emit('mutated')"
     />
     <div v-else class="text-gray-500">

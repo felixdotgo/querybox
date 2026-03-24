@@ -121,6 +121,27 @@ If a plugin advertises `"explain-query"` in its `capabilities` array, the host r
 
 ---
 
+## Exec Options Convention
+
+The `exec` command accepts an optional `options` map (`map<string, string>`) to pass feature flags. Plugins should check for known keys and ignore unknown ones.
+
+| Option | Value | Description |
+|---|---|---|
+| `explain-query` | `"yes"` | Plugin prepends `EXPLAIN` to the query |
+| `sort-column` | column name string | Plugin appends `ORDER BY <col>` with dialect-specific identifier quoting |
+| `sort-direction` | `"asc"` or `"desc"` | Sort direction to use with `sort-column` (default: `"asc"`) |
+
+**Dialect quoting for `sort-column`:**
+| Plugin | Quote char | Example |
+|---|---|---|
+| `mysql` | `` ` `` (backtick) | `` ORDER BY `name` ASC `` |
+| `postgresql` | `"` (double-quote) | `ORDER BY "name" ASC` |
+| `sqlite` | `"` (double-quote) | `ORDER BY "name" ASC` |
+
+Plugins strip any existing `ORDER BY` clause before appending the new one (using `strings.LastIndex`).
+
+---
+
 ## Reference Plugins
 
 | Plugin | Commands | Capabilities | Notes |

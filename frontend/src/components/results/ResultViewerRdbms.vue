@@ -1,8 +1,9 @@
 <script setup>
-import { NButton, NIcon, NTag } from 'naive-ui'
-import { computed, defineEmits, h, onBeforeUnmount, onMounted, ref } from 'vue'
+import { NButton, NIcon, NSpin, NTag } from 'naive-ui'
+import { computed, defineEmits, h, onBeforeUnmount, onMounted, ref, toRef, watch } from 'vue'
 import { GetCredential } from '@/bindings/github.com/felixdotgo/querybox/services/connectionservice'
 import { ExecPlugin } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
+import { useResultSort } from '@/composables/useResultSort'
 import { useRowEditorModal } from '@/composables/useRowEditorModal'
 import { getDataTypeColor, Key, Pencil, Pin, Trash } from '@/lib/icons'
 import RowEditorModal from './RowEditorModal.vue'
@@ -25,9 +26,48 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  query: {
+    type: String,
+    default: '',
+  },
 })
 
 const emit = defineEmits(['mutated'])
+
+// Derive database name from schema (e.g. "employees.users" → "employees").
+// Passed to useResultSort so the sort re-execution targets the correct DB.
+const sortDatabase = computed(() => {
+  const name = props.schema?.name
+  if (name && typeof name === 'string' && name.includes('.'))
+    return name.split('.')[0]
+  return null
+})
+
+const {
+  sortStates,
+  isSorting,
+  sortedPayload,
+  handleSorterChange,
+  resetSort,
+} = useResultSort({
+  query: toRef(props, 'query'),
+  connection: toRef(props, 'connection'),
+  database: sortDatabase,
+})
+
+watch(() => props.payload, resetSort)
+
+// Prevent column resize from spuriously triggering the sorter handler.
+// When the user drags a resize handle, the mouseup can bubble to the column
+// header and fire @update:sorter.  We track resize intent and suppress the
+// sorter event while it is active.
+const isResizing = ref(false)
+let resizeMousedownListener = null
+
+function onSorterChange(state) {
+  if (isResizing.value) return
+  handleSorterChange(state)
+}
 
 // Derive which action buttons are permitted by the plugin's declared capabilities.
 // Backward-compat: a plugin that declares only "mutate-row" (no sub-capabilities)
@@ -98,16 +138,8 @@ function sourceFrom() {
   return (props.schema && props.schema.name) ? props.schema.name : ''
 }
 function namedRow(row) {
-  let cols = props.payload.columns || []
-  if (!Array.isArray(cols)) {
-    cols = Array.from(cols)
-  }
-  const obj = {}
-  cols.forEach((c, i) => {
-    const name = c.name || `col${i}`
-    obj[name] = row[`col${i}`]
-  })
-  return obj
+  const { key: _key, ...rest } = row
+  return rest
 }
 
 const {
@@ -158,7 +190,7 @@ const tableColumns = computed(() => {
         }
       }
     }
-    const key = `col${idx}`
+    const key = name
     const isPinned = pinnedColumns.value.includes(key)
     const width = Math.max(COL_MIN_WIDTH, display.length * COL_CHAR_WIDTH + 24)
 
@@ -206,6 +238,8 @@ const tableColumns = computed(() => {
         ]),
       key,
       align: 'left',
+      sorter: () => 0,
+      sortOrder: sortStates.value.get(key) ?? false,
       // fixed columns need explicit width, not just minWidth
       width,
       minWidth: width,
@@ -284,16 +318,34 @@ onMounted(() => {
   ro = new ResizeObserver(([entry]) => {
     tableHeight.value = Math.floor(entry.contentRect.height)
   })
-  if (wrapperRef.value)
+  if (wrapperRef.value) {
     ro.observe(wrapperRef.value)
+    resizeMousedownListener = (e) => {
+      if (e.target.closest('.n-data-table-resize-button')) {
+        isResizing.value = true
+        window.addEventListener('mouseup', () => {
+          // Small delay so the click event that fires after mouseup is still suppressed
+          setTimeout(() => { isResizing.value = false }, 50)
+        }, { once: true })
+      }
+    }
+    wrapperRef.value.addEventListener('mousedown', resizeMousedownListener)
+  }
 })
-onBeforeUnmount(() => ro?.disconnect())
+onBeforeUnmount(() => {
+  ro?.disconnect()
+  if (wrapperRef.value && resizeMousedownListener)
+    wrapperRef.value.removeEventListener('mousedown', resizeMousedownListener)
+})
 
 const tableData = computed(() => {
-  let rows = props.payload.rows || []
-  if (!Array.isArray(rows)) {
+  const source = sortedPayload.value || props.payload
+  let cols = source.columns || []
+  if (!Array.isArray(cols))
+    cols = Array.from(cols)
+  let rows = source.rows || []
+  if (!Array.isArray(rows))
     rows = Array.from(rows)
-  }
 
   return rows.map((r, rowIdx) => {
     const obj = { key: rowIdx }
@@ -308,7 +360,8 @@ const tableData = computed(() => {
         vals = r.getValues()
     }
     ;(vals || []).forEach((v, i) => {
-      obj[`col${i}`] = v
+      const colName = (cols[i] && cols[i].name) ? cols[i].name : `col${i}`
+      obj[colName] = v
     })
     // apply any in-place overrides from a targeted row refresh after UPDATE
     const overrides = rowOverrides.value.get(rowIdx)
@@ -350,10 +403,14 @@ async function refreshRow(rowKey, source, filter) {
       emit('mutated')
       return
     }
-    // map returned column values back to col0/col1/… keys
+    // map returned column values back to named column keys
     const freshVals = rows[0].Values ?? rows[0].values ?? []
+    const schemaCols = Array.isArray(props.payload.columns) ? props.payload.columns : []
     const patch = {}
-    freshVals.forEach((v, i) => { patch[`col${i}`] = v })
+    freshVals.forEach((v, i) => {
+      const colName = (schemaCols[i] && schemaCols[i].name) ? schemaCols[i].name : `col${i}`
+      patch[colName] = v
+    })
     rowOverrides.value = new Map(rowOverrides.value).set(rowKey, patch)
   }
   catch {
@@ -378,21 +435,24 @@ async function handleMutation(params) {
 
 <template>
   <div ref="wrapperRef" class="h-full w-full pb-10">
-    <n-data-table
-      :columns="tableColumns"
-      :data="tableData"
-      :row-key="rowKeyFunction"
-      :scroll-x="scrollX"
-      :max-height="tableHeight"
-      :height-for-row="heightForRow"
-      size="small"
-      :bordered="false"
-      :single-line="false"
-      striped
-      scrollable
-      resizable
-      class="w-full"
-    />
+    <n-spin :show="isSorting" description="Sorting...">
+      <n-data-table
+        :columns="tableColumns"
+        :data="tableData"
+        :row-key="rowKeyFunction"
+        :scroll-x="scrollX"
+        :max-height="tableHeight"
+        :height-for-row="heightForRow"
+        size="small"
+        :bordered="false"
+        :single-line="false"
+        striped
+        scrollable
+        resizable
+        class="w-full"
+        @update:sorter="onSorterChange"
+      />
+    </n-spin>
     <RowEditorModal
       v-model:show="showEditor"
       :operation="editorOperation"
