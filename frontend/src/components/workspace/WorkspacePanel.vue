@@ -1,6 +1,6 @@
 <script setup>
 import { NButton, NIcon, useNotification } from 'naive-ui'
-import { computed, onMounted, ref, toRef, watch } from 'vue'
+import { onMounted, ref, toRef, watch } from 'vue'
 import { ResultViewer } from '@/components/results'
 import { useConnectionTree } from '@/composables/useConnectionTree'
 import { Analytics, Play } from '@/lib/icons'
@@ -19,33 +19,19 @@ const emit = defineEmits(['tab-closed', 'active-connection-changed', 'refresh-ta
 const { getSchema, fetchSchema } = useConnectionTree(toRef(props, 'selectedConnection'))
 const notification = useNotification()
 
-const currentSchema = computed(() => {
-  // eslint-disable-next-line ts/no-use-before-define
-  const tab = tabs.value.find(t => t.key === activeTabKey.value)
-  if (!tab || !tab.context || !tab.context.node)
+function getSchemaForTab(tab) {
+  if (!tab?.context?.node)
     return null
-
-  // node.key may include conn prefix ("<conn.id>:"), strip if present
   let key = tab.context.node.key
-  if (key && typeof key === 'string' && tab.context?.conn && key.startsWith(`${tab.context.conn.id}:`)) {
+  if (key && typeof key === 'string' && tab.context?.conn && key.startsWith(`${tab.context.conn.id}:`))
     key = key.slice((`${tab.context.conn.id}:`).length)
-  }
-
-  // Deep tree plugins (e.g. PostgreSQL: db→schema→"Tables"→table) build
-  // hierarchical keys like "mydb:public:public.Tables:public.users".
-  // Extract only the last colon-separated segment so getSchema receives
-  // the actual node key (e.g. "public.users") regardless of depth.
   const lastColon = key ? key.lastIndexOf(':') : -1
-  if (lastColon !== -1) {
+  if (lastColon !== -1)
     key = key.slice(lastColon + 1)
-  }
-
   if (!key || typeof key !== 'string')
     return null
-  const schema = getSchema(key, tab.context.conn)
-  console.debug('currentSchema lookup', key, 'conn', tab.context?.conn?.id, schema)
-  return schema
-})
+  return getSchema(key, tab.context.conn)
+}
 const tabs = ref([])
 const activeTabKey = ref('')
 
@@ -257,7 +243,7 @@ function openTab(title, result, error, tabKey, version, context) {
   if (existing) {
     const idx = tabs.value.findIndex(t => t.key === key)
     if (idx !== -1) {
-      tabs.value.splice(idx, 1, newTab)
+      Object.assign(tabs.value[idx], newTab)
     }
     else {
       tabs.value.push(newTab)
@@ -386,7 +372,7 @@ defineExpose({ openTab })
               </template>
               <n-tab-pane name="result" tab="Result" display-directives="show:lazy">
                 <template #default>
-                  <ResultViewer v-if="tab.result" :result="tab.result" :schema="currentSchema" :connection="tab.context?.conn" :capabilities="tab.context?.capabilities ?? []" :query="tab.query" @mutated="handleRefresh(tab)" />
+                  <ResultViewer v-if="tab.result" :result="tab.result" :schema="getSchemaForTab(tab)" :connection="tab.context?.conn" :capabilities="tab.context?.capabilities ?? []" :query="tab.query" @mutated="handleRefresh(tab)" />
                   <pre
                     v-else-if="tab.error"
                     class="whitespace-pre-wrap p-4 text-red-600 bg-red-50 flex-1 overflow-auto font-mono text-sm"
@@ -409,9 +395,9 @@ defineExpose({ openTab })
                   </pre>
                 </template>
               </n-tab-pane>
-              <n-tab-pane v-if="currentSchema" name="structure" tab="Structure" display-directives="show:lazy">
+              <n-tab-pane v-if="getSchemaForTab(tab)" name="structure" tab="Structure" display-directives="show:lazy">
                 <template #default>
-                  <TableStructureViewer :schema="currentSchema" />
+                  <TableStructureViewer :schema="getSchemaForTab(tab)" />
                 </template>
               </n-tab-pane>
             </n-tabs>
