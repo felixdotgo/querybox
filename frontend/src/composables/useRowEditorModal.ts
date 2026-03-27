@@ -1,22 +1,20 @@
 import { useNotification } from 'naive-ui'
-import { ref } from 'vue'
+import { ref, type Ref } from 'vue'
+import type { MutationParams } from '@/lib/types'
 
 /**
  * Shared modal state and mutation helper for row editor modals used
  * across the three ResultViewer components (RDBMS, Document, KeyValue).
- *
- * @param {Function} [buildFilter] - optional function (row) => string that
- *   produces a default filter expression for the given row.
  */
-export function useRowEditorModal(buildFilter) {
+export function useRowEditorModal(buildFilter?: (row: Record<string, unknown>) => string) {
   const notification = useNotification()
-  const showEditor = ref(false)
-  const editorOperation = ref('update')
-  const editorRow = ref(null)
-  const editorFilter = ref('')
-  const editorSource = ref('')
+  const showEditor: Ref<boolean> = ref(false)
+  const editorOperation: Ref<string> = ref('update')
+  const editorRow: Ref<Record<string, unknown> | null> = ref(null)
+  const editorFilter: Ref<string> = ref('')
+  const editorSource: Ref<string> = ref('')
 
-  function openEditor(op, row, source = '', filter = null) {
+  function openEditor(op: string, row: Record<string, unknown>, source = '', filter: string | null = null): void {
     editorOperation.value = op
     editorRow.value = row
     editorFilter.value = filter !== null ? filter : (buildFilter ? buildFilter(row) : '')
@@ -24,11 +22,15 @@ export function useRowEditorModal(buildFilter) {
     showEditor.value = true
   }
 
-  function closeEditor() {
+  function closeEditor(): void {
     showEditor.value = false
   }
 
-  async function performMutation(connection, params, onMutated) {
+  async function performMutation(
+    connection: { id: string; driver_type: string },
+    params: MutationParams,
+    onMutated?: (info: { operation: string; source: string; filter: string }) => void,
+  ): Promise<void> {
     const { mutateRow } = await import('@/composables/useRowMutation')
     try {
       const res = await mutateRow(
@@ -48,9 +50,10 @@ export function useRowEditorModal(buildFilter) {
       notification.success({ title: opLabel, duration: 3000 })
       onMutated?.({ operation: params.operation, source: params.source, filter: params.filter })
     }
-    catch (err) {
+    catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err)
       console.error('mutation failed', err)
-      notification.error({ title: 'Mutation failed', content: err?.message || String(err), duration: 5000 })
+      notification.error({ title: 'Mutation failed', content: message, duration: 5000 })
     }
   }
 

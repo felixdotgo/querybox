@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
+	"github.com/felixdotgo/querybox/pkg/driverid"
 	"github.com/felixdotgo/querybox/services/credmanager"
 	"github.com/google/uuid"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -34,7 +34,7 @@ type Connection struct {
 // safe for concurrent use.
 type ConnectionService struct {
 	db   *sql.DB
-	cred *credmanager.CredManager
+	cred credmanager.CredentialStore
 	app  *application.App
 }
 
@@ -216,14 +216,9 @@ func (s *ConnectionService) GetConnection(ctx context.Context, id string) (Conne
 	return r, nil
 }
 
-// normalizeDriverType strips any filesystem extension (e.g. ".exe") from
-// a plugin identifier.  This ensures connections save the same driver name
-// across platforms and avoids persisting stale Windows-specific suffixes.
+// normalizeDriverType is a convenience alias for driverid.Normalize.
 func normalizeDriverType(dt string) string {
-    if dt == "" {
-        return dt
-    }
-    return strings.TrimSuffix(dt, filepath.Ext(dt))
+    return driverid.Normalize(dt)
 }
 
 // CreateConnection inserts a new connection record and returns it. The

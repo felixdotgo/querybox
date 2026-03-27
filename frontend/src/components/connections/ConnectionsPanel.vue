@@ -1,87 +1,28 @@
 <script setup>
-import { Events } from '@wailsio/runtime'
-import { NButton, NIcon, NSpin, useDialog, useNotification } from 'naive-ui'
-import { computed, h, onUnmounted, ref, watch } from 'vue'
+import { NButton, NIcon } from 'naive-ui'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   ShowConnectionsWindow,
-  ShowEditConnectionWindow,
 } from '@/bindings/github.com/felixdotgo/querybox/services/app'
-import {
-  DeleteConnection,
-  GetCredential,
-  ListConnections,
-} from '@/bindings/github.com/felixdotgo/querybox/services/connectionservice'
-// @ts-expect-error: may be generated after adding new methods
-import {
-  ExecPlugin,
-  ExecTreeAction,
-} from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
-import DbIcon from '@/components/DbIcon.vue'
 import { tagWithConnId, useConnectionTree } from '@/composables/useConnectionTree'
-// plugin capability cache keyed by plugin id (driver name) derived
-// from the global plugin list.
+import { useConnectionEvents } from '@/composables/useConnectionEvents'
+import { useTreeRenderers } from '@/composables/useTreeRenderers'
+import { useTreeActions } from '@/composables/useTreeActions'
 import { usePlugins } from '@/composables/usePlugins'
-import { getIconNameForDriver } from '@/lib/dbIcons'
-import {
-  AddCircle,
-  nodeTypeFallbackIcon,
-  nodeTypeIconMap,
-  Search,
-} from '@/lib/icons'
+import { AddCircle, Search } from '@/lib/icons'
+import { ShowEditConnectionWindow } from '@/bindings/github.com/felixdotgo/querybox/services/app'
 import ActionFormModal from './ActionFormModal.vue'
-import ConnectionEntryLabel from './ConnectionEntryLabel.vue'
-
-import ConnectionTreeItemLabel from './ConnectionTreeItemLabel.vue'
 
 const props = defineProps({
   activeConnectionId: { type: String, default: null },
 })
 
-// declare events emitted by this component
 const emit = defineEmits([
   'connection-selected',
   'query-result',
   'connection-opened',
 ])
-
-// helper exported for unit tests and the prose above runTreeAction
-// normalises node.key values from the connection tree.  It strips the
-// optional `<connId>:` prefix and then returns the characters preceding the
-// first '.' or ':' separator – that prefix represents the database name for
-// most drivers.  Returning `null` indicates nothing suitable was found.
-function extractDatabaseFromNodeKey(connId, nodeKey) {
-  if (!nodeKey || typeof nodeKey !== 'string') {
-    return null
-  }
-
-  let key = nodeKey
-  const prefix = `${connId}:`
-  if (key.startsWith(prefix)) {
-    key = key.slice(prefix.length)
-  }
-
-  const dot = key.indexOf('.')
-  const col = key.indexOf(':')
-  let cut = -1
-  if (dot !== -1 && col !== -1) {
-    cut = Math.min(dot, col)
-  }
-  else if (dot !== -1) {
-    cut = dot
-  }
-  else if (col !== -1) {
-    cut = col
-  }
-
-  if (cut !== -1) {
-    return key.slice(0, cut)
-  }
-
-  return null
-}
-
-const dialog = useDialog()
 
 const router = useRouter()
 async function openConnections() {
@@ -94,13 +35,6 @@ async function openConnections() {
 }
 
 // panel state -------------------------------------------------------------
-// `connectionTrees` is a shared cache where an entry exists iff the
-// connection has been "connected" at least once.  presence in this cache
-// is treated as the authoritative flag for whether a single-click on a
-// connection root should fetch the tree or simply toggle expansion.
-//
-// TODO: once the frontend has a unit-test harness, add tests covering
-// behaviour around cached vs uncached roots.
 const treeScrollRef = ref(null)
 const isScrolled = ref(false)
 const connections = ref([])
@@ -115,59 +49,63 @@ const pluginCaps = computed(() => {
   return map
 })
 
-// map plugin ID → PluginInfo for quick lookup (used for icon hints)
-function createPluginMap(pluginList) {
+const pluginMap = computed(() => {
   const m = {}
-  for (const p of pluginList || []) {
+  for (const p of plugins.value || []) {
     if (p && p.id) {
       m[p.id.toLowerCase()] = p
     }
   }
   return m
-}
+})
 
-const pluginMap = computed(() => createPluginMap(plugins.value))
-
-// track nodes that currently have an in-flight action/query
-// keyed by the node.key string.  the tree renderer uses this to show a
-// spinner in place of the normal icon so the user immediately sees that
-// something is happening when they click a leaf.
 const loadingNodes = ref({})
-
-// loading state for connect/reconnect buttons keyed by connection id
 const connecting = ref({})
-
-// pluginCaps is computed above; no async loader needed.
 const filter = ref('')
-// connectionTrees replaced by shared cache from composable
 const { cache: connectionTrees, load: loadConnectionTree, schemaCache } = useConnectionTree()
-const notification = useNotification()
 const selectedConnection = ref(null)
 const expandedKeys = ref([])
-const deleteModal = ref({ visible: false, conn: null })
-const actionModal = ref({ visible: false, action: null, conn: null, node: null })
+
+// --- Event handling (extracted to composable) ---
+const { loadConnections } = useConnectionEvents({
+  connections,
+  connectionTrees,
+  schemaCache,
+  selectedConnection,
+  expandedKeys,
+  loadingNodes,
+  filter,
+})
+
+// --- Tree actions (extracted to composable) ---
+const {
+  deleteModal,
+  actionModal,
+  runTreeAction,
+  fetchTreeFor,
+  handleAction,
+  handleSelect,
+  handleConnectionDblclick,
+  onActionModalSubmit,
+  confirmDelete,
+} = useTreeActions({
+  connections,
+  connectionTrees,
+  schemaCache,
+  expandedKeys,
+  loadingNodes,
+  connecting,
+  selectedConnection,
+  pluginCaps,
+  loadConnectionTree,
+  emit,
+})
 
 const defaultExpandedKeys = computed(() => {
-  // include every connection id so that roots are always visible when
-  // expansion state is reset.  `connectionTrees` only contains entries for
-  // connections whose tree has been loaded, so combining both ensures the
-  // first connection never vanishes after a search.
   const ids = new Set(Object.keys(connectionTrees))
   connections.value.forEach(c => ids.add(c.id))
   return Array.from(ids)
 })
-
-/**
- * Recursively stamps every node (and its descendants) with the owning
- * connection id.  This lets the three parentConn-finder loops below resolve
- * the correct connection in O(1) instead of scanning every loaded tree,
- * which previously picked the wrong driver when two connections shared a
- * node key such as "__server__".
- *
- * Also normalises node_type from proto enum integers (e.g. 2) to the
- * lowercase strings the rest of the component expects (e.g. "table").
- */
-// moved to composable; imported above
 
 const treeData = computed(() => {
   return (connections.value || []).map((cc) => {
@@ -176,8 +114,6 @@ const treeData = computed(() => {
   })
 })
 
-// Retain original node references — only slice the top-level connections array.
-// Child nodes are never cloned so all tree interactions remain intact.
 const filteredTreeData = computed(() => {
   const q = (filter.value || '').toLowerCase().trim()
   if (!q)
@@ -187,492 +123,39 @@ const filteredTreeData = computed(() => {
   )
 })
 
-async function loadConnections() {
-  try {
-    connections.value = (await ListConnections()) || []
-    // clear cache when whole list is reloaded; avoids stale entries
-    Object.keys(connectionTrees).forEach(k => delete connectionTrees[k])
-    Object.keys(schemaCache).forEach(k => delete schemaCache[k])
-  }
-  catch (err) {
-    console.error('ListConnections', err)
-    connections.value = []
-    Object.keys(connectionTrees).forEach(k => delete connectionTrees[k])
-    Object.keys(schemaCache).forEach(k => delete schemaCache[k])
-  }
-}
+// --- Tree renderers (extracted to composable) ---
+const activeConnectionIdComputed = computed(() => props.activeConnectionId)
 
-// Node types that are data-bearing leaves: clicking them should immediately
-// open a tab showing the data via their "select" action.
-const INSTANT_SELECT_TYPES = new Set(['table', 'collection', 'key', 'view', 'foreign-table'])
-
-function handleSelect(keys, options, meta) {
-  const key = meta?.node?.key ?? (Array.isArray(keys) ? keys[0] : keys)
-  if (key == null)
-    return
-
-  // top‑level connection selected
-  const conn = connections.value.find(c => c.id === key)
-  if (conn) {
-    selectedConnection.value = conn
-
-    // If the tree hasn't been loaded yet, perform the usual connect
-    // behaviour: clear any stale cache, fetch the tree, and fire events.
-    // Once the tree is cached we treat the connection as "connected" and
-    // subsequent single-clicks should simply expand/collapse the node.
-    if (!connectionTrees[conn.id]) {
-      // clear cache just in case and fetch
+const { getNodeProps, renderLabel, renderPrefix } = useTreeRenderers({
+  connections,
+  connectionTrees,
+  schemaCache,
+  selectedConnection,
+  loadingNodes,
+  connecting,
+  pluginMap,
+  activeConnectionId: activeConnectionIdComputed,
+  onConnect(conn) {
+    if (connectionTrees[conn.id]) {
       delete connectionTrees[conn.id]
       delete schemaCache[conn.id]
-      fetchTreeFor(conn)
-      emit('connection-selected', conn)
-      emit('connection-opened', conn)
     }
-    else {
-      // already connected; toggle expansion instead of reconnecting
-      const idx = expandedKeys.value.indexOf(conn.id)
-      if (idx === -1) {
-        expandedKeys.value = [...expandedKeys.value, conn.id]
-      }
-      else {
-        expandedKeys.value = expandedKeys.value.filter(k => k !== conn.id)
-      }
-    }
-    return
-  }
+    fetchTreeFor(conn)
+  },
+  onEdit(conn) {
+    ShowEditConnectionWindow(conn.id)
+  },
+  onDelete(conn) {
+    deleteModal.value = { visible: true, conn }
+  },
+  onDblclick(conn) {
+    handleConnectionDblclick(conn)
+  },
+  onAction(conn, action, node) {
+    handleAction(conn, action, node)
+  },
+})
 
-  // Tree node clicked — resolve the owning connection.
-  const node = meta?.node
-  if (!node)
-    return
-
-  const parentConn = node._connectionId
-    ? connections.value.find(c => c.id === node._connectionId)
-    : selectedConnection.value
-  if (!parentConn)
-    return
-
-  const nodeType = node.node_type
-
-  // "action" leaf nodes (e.g. "New database", "New table"): fire the
-  // first action immediately on click without needing to hover.
-  if (nodeType === 'action' && node.actions?.length > 0) {
-    handleAction(parentConn, node.actions[0], node)
-    return
-  }
-
-  // Data-bearing leaf nodes: fire the "select" action immediately to
-  // open a result tab, giving instant feedback on single click.
-  if (INSTANT_SELECT_TYPES.has(nodeType)) {
-    const selectAction = node.actions?.find(a => a.type === 'select')
-    if (selectAction)
-      handleAction(parentConn, selectAction, node)
-    return
-  }
-
-  // Container nodes (database, schema, collection, …) that have children
-  // but no select action should expand/collapse on click instead of doing
-  // nothing.  This gives a natural feel when browsing the tree.
-  const hasChildren = Array.isArray(node.children) && node.children.length > 0
-  const hasSelectAction = node.actions?.some(a => a.type === 'select')
-  if (hasChildren && !hasSelectAction) {
-    const idx = expandedKeys.value.indexOf(node.key)
-    if (idx === -1) {
-      expandedKeys.value = [...expandedKeys.value, node.key]
-    }
-    else {
-      expandedKeys.value = expandedKeys.value.filter(k => k !== node.key)
-    }
-  }
-}
-
-function handleConnectionDblclick(conn) {
-  if (!conn)
-    return
-  selectedConnection.value = conn
-  // double-click has historically behaved as a "reconnect": clear the
-  // cache and run a quick check.  We deliberately do **not** auto-fetch
-  // the tree here; callers can click the connect button or wait for
-  // other interactions to load it.  The cache-clear ensures the next
-  // single-click will refetch.
-  delete connectionTrees[conn.id]
-  delete schemaCache[conn.id]
-  checkConnection(conn)
-  // tree load remains tied to the explicit connect button so we don't
-  // auto-fetch here
-  emit('connection-opened', conn)
-}
-
-function getNodeProps(node) {
-  const props = {}
-  const conn = connections.value.find(c => c.id === node.key)
-  if (conn) {
-    // double‑click on a connection header opens the connections window
-    props.onDblclick = (e) => {
-      e.stopPropagation()
-      handleConnectionDblclick(conn)
-    }
-  }
-
-  return props
-}
-
-function renderLabel({ option }) {
-  const conn = connections.value.find(c => c.id === option.key)
-
-  // "action" leaf nodes (New database, New table, …) are rendered as secondary
-  // buttons with their icon embedded; clicking the row fires the action via handleSelect.
-  if (!conn && option.node_type === 'action') {
-    const actionIcon = nodeTypeIconMap[option.node_type] ?? nodeTypeFallbackIcon
-    return h(
-      NButton,
-      { size: 'tiny', secondary: true, style: 'margin: 1px 0', type: 'primary' },
-      {
-        icon: () => h(NIcon, { size: 14 }, { default: () => h(actionIcon) }),
-        default: () => option.label,
-      },
-    )
-  }
-
-  // non-connection nodes with plugin-defined actions: render action buttons on hover
-  if (!conn && option.actions && option.actions.length > 0) {
-    return h(ConnectionTreeItemLabel, {
-      label: option.label,
-      actions: option.actions,
-      onAction(action) {
-        const parentConn = option._connectionId
-          ? connections.value.find(c => c.id === option._connectionId)
-          : selectedConnection.value
-        if (parentConn)
-          handleAction(parentConn, action, option)
-      },
-    })
-  }
-
-  // driver group headers and connection-less plain nodes just show the label
-  if (!conn)
-    return option.label
-
-  return h(ConnectionEntryLabel, {
-    label: option.label,
-    hasTree: !!connectionTrees[conn.id],
-    isActive: props.activeConnectionId === conn.id,
-    loading: !!connecting.value[conn.id],
-    onConnect() {
-      if (connectionTrees[conn.id]) {
-        delete connectionTrees[conn.id]
-        delete schemaCache[conn.id]
-      }
-      fetchTreeFor(conn)
-    },
-    onEdit() {
-      ShowEditConnectionWindow(conn.id)
-    },
-    onDelete() {
-      deleteModal.value = { visible: true, conn }
-    },
-    onDblclick() {
-      handleConnectionDblclick(conn)
-    },
-  })
-}
-
-function renderPrefix({ option }) {
-  // if an action/query is currently running for this node show a small
-  // spinner instead of the normal icon.  this provides instant feedback
-  // when the user clicks a leaf and keeps the tree from appearing unresponsive.
-  if (loadingNodes.value[option.key]) {
-    return h(NSpin, { size: 14 })
-  }
-
-  // action nodes render their icon inside the button label; skip the prefix.
-  if (option.node_type === 'action')
-    return null
-
-  // connections get a branded icon based on plugin metadata/driver
-  const conn = connections.value.find(c => c.id === option.key)
-  if (conn) {
-    const key = conn.driver_type ? conn.driver_type.toLowerCase() : ''
-    const plugin = pluginMap.value[key]
-    const iconName = getIconNameForDriver(conn.driver_type, plugin)
-    return h(DbIcon, { driver: iconName, size: 14 })
-  }
-
-  // non-connection nodes continue using the existing mapping
-  const icon = nodeTypeIconMap[option.node_type] ?? nodeTypeFallbackIcon
-  const iconNode = h(NIcon, { size: 14 }, { default: () => h(icon) })
-
-  if (conn && props.activeConnectionId === conn.id) {
-    return h('div', { style: { position: 'relative', display: 'inline-flex' } }, [
-      iconNode,
-      h('span', {
-        style: {
-          position: 'absolute',
-          bottom: '-2px',
-          right: '-3px',
-          width: '8px',
-          height: '8px',
-          borderRadius: '50%',
-          backgroundColor: '#22c55e',
-          border: '1px solid white',
-        },
-      }),
-    ])
-  }
-
-  return iconNode
-}
-
-async function confirmDelete() {
-  const conn = deleteModal.value.conn
-  if (!conn)
-    return
-  try {
-    // Backend emits connection:deleted on success; the event handler cleans up state.
-    await DeleteConnection(conn.id)
-  }
-  catch (err) {
-    console.error('DeleteConnection', err)
-  }
-  finally {
-    deleteModal.value = { visible: false, conn: null }
-  }
-}
-
-/** Action types that require the user to fill in a form before execution. */
-const PROMPT_ACTION_TYPES = new Set(['create-database', 'create-table'])
-
-/** Action types that require an explicit destructive confirmation dialog. */
-const DESTRUCTIVE_ACTION_TYPES = new Set(['drop-database', 'drop-table', 'drop-collection'])
-
-/**
- * Central dispatcher for node actions.
- * Routes create actions to the input form modal, destructive actions to a
- * confirmation dialog, and everything else straight to runTreeAction.
- */
-function handleAction(conn, action, node) {
-  if (PROMPT_ACTION_TYPES.has(action.type)) {
-    actionModal.value = { visible: true, action, conn, node }
-    return
-  }
-
-  if (DESTRUCTIVE_ACTION_TYPES.has(action.type)) {
-    dialog.error({
-      title: action.title ?? 'Confirm action',
-      content: `The following query will be executed — this cannot be undone:\n\n${action.query}`,
-      positiveText: 'Execute',
-      negativeText: 'Cancel',
-      onPositiveClick() {
-        runTreeAction(conn, action, node)
-      },
-    })
-    return
-  }
-
-  runTreeAction(conn, action, node)
-}
-
-function onActionModalSubmit(modifiedQuery) {
-  const { conn, action, node } = actionModal.value
-  if (!conn || !action)
-    return
-  runTreeAction(conn, { ...action, query: modifiedQuery }, node)
-}
-
-async function runTreeAction(conn, action, node, extras = {}) {
-  // when any tree action is invoked we show a spinner on the originating
-  // node so the user gets immediate feedback.  the key may not exist for
-  // actions created programmatically (e.g. Refresh from workspace), so we
-  // compute it similarly to the tabKey logic and stash it separately.
-  const nodeKeyForSpinner = node && node.key ? node.key : null
-  if (nodeKeyForSpinner) {
-    loadingNodes.value[nodeKeyForSpinner] = true
-  }
-
-  // debug: see what capabilities we actually have for this driver
-  console.debug('pluginCaps lookup', conn?.driver_type, pluginCaps.value[conn?.driver_type])
-
-  // mark invocation time before hitting the network so we can compare
-  // request ordering regardless of return speed.
-  const invocationVersion = Date.now()
-
-  // Hoist stable identifiers so they are available in the catch block too.
-  const nodeKey = node && node.key ? node.key : (action.query || String(invocationVersion))
-  const tabKey = (typeof nodeKey === 'string' && nodeKey.startsWith(`${conn.id}:`))
-    ? nodeKey
-    : `${conn.id}:${nodeKey}`
-  let title = (node && node.key) || action.title || action.query || 'Query'
-  title = title.split(':').pop()
-
-  // Actions with new_tab=false run silently in the background: no tab is opened.
-  // The result is only logged to the console / backend log stream.
-  // After a successful silent action the connection tree is refreshed so
-  // any structural change (create-table, etc.) is reflected immediately.
-  if (!action.new_tab) {
-    try {
-      const cred = await GetCredential(conn.id)
-      const params = {}
-      if (cred)
-        params.credential_blob = cred
-      // When the user clicks a node in the tree we may need to tell the
-      // plugin which database was selected.  The node.key value is a
-      // hierarchical identifier that uses `:` as the connection‑ID separator
-      // and may contain `.` inside the final segment (e.g. "public.users").
-      // Previously we naively split on `.` which produced incorrect overrides
-      // for Postgres keys like "phonedb:public:public.users"; the first
-      // segment contained extra colon‑separated context and became the bogus
-      // database name seen in the logs.  The helper below isolates the
-      // database name correctly by chopping at the first separator of either
-      // kind.
-      if (node && node.key && typeof node.key === 'string') {
-        const db = extractDatabaseFromNodeKey(conn.id, node.key)
-        if (db) {
-          params.database = db
-        }
-      }
-      const res = await ExecTreeAction(conn.driver_type, params, action.query || '', extras.options || (extras.explain ? { 'explain-query': 'yes' } : {}))
-      if (res.error) {
-        console.error('runTreeAction [hidden]', action.type, res.error)
-        notification.error({ title: 'Action failed', content: res.error, duration: 5000 })
-      }
-      else {
-        console.debug('runTreeAction [hidden] ok', action.type)
-        // Refresh the tree so newly created tables/databases appear.
-        delete connectionTrees[conn.id]
-        delete schemaCache[conn.id]
-        fetchTreeFor(conn)
-      }
-    }
-    catch (err) {
-      console.error('runTreeAction [hidden] error', action.type, err?.message || err)
-      notification.error({ title: 'Action failed', content: err?.message || String(err), duration: 5000 })
-    }
-    return
-  }
-
-  try {
-    const cred = await GetCredential(conn.id)
-    const params = {}
-    if (cred)
-      params.credential_blob = cred
-    // forward selected database from the node key when available
-    if (node && node.key && typeof node.key === 'string') {
-      const db = extractDatabaseFromNodeKey(conn.id, node.key)
-      if (db) {
-        params.database = db
-      }
-    }
-    let queryToRun = action.query || ''
-    if (
-      action.type === 'select'
-      && /^\s*select\b/i.test(queryToRun)
-      && !/\blimit\b/i.test(queryToRun)
-    ) {
-      queryToRun = `${queryToRun.trim()} LIMIT 100`
-    }
-
-    const res = await ExecTreeAction(conn.driver_type, params, queryToRun, extras.options || (extras.explain ? { 'explain-query': 'yes' } : {}))
-
-    // regardless of query type we unwrap and normalise any result that came
-    // back; the workspace will decide how to render it (or just show an
-    // error if `res.error` is set).  this makes behaviour consistent for
-    // non-SELECT actions like 'USE' if we ever want to display feedback.
-    let payload = res.result || {}
-    if (payload && payload.Payload) {
-      payload = payload.Payload
-    }
-
-    if (payload.Sql)
-      payload = payload.Sql
-    else if (payload.Document)
-      payload = payload.Document
-    else if (payload.Kv)
-      payload = payload.Kv
-
-    // capitalised keys (protojson output) confuse the viewer; lowercase
-    // everything once so callers don't have to care.
-    const normalizeKeys = (obj) => {
-      if (!obj || typeof obj !== 'object')
-        return obj
-      const out = {}
-      for (const key of Object.keys(obj)) {
-        const lower = key.charAt(0).toLowerCase() + key.slice(1)
-        out[lower] = obj[key]
-      }
-      return out
-    }
-    payload = normalizeKeys(payload)
-
-    // use the version we captured at the start; the response time may
-    // not reflect request order, so this guarantees the later-initiated
-    // query cannot be accidentally overwritten by an earlier one.
-    const version = invocationVersion
-    console.debug('runTreeAction result', action, queryToRun, res, payload, tabKey, version)
-
-    // Store context to support Refresh functionality.  include capabilities
-    // (for explain-button logic) plus any extras passed by caller.
-    const context = { conn, action, node, capabilities: pluginCaps.value[conn.driver_type] || [], ...extras }
-    console.debug('emitting query-result with context', context)
-
-    if (res.error) {
-      emit('query-result', title, null, res.error, tabKey, version, context)
-    }
-    else {
-      emit('query-result', title, payload, null, tabKey, version, context)
-    }
-  }
-  catch (err) {
-    console.error('ExecTreeAction', conn.id, err)
-    // Surface the error in the workspace tab so it is visible to the user.
-    // The backend already emits an app:log event for these failures;
-    // opening an error tab gives additional in-context feedback.
-    const context = { conn, action, node }
-    emit('query-result', title, null, err?.message || String(err), tabKey, invocationVersion, context)
-  }
-  finally {
-    if (nodeKeyForSpinner) {
-      delete loadingNodes.value[nodeKeyForSpinner]
-    }
-  }
-}
-
-async function checkConnection(conn) {
-  try {
-    const cred = await GetCredential(conn.id)
-    const params = {}
-    if (cred)
-      params.credential_blob = cred
-    await ExecPlugin(conn.driver_type, params, 'SELECT 1')
-  }
-  catch (err) {
-    console.error('connection check', conn.id, err)
-  }
-}
-
-async function fetchTreeFor(conn) {
-  if (!conn)
-    return
-  // show spinner on connect button (and optionally prefix icon)
-  connecting.value[conn.id] = true
-  loadingNodes.value[conn.id] = true
-  try {
-    await loadConnectionTree(conn)
-    if (!expandedKeys.value.includes(conn.id)) {
-      expandedKeys.value = [...expandedKeys.value, conn.id]
-    }
-  }
-  catch (err) {
-    console.error('fetchTreeFor', conn.id, err)
-    notification.error({ title: 'Connection failed', content: err?.message || String(err), duration: 5000 })
-  }
-  finally {
-    delete connecting.value[conn.id]
-    delete loadingNodes.value[conn.id]
-  }
-}
-
-// When filter is cleared, reset scroll so the first connection is visible.
-// Naive UI's built-in pattern/filter props handle expanding matching nodes.
 watch(filter, (q) => {
   if (!(q || '').trim() && treeScrollRef.value) {
     treeScrollRef.value.scrollTop = 0
@@ -681,79 +164,7 @@ watch(filter, (q) => {
 
 // initialize
 loadConnections()
-// plugin list will populate automatically via composable
 
-// Backend domain events — frontend only listens, never emits these topics.
-
-// connection:created → refresh the list rather than mutating directly.
-// This ensures we correctly show a brand‑new connection even if the ID was
-// reused after a delete or if the event payload was malformed. It also keeps
-// the local cache in sync with the backend.
-const offConnectionCreated = Events.On('connection:created', async (event) => {
-  const conn = (event?.data ?? event)?.connection
-  if (!conn)
-    return
-  try {
-    await loadConnections()
-    // if a search filter was active the newly-added connection may have been
-    // hidden; reset the filter so it is visible immediately.
-    filter.value = ''
-  }
-  catch (err) {
-    console.error('connection:created handler loadConnections', err)
-  }
-})
-
-// connection:deleted → reload list as well to guard against edge cases where
-// a new connection with the same ID gets created immediately after deletion.
-const offConnectionDeleted = Events.On('connection:deleted', async (event) => {
-  const id = (event?.data ?? event)?.id
-  if (!id)
-    return
-  try {
-    await loadConnections()
-  }
-  catch (err) {
-    console.error('connection:deleted handler loadConnections', err)
-  }
-  // additional cleanup for tree cache/state
-  delete connectionTrees[id]
-  delete schemaCache[id]
-  if (selectedConnection.value?.id === id)
-    selectedConnection.value = null
-  expandedKeys.value = expandedKeys.value.filter(k => k !== id)
-  Object.keys(loadingNodes.value).forEach((k) => {
-    if (k.startsWith(`${id}:`))
-      delete loadingNodes.value[k]
-  })
-})
-
-// connection:updated → refresh the list and clear the tree cache for the updated
-// connection so the next connect action fetches fresh data.
-const offConnectionUpdated = Events.On('connection:updated', async (event) => {
-  const id = (event?.data ?? event)?.connection?.id
-  if (id) {
-    delete connectionTrees[id]
-    delete schemaCache[id]
-  }
-  try {
-    await loadConnections()
-  }
-  catch (err) {
-    console.error('connection:updated handler loadConnections', err)
-  }
-})
-
-onUnmounted(() => {
-  if (offConnectionCreated)
-    offConnectionCreated()
-  if (offConnectionDeleted)
-    offConnectionDeleted()
-  if (offConnectionUpdated)
-    offConnectionUpdated()
-})
-
-// Expose runTreeAction to support Refresh from the Workspace panel.
 defineExpose({
   runTreeAction,
 })

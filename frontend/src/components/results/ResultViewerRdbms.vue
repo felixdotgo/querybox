@@ -185,10 +185,18 @@ function handleColumnSort(col) {
 
 // ─── row mutations ────────────────────────────────────────────────────────────
 
+function escapeSqlValue(val) {
+  if (val === null || val === undefined) return 'NULL'
+  return String(val).replace(/'/g, "''")
+}
+
 function defaultFilterFor(row) {
   const parts = []
   for (const key in row) {
-    if (key !== 'key') parts.push(`${key} = '${row[key]}'`)
+    if (key !== 'key') {
+      const v = row[key]
+      parts.push(v === null || v === undefined ? `${key} IS NULL` : `${key} = '${escapeSqlValue(v)}'`)
+    }
   }
   return parts.join(' AND ')
 }
@@ -199,7 +207,10 @@ function pkFilterFor(row) {
   if (pkNames.length === 0) return defaultFilterFor(row)
   const parts = []
   for (const key in row) {
-    if (pkNames.includes(key)) parts.push(`${key} = '${row[key]}'`)
+    if (pkNames.includes(key)) {
+      const v = row[key]
+      parts.push(v === null || v === undefined ? `${key} IS NULL` : `${key} = '${escapeSqlValue(v)}'`)
+    }
   }
   return parts.join(' AND ')
 }

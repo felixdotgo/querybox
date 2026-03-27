@@ -128,7 +128,9 @@ func (c *CredManager) Store(key string, secret string) error {
 		if err == nil {
 			return nil
 		}
-		// fall through to in-memory if db write fails
+		// DB write failed — fall through to in-memory as last resort but
+		// log a warning so the caller can diagnose persistence issues.
+		fmt.Printf("warning: credential db write failed, using in-memory fallback: %v\n", err)
 	}
 	c.mu.Lock()
 	c.fallback[key] = secret

@@ -25,6 +25,9 @@ import * as pluginpb$0 from "../../rpc/contracts/plugin/v1/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as application$0 from "../../../../wailsapp/wails/v3/pkg/application/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as time$0 from "../../../../../time/models.js";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -166,6 +169,21 @@ export function MutateRow(name, connection, operation, source, values, filter) {
  */
 export function Rescan() {
     return $Call.ByID(3306130489);
+}
+
+/**
+ * RunCommand is the public implementation of PluginExecutor. It delegates to
+ * the internal runPluginCommand with a fixed caller label.
+ * @param {string} name
+ * @param {string} command
+ * @param {time$0.Duration} timeout
+ * @param {string} req
+ * @returns {$CancellablePromise<string>}
+ */
+export function RunCommand(name, command, timeout, req) {
+    return $Call.ByID(247512939, name, command, timeout, req).then(/** @type {($result: any) => any} */(($result) => {
+        return $Create.ByteSlice($result);
+    }));
 }
 
 /**

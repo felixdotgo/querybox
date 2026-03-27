@@ -26,6 +26,7 @@ const footerDefaultSize = computed(() => {
 // log entries streamed from the Go backend via the app:log event
 const logs = ref([])
 let offAppLog = null
+let offMenuLogs = null
 
 function clearLogs() {
   logs.value = []
@@ -39,8 +40,8 @@ function toggleFooter() {
 const workspaceRef = ref(null)
 const connectionsRef = ref(null)
 
-function openTab(title, result, error, tabKey, version, context) {
-  workspaceRef.value?.openTab(title, result, error, tabKey, version, context)
+function openTab(params) {
+  workspaceRef.value?.openTab(params)
 }
 
 function handleRefreshTab(context) {
@@ -61,12 +62,14 @@ onMounted(() => {
     logs.value.push(entry)
   })
 
-  Events.On('menu:logs-toggled', () => toggleFooter())
+  offMenuLogs = Events.On('menu:logs-toggled', () => toggleFooter())
 })
 
 onUnmounted(() => {
   if (offAppLog)
     offAppLog()
+  if (offMenuLogs)
+    offMenuLogs()
 })
 </script>
 

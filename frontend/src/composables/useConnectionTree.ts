@@ -2,14 +2,15 @@ import type { Ref } from 'vue'
 import { reactive, ref, watch } from 'vue'
 import { GetCredential } from '@/bindings/github.com/felixdotgo/querybox/services/connectionservice'
 import { DescribeSchema, GetConnectionTree } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
+import type { ColumnSchema, Connection, TableSchema, TreeNode } from '@/lib/types'
 
 // global reactive cache mapping connection id -> nodes array
-const treeCache: Record<string, any[]> = reactive({})
+const treeCache: Record<string, TreeNode[]> = reactive({})
 
 // schemaCache maps connection id -> tableName -> Schema object returned by plugin
 // TODO: persist these entries on disk (via the connection service or similar)
 // so that table information can survive restarts and be available offline.
-const schemaCache: Record<string, Record<string, any>> = reactive({})
+const schemaCache: Record<string, Record<string, TableSchema>> = reactive({})
 
 // map proto enum numbers to lowercase names; used both here and by the
 // ConnectionsPanel component.  Exported so tests can verify tagging logic.
@@ -31,7 +32,7 @@ export const NODE_TYPE_ENUM_MAP: Record<number, string> = {
 // easier to test and avoids regenerating fresh objects on every render (which
 // confused the tree view and led to duplicate entries when a node was
 // expanded/collapsed repeatedly).
-export function tagWithConnId(nodes: any[], connId: string, _prefix?: string): any[] {
+export function tagWithConnId(nodes: TreeNode[], connId: string, _prefix?: string): TreeNode[] {
   // `_prefix` accumulates the full ancestor key path so that sibling nodes
   // in different databases (e.g. both have a "public" schema) receive distinct
   // keys, preventing NaiveUI from conflating their expansion state.
@@ -40,10 +41,10 @@ export function tagWithConnId(nodes: any[], connId: string, _prefix?: string): a
 
   const tagged = nodes.map((n) => {
     const nodeType = typeof n.node_type === 'number'
-      ? (NODE_TYPE_ENUM_MAP[n.node_type] ?? null)
+      ? (NODE_TYPE_ENUM_MAP[n.node_type] ?? String(n.node_type))
       : n.node_type
 
-    const base: any = {
+    const base: TreeNode = {
       ...n,
       key: `${prefix}:${n.key}`,
       _connectionId: connId,
@@ -56,7 +57,7 @@ export function tagWithConnId(nodes: any[], connId: string, _prefix?: string): a
   })
 
   // deduplicate siblings by key preserving original order
-  const out: any[] = []
+  const out: TreeNode[] = []
   for (const t of tagged) {
     if (!seenKeys.has(t.key)) {
       seenKeys.add(t.key)
@@ -78,7 +79,7 @@ export function tagWithConnId(nodes: any[], connId: string, _prefix?: string): a
   return out
 }
 
-function normalizeNodes(nodes: any[]): any[] {
+function normalizeNodes(nodes: TreeNode[]): TreeNode[] {
   return nodes.map((n) => {
     const type = typeof n.node_type === 'number'
       ? NODE_TYPE_ENUM_MAP[n.node_type] || String(n.node_type)
@@ -97,8 +98,8 @@ function normalizeNodes(nodes: any[]): any[] {
  * the optional ref, the tree will be loaded automatically.  Otherwise the
  * caller may manually invoke `load(conn)`.
  */
-export function useConnectionTree(connRef?: Ref<any | null>) {
-  const nodes = ref<any[]>([])
+export function useConnectionTree(connRef?: Ref<Connection | null>) {
+  const nodes = ref<TreeNode[]>([])
 
   // update whenever cache entry is modified or the connection changes
   const updateLocal = () => {
@@ -109,13 +110,13 @@ export function useConnectionTree(connRef?: Ref<any | null>) {
   if (connRef) {
     watch(connRef, async (conn) => {
       if (conn && typeof conn === 'object') {
-        await load(conn as { id: string, driver_type: string })
+        await load(conn)
       }
       updateLocal()
     }, { immediate: true })
   }
 
-  async function load(conn: { id: string, driver_type: string }) {
+  async function load(conn: Pick<Connection, 'id' | 'driver_type'>) {
     if (!conn || !conn.id)
       return
     const id = conn.id
@@ -123,21 +124,18 @@ export function useConnectionTree(connRef?: Ref<any | null>) {
       return // already fetched
     try {
       const cred = await GetCredential(id)
-      const params: Record<string, any> = {}
+      const params: Record<string, string> = {}
       if (cred)
         params.credential_blob = cred
       const resp = await GetConnectionTree(conn.driver_type, params)
-      treeCache[id] = normalizeNodes(resp.nodes || [])
-      console.debug('useConnectionTree.load: cached nodes for', id, treeCache[id])
+      treeCache[id] = normalizeNodes((resp?.nodes ?? []).filter(n => n !== null) as unknown as TreeNode[])
       // load schema info in parallel; ignore errors
       try {
         // @ts-expect-error: may be generated later
         const schemaResp = await DescribeSchema(conn.driver_type, params)
-        console.debug('useConnectionTree.load: raw schema response', id, schemaResp)
-        console.debug('useConnectionTree.load: tables count', id, schemaResp?.tables?.length)
-        const tableMap: Record<string, any> = {}
+        const tableMap: Record<string, TableSchema> = {}
         if (schemaResp && Array.isArray(schemaResp.tables)) {
-          for (const t of schemaResp.tables) {
+          for (const t of schemaResp.tables as TableSchema[]) {
             if (t && t.name) {
               // cache under the exact name returned by the plugin
               tableMap[t.name] = t
@@ -157,7 +155,6 @@ export function useConnectionTree(connRef?: Ref<any | null>) {
           }
         }
         schemaCache[id] = tableMap
-        console.debug('useConnectionTree.load: cached schema for', id, tableMap)
       }
       catch (err) {
         console.error('useConnectionTree.load schema error', id, err)
@@ -175,11 +172,9 @@ export function useConnectionTree(connRef?: Ref<any | null>) {
 
   function getTableNames(): string[] {
     const out: string[] = []
-    const gather = (items: any[]) => {
+    const gather = (items: TreeNode[]) => {
       for (const n of items) {
-        // log each node inspected
-        console.log('getTableNames inspecting', n.label, 'type', n.node_type)
-        if (['table', 'view', 'collection'].includes(n.node_type)) {
+        if (['table', 'view', 'collection'].includes(n.node_type as string)) {
           out.push(n.label)
         }
         if (Array.isArray(n.children))
@@ -187,16 +182,15 @@ export function useConnectionTree(connRef?: Ref<any | null>) {
       }
     }
     gather(nodes.value)
-    console.log('getTableNames result', out)
     return out
   }
 
   function getColumns(tableName: string): string[] {
     let cols: string[] = []
-    const findTable = (items: any[]) => {
+    const findTable = (items: TreeNode[]) => {
       for (const n of items) {
         if (n.label === tableName && Array.isArray(n.children)) {
-          cols = n.children.map((c: any) => c.label)
+          cols = n.children.map(c => c.label)
           return true
         }
         if (Array.isArray(n.children) && findTable(n.children))
@@ -213,10 +207,10 @@ export function useConnectionTree(connRef?: Ref<any | null>) {
    * Each item includes { name, type, nullable, primary_key }.
    * Falls back to plain name-only objects when schema data is unavailable.
    */
-  function getColumnDetails(tableName: string): Array<{ name: string, type: string, nullable: boolean, primary_key: boolean }> {
+  function getColumnDetails(tableName: string): ColumnSchema[] {
     const schema = getSchema(tableName)
     if (schema && Array.isArray(schema.columns) && schema.columns.length > 0) {
-      return schema.columns.map((c: any) => ({
+      return schema.columns.map((c: ColumnSchema) => ({
         name: c.name || '',
         type: c.type || '',
         nullable: !!c.nullable,
@@ -227,7 +221,7 @@ export function useConnectionTree(connRef?: Ref<any | null>) {
     return getColumns(tableName).map(name => ({ name, type: '', nullable: true, primary_key: false }))
   }
 
-  function getSchema(tableName: string, overrideConn?: { id: string, driver_type: string }): any | null {
+  function getSchema(tableName: string, overrideConn?: Pick<Connection, 'id' | 'driver_type'>): TableSchema | null {
     // connection id determined either from override or reactive ref
     const id = overrideConn?.id || connRef?.value?.id
     if (!id)
@@ -260,7 +254,7 @@ export function useConnectionTree(connRef?: Ref<any | null>) {
     return null
   }
 
-  function getAllSchemas(): Record<string, any> {
+  function getAllSchemas(): Record<string, TableSchema> {
     const id = connRef?.value?.id
     if (!id)
       return {}
@@ -276,14 +270,14 @@ export function useConnectionTree(connRef?: Ref<any | null>) {
   // that buildConnString on the backend opens the correct database.  This is
   // distinct from the schema/dbFilter derived from the table name, which is
   // used as the DescribeSchema filter argument.
-  async function fetchSchema(table?: string, overrideConn?: { id: string, driver_type: string }, database?: string) {
+  async function fetchSchema(table?: string, overrideConn?: Pick<Connection, 'id' | 'driver_type'>, database?: string) {
     // choose connection info from override or reactive ref
     const conn = overrideConn || connRef?.value
     const id = conn?.id
     if (!id || !conn)
       return
     const cred = await GetCredential(id)
-    const params: Record<string, any> = {}
+    const params: Record<string, string> = {}
     if (cred)
       params.credential_blob = cred
     // forward the actual database name so the backend DSN targets the right DB
@@ -305,12 +299,10 @@ export function useConnectionTree(connRef?: Ref<any | null>) {
     }
 
     try {
-      console.debug('useConnectionTree.fetchSchema', id, 'table', table, 'dbFilter', dbFilter, 'tblFilter', tblFilter, 'database', database)
       const schemaResp = await DescribeSchema(conn.driver_type, params, dbFilter, tblFilter)
-      console.debug('useConnectionTree.fetchSchema: raw response', id, table, schemaResp)
-      const tableMap: Record<string, any> = {}
+      const tableMap: Record<string, TableSchema> = {}
       if (schemaResp && Array.isArray(schemaResp.tables)) {
-        for (const t of schemaResp.tables) {
+        for (const t of schemaResp.tables as TableSchema[]) {
           if (t && t.name) {
             tableMap[t.name] = t
             const idx = t.name.indexOf('.')
@@ -324,7 +316,6 @@ export function useConnectionTree(connRef?: Ref<any | null>) {
         }
         // merge into existing cache rather than clobber
         schemaCache[id] = { ...(schemaCache[id] || {}), ...tableMap }
-        console.debug('useConnectionTree.fetchSchema: merged schema for', id, table, tableMap)
       }
     }
     catch (err) {

@@ -1,6 +1,5 @@
 import { Events } from '@wailsio/runtime'
 import { ref } from 'vue'
-// @ts-expect-error: generated bindings may not yet have typings
 import { ListPlugins } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
 
 // shared reactive state; once initialized it stays in memory so every

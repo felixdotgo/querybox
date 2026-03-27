@@ -4,6 +4,7 @@ import { onMounted, ref, toRef, watch } from 'vue'
 import { ResultViewer } from '@/components/results'
 import { useConnectionTree } from '@/composables/useConnectionTree'
 import { Analytics, Play } from '@/lib/icons'
+import { extractDatabase, extractTableName } from '@/lib/nodeKey'
 import QueryEditor from './QueryEditor.vue'
 import TableStructureViewer from './TableStructureViewer.vue'
 import WelcomeTab from './WelcomeTab.vue'
@@ -20,17 +21,9 @@ const { getSchema, fetchSchema } = useConnectionTree(toRef(props, 'selectedConne
 const notification = useNotification()
 
 function getSchemaForTab(tab) {
-  if (!tab?.context?.node)
-    return null
-  let key = tab.context.node.key
-  if (key && typeof key === 'string' && tab.context?.conn && key.startsWith(`${tab.context.conn.id}:`))
-    key = key.slice((`${tab.context.conn.id}:`).length)
-  const lastColon = key ? key.lastIndexOf(':') : -1
-  if (lastColon !== -1)
-    key = key.slice(lastColon + 1)
-  if (!key || typeof key !== 'string')
-    return null
-  return getSchema(key, tab.context.conn)
+  const tbl = getTableNameFromTab(tab)
+  if (!tbl) return null
+  return getSchema(tbl, tab.context.conn)
 }
 const tabs = ref([])
 const activeTabKey = ref('')
@@ -77,48 +70,17 @@ function getMonacoLanguage(driver) {
   return 'sql'
 }
 
-// helper to derive a table name from a tab object (mirrors
-// currentSchema computation logic).  returns null if no valid table.
-function extractTableName(tab) {
-  if (!tab || !tab.context || !tab.context.node)
-    return null
-  let key = tab.context.node.key
-  if (key && typeof key === 'string' && key.startsWith(`${tab.context.conn?.id}:`)) {
-    key = key.slice((`${tab.context.conn.id}:`).length)
-  }
-  // For deep-hierarchy plugins (e.g. PostgreSQL) the remaining key still
-  // contains parent-path segments; keep only the last colon-segment.
-  const lastColon = key ? key.lastIndexOf(':') : -1
-  if (lastColon !== -1) {
-    key = key.slice(lastColon + 1)
-  }
-  if (!key || typeof key !== 'string')
-    return null
-  return key
+function getTableNameFromTab(tab) {
+  if (!tab?.context?.node) return null
+  return extractTableName(tab.context.conn?.id, tab.context.node.key)
 }
 
-// Extract the actual database name from a PostgreSQL-style node key.
-// After stripping the conn prefix the first colon-separated segment is the
-// database name (e.g. "mydb" from "<connId>:mydb:public:public.Tables:public.users").
-// Returns null for flat-hierarchy drivers (MySQL, SQLite) where no colon remains.
-function extractDatabaseFromTab(tab) {
-  if (!tab || !tab.context || !tab.context.node)
-    return null
-  let key = tab.context.node.key
-  if (!key || typeof key !== 'string')
-    return null
-  const connId = tab.context.conn?.id
-  if (connId && key.startsWith(`${connId}:`))
-    key = key.slice(connId.length + 1)
-  const col = key.indexOf(':')
-  if (col === -1)
-    return null
-  const db = key.slice(0, col)
-  return db || null
+function getDatabaseFromTab(tab) {
+  if (!tab?.context?.node) return null
+  return extractDatabase(tab.context.conn?.id, tab.context.node.key)
 }
 
 watch(activeTabKey, (key) => {
-  console.debug('activeTabKey changed to', key)
   // tabKey format: conn.id + ":" + node.key — extract the connection ID
   const connId = key ? key.split(':')[0] : null
   emit('active-connection-changed', connId || null)
@@ -128,21 +90,18 @@ watch(activeTabKey, (key) => {
   // `currentSchema` watcher will flip us to the Structure page when data
   // arrives.
   const tab = tabs.value.find(t => t.key === key)
-  const tbl = extractTableName(tab)
-  console.debug('activeTabKey watcher table', tbl, 'cached?', tbl ? !!getSchema(tbl, tab.context?.conn) : null)
+  const tbl = getTableNameFromTab(tab)
   if (tbl) {
     if (!getSchema(tbl, tab.context?.conn)) {
-      const db = extractDatabaseFromTab(tab)
-      console.debug('activeTabKey watcher invoking fetchSchema for', tbl, 'conn', tab.context?.conn?.id, 'db', db)
+      const db = getDatabaseFromTab(tab)
       fetchSchema(tbl, tab.context?.conn, db).catch(err => console.error('fetchSchema failed', err))
-    }
-    else {
-      console.debug('schema already cached for', tbl, 'conn', tab.context?.conn?.id)
     }
   }
 })
 
-function openTab(title, result, error, tabKey, version, context) {
+function openTab(params) {
+  const { title: rawTitle, result, error, tabKey, version, context } = params
+  let title = rawTitle
   // sanitize human title just in case it still contains a prefix
   const sanitize = t => (t ? t.split(':').pop() : t)
   title = sanitize(title)
@@ -225,19 +184,12 @@ function openTab(title, result, error, tabKey, version, context) {
   // if we already know the schema for this table, kick off a fetch so the
   // structure tab can display quickly when the user switches to it. we no
   // longer preselect the structure pane; result is always the starting point.
-  const prefetchTable = extractTableName(newTab)
-  if (prefetchTable) {
-    if (getSchema(prefetchTable, newTab.context?.conn)) {
-      // schema is cached, but don't switch tabs automatically
-      console.debug('schema already cached for', prefetchTable, 'conn', newTab.context?.conn?.id)
-    }
-    else {
-      // still initiate a fetch so the structure data will be available if the
-      // user clicks the tab later.
-      const db = extractDatabaseFromTab(newTab)
-      console.debug('openTab triggering fetchSchema for', prefetchTable, 'conn', newTab.context?.conn?.id, 'db', db)
-      fetchSchema(prefetchTable, newTab.context?.conn, db).catch(err => console.error('fetchSchema failed', err))
-    }
+  const prefetchTable = getTableNameFromTab(newTab)
+  if (prefetchTable && !getSchema(prefetchTable, newTab.context?.conn)) {
+    // initiate a fetch so the structure data will be available if the
+    // user clicks the tab later.
+    const db = getDatabaseFromTab(newTab)
+    fetchSchema(prefetchTable, newTab.context?.conn, db).catch(err => console.error('fetchSchema failed', err))
   }
 
   if (existing) {

@@ -78,6 +78,25 @@ type EditConnectionWindowOpenedEvent struct {
 	ID string `json:"id"`
 }
 
+// EventEmitter abstracts event emission so that services can be tested
+// without a running Wails application. The Wails *application.App type
+// satisfies this interface via its Event.Emit method; tests may provide
+// a no-op or recording implementation.
+type EventEmitter interface {
+	EmitEvent(name string, data interface{})
+}
+
+// WailsEmitter wraps a *application.App to satisfy EventEmitter.
+type WailsEmitter struct {
+	App *application.App
+}
+
+func (w *WailsEmitter) EmitEvent(name string, data interface{}) {
+	if w.App != nil {
+		w.App.Event.Emit(name, data)
+	}
+}
+
 // emitLog is a nil-safe helper that emits an EventAppLog event on the Wails app.
 // If app is nil the call is a no-op so services remain functional in tests.
 func emitLog(app *application.App, level LogLevel, message string) {
