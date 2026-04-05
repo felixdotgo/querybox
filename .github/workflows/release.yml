@@ -71,8 +71,8 @@ jobs:
 
       - name: Rename packages with version
         run: |
-          DEB=$(ls bin/querybox_*.deb 2>/dev/null | head -1)
-          RPM=$(ls bin/querybox-*.rpm 2>/dev/null | head -1)
+          DEB=$(find bin -maxdepth 1 -name "querybox*.deb" | head -1)
+          RPM=$(find bin -maxdepth 1 -name "querybox*.rpm" | head -1)
           [ -n "$DEB" ] && cp "$DEB" querybox-linux-amd64.deb
           [ -n "$RPM" ] && cp "$RPM" querybox-linux-amd64.rpm
 
