@@ -29,7 +29,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc libgtk-3-dev libwebkit2gtk-4.1-dev
+          sudo apt-get install -y gcc libgtk-3-dev libwebkit2gtk-4.1-dev rpm
 
       - name: Cache Go tools
         id: cache-tools
@@ -50,20 +50,39 @@ jobs:
       - name: Build plugins
         run: task build:plugins
 
+      - name: Set version
+        run: echo "APP_VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+
       - name: Build app
         run: wails3 build
 
-      - name: Package
+      - name: Create deb and rpm packages
+        run: task linux:generate:deb linux:generate:rpm
+        env:
+          APP_VERSION: ${{ env.APP_VERSION }}
+          GOARCH: amd64
+
+      - name: Package tar.gz
         run: |
           mkdir -p staging/bin/plugins
           cp bin/querybox staging/
           cp bin/plugins/* staging/bin/plugins/
           tar -czf querybox-linux-amd64.tar.gz -C staging .
 
+      - name: Rename packages with version
+        run: |
+          DEB=$(ls bin/querybox_*.deb 2>/dev/null | head -1)
+          RPM=$(ls bin/querybox-*.rpm 2>/dev/null | head -1)
+          [ -n "$DEB" ] && cp "$DEB" querybox-linux-amd64.deb
+          [ -n "$RPM" ] && cp "$RPM" querybox-linux-amd64.rpm
+
       - uses: actions/upload-artifact@v4
         with:
           name: linux-artifact
-          path: querybox-linux-amd64.tar.gz
+          path: |
+            querybox-linux-amd64.tar.gz
+            querybox-linux-amd64.deb
+            querybox-linux-amd64.rpm
 
   build-darwin:
     name: Build (macOS)
@@ -178,6 +197,8 @@ jobs:
           generate_release_notes: true
           files: |
             querybox-linux-amd64.tar.gz
+            querybox-linux-amd64.deb
+            querybox-linux-amd64.rpm
             querybox-darwin-universal.zip
             querybox-windows-amd64-installer.exe
         env:
