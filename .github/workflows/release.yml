@@ -1,0 +1,196 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    name: Build (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: .go-version
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      - name: Install wails3 CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+
+      - name: Build frontend
+        run: cd frontend && npm ci && npm run build
+
+      - name: Build plugins
+        run: bash scripts/build-plugins.sh
+
+      - name: Build binary
+        run: |
+          CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
+          go build -tags production -trimpath -buildvcs=false \
+          -ldflags="-w -s" -o bin/querybox .
+
+      - name: Package
+        run: |
+          mkdir -p staging/bin/plugins
+          cp bin/querybox staging/
+          cp bin/plugins/* staging/bin/plugins/
+          tar -czf querybox-linux-amd64.tar.gz -C staging .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-artifact
+          path: querybox-linux-amd64.tar.gz
+
+  build-darwin:
+    name: Build (macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: .go-version
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install wails3 CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+
+      - name: Build frontend
+        run: cd frontend && npm ci && npm run build
+
+      - name: Build plugins
+        run: bash scripts/build-plugins.sh
+
+      - name: Build universal binary
+        run: |
+          CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 \
+          CGO_CFLAGS="-mmacosx-version-min=10.15" \
+          CGO_LDFLAGS="-mmacosx-version-min=10.15" \
+          MACOSX_DEPLOYMENT_TARGET=10.15 \
+          go build -tags production -trimpath -buildvcs=false \
+          -ldflags="-w -s" -o bin/querybox-amd64 .
+
+          CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 \
+          CGO_CFLAGS="-mmacosx-version-min=10.15" \
+          CGO_LDFLAGS="-mmacosx-version-min=10.15" \
+          MACOSX_DEPLOYMENT_TARGET=10.15 \
+          go build -tags production -trimpath -buildvcs=false \
+          -ldflags="-w -s" -o bin/querybox-arm64 .
+
+          lipo -create -output bin/querybox bin/querybox-amd64 bin/querybox-arm64
+
+      - name: Create .app bundle
+        run: |
+          mkdir -p bin/querybox.app/Contents/MacOS/bin/plugins
+          mkdir -p bin/querybox.app/Contents/Resources
+          cp build/darwin/icons.icns bin/querybox.app/Contents/Resources/
+          cp build/darwin/Assets.car bin/querybox.app/Contents/Resources/
+          cp build/darwin/Info.plist bin/querybox.app/Contents/
+          cp bin/querybox bin/querybox.app/Contents/MacOS/
+          cp bin/plugins/* bin/querybox.app/Contents/MacOS/bin/plugins/
+          codesign --force --deep --sign - bin/querybox.app
+
+      - name: Package
+        run: cd bin && zip -r ../querybox-darwin-universal.zip querybox.app
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: darwin-artifact
+          path: querybox-darwin-universal.zip
+
+  build-windows:
+    name: Build (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: .go-version
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install NSIS
+        run: choco install nsis -y
+
+      - name: Install wails3 CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+
+      - name: Build frontend
+        run: cd frontend && npm ci && npm run build
+
+      - name: Build plugins
+        shell: bash
+        run: bash scripts/build-plugins.sh
+
+      - name: Generate Windows resources
+        run: |
+          wails3 generate syso `
+            -arch amd64 `
+            -icon build/windows/icon.ico `
+            -manifest build/windows/wails.exe.manifest `
+            -info build/windows/info.json `
+            -out wails_windows_amd64.syso
+
+      - name: Build binary
+        run: |
+          $env:CGO_ENABLED = "0"
+          $env:GOOS = "windows"
+          $env:GOARCH = "amd64"
+          go build -tags production -trimpath -buildvcs=false `
+            -ldflags="-w -s -H windowsgui" -o bin/querybox.exe .
+
+      - name: Generate WebView2 bootstrapper
+        run: wails3 generate webview2bootstrapper -dir build/windows/nsis
+
+      - name: Build NSIS installer
+        run: |
+          $root = $pwd.Path
+          makensis `
+            "-DARG_WAILS_AMD64_BINARY=$root\bin\querybox.exe" `
+            "-DARG_WAILS_PLUGINS_DIR=$root\bin\plugins" `
+            "build\windows\nsis\project.nsi"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-artifact
+          path: bin/querybox-amd64-installer.exe
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [build-linux, build-darwin, build-windows]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: QueryBox ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            querybox-linux-amd64.tar.gz
+            querybox-darwin-universal.zip
+            querybox-windows-amd64-installer.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
