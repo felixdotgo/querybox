@@ -136,19 +136,8 @@ jobs:
       - name: Build plugins
         run: task build:plugins
 
-      - name: Build app
-        run: wails3 build
-
-      - name: Generate WebView2 bootstrapper
-        run: wails3 generate webview2bootstrapper -dir build/windows/nsis
-
-      - name: Build NSIS installer
-        run: |
-          $root = $pwd.Path
-          makensis `
-            "-DARG_WAILS_AMD64_BINARY=$root\bin\querybox.exe" `
-            "-DARG_WAILS_PLUGINS_DIR=$root\bin\plugins" `
-            "build\windows\nsis\project.nsi"
+      - name: Package app
+        run: wails3 package GOOS=windows
 
       - uses: actions/upload-artifact@v4
         with:
