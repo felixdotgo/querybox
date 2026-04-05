@@ -21,27 +21,26 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
 
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc libgtk-3-dev libwebkit2gtk-4.1-dev
 
-      - name: Install wails3 CLI
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+      - name: Install tools
+        run: |
+          go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+          go install github.com/go-task/task/v3/cmd/task@latest
 
-      - name: Build frontend
-        run: cd frontend && npm ci && npm run build
+      - name: Install frontend dependencies
+        run: cd frontend && npm ci
 
       - name: Build plugins
-        run: bash scripts/build-plugins.sh
+        run: task build:plugins
 
-      - name: Build binary
-        run: |
-          CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
-          go build -tags production -trimpath -buildvcs=false \
-          -ldflags="-w -s" -o bin/querybox .
+      - name: Build app
+        run: wails3 build
 
       - name: Package
         run: |
@@ -67,33 +66,25 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
 
-      - name: Install wails3 CLI
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+      - name: Install tools
+        run: |
+          go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+          go install github.com/go-task/task/v3/cmd/task@latest
 
-      - name: Build frontend
-        run: cd frontend && npm ci && npm run build
+      - name: Install frontend dependencies
+        run: cd frontend && npm ci
 
       - name: Build plugins
-        run: bash scripts/build-plugins.sh
+        run: task build:plugins
 
       - name: Build universal binary
         run: |
-          CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 \
-          CGO_CFLAGS="-mmacosx-version-min=10.15" \
-          CGO_LDFLAGS="-mmacosx-version-min=10.15" \
-          MACOSX_DEPLOYMENT_TARGET=10.15 \
-          go build -tags production -trimpath -buildvcs=false \
-          -ldflags="-w -s" -o bin/querybox-amd64 .
-
-          CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 \
-          CGO_CFLAGS="-mmacosx-version-min=10.15" \
-          CGO_LDFLAGS="-mmacosx-version-min=10.15" \
-          MACOSX_DEPLOYMENT_TARGET=10.15 \
-          go build -tags production -trimpath -buildvcs=false \
-          -ldflags="-w -s" -o bin/querybox-arm64 .
-
+          GOARCH=amd64 wails3 build
+          cp bin/querybox bin/querybox-amd64
+          GOARCH=arm64 wails3 build
+          cp bin/querybox bin/querybox-arm64
           lipo -create -output bin/querybox bin/querybox-amd64 bin/querybox-arm64
 
       - name: Create .app bundle
@@ -127,37 +118,26 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
 
       - name: Install NSIS
-        run: choco install nsis -y
+        run: |
+          choco install nsis -y
+          echo "C:\Program Files (x86)\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-      - name: Install wails3 CLI
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+      - name: Install tools
+        run: |
+          go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+          go install github.com/go-task/task/v3/cmd/task@latest
 
-      - name: Build frontend
-        run: cd frontend && npm ci && npm run build
+      - name: Install frontend dependencies
+        run: cd frontend && npm ci
 
       - name: Build plugins
-        shell: bash
-        run: bash scripts/build-plugins.sh
+        run: task build:plugins
 
-      - name: Generate Windows resources
-        run: |
-          wails3 generate syso `
-            -arch amd64 `
-            -icon build/windows/icon.ico `
-            -manifest build/windows/wails.exe.manifest `
-            -info build/windows/info.json `
-            -out wails_windows_amd64.syso
-
-      - name: Build binary
-        run: |
-          $env:CGO_ENABLED = "0"
-          $env:GOOS = "windows"
-          $env:GOARCH = "amd64"
-          go build -tags production -trimpath -buildvcs=false `
-            -ldflags="-w -s -H windowsgui" -o bin/querybox.exe .
+      - name: Build app
+        run: wails3 build
 
       - name: Generate WebView2 bootstrapper
         run: wails3 generate webview2bootstrapper -dir build/windows/nsis
