@@ -1,4 +1,4 @@
-# QueryBox (Current under development - Not released)
+# QueryBox
 
 **QueryBox** is a plugin-based database app for running core database actions, querying and viewing data across multiple systems. It is built for focused data work rather than complex database administration workflows.
 
