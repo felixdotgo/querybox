@@ -101,26 +101,10 @@ jobs:
       - name: Build plugins
         run: task build:plugins
 
-      - name: Build universal binary
-        run: |
-          GOARCH=amd64 wails3 build
-          cp bin/querybox bin/querybox-amd64
-          GOARCH=arm64 wails3 build
-          cp bin/querybox bin/querybox-arm64
-          lipo -create -output bin/querybox bin/querybox-amd64 bin/querybox-arm64
+      - name: Package universal app
+        run: task darwin:package:universal
 
-      - name: Create .app bundle
-        run: |
-          mkdir -p bin/querybox.app/Contents/MacOS/bin/plugins
-          mkdir -p bin/querybox.app/Contents/Resources
-          cp build/darwin/icons.icns bin/querybox.app/Contents/Resources/
-          cp build/darwin/Assets.car bin/querybox.app/Contents/Resources/
-          cp build/darwin/Info.plist bin/querybox.app/Contents/
-          cp bin/querybox bin/querybox.app/Contents/MacOS/
-          cp bin/plugins/* bin/querybox.app/Contents/MacOS/bin/plugins/
-          codesign --force --deep --sign - bin/querybox.app
-
-      - name: Package
+      - name: Archive .app bundle
         run: cd bin && zip -r ../querybox-darwin-universal.zip querybox.app
 
       - uses: actions/upload-artifact@v4
@@ -170,12 +154,14 @@ jobs:
         run: task build:plugins
 
       - name: Package app
-        run: wails3 package GOOS=windows
+        run: |
+          wails3 package GOOS=windows
+          mv bin/querybox-amd64-installer.exe querybox-windows-amd64-installer.exe
 
       - uses: actions/upload-artifact@v4
         with:
           name: windows-artifact
-          path: bin/querybox-amd64-installer.exe
+          path: querybox-windows-amd64-installer.exe
 
   release:
     name: Create Release
