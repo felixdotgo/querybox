@@ -39,12 +39,14 @@ watch(() => props.payload, resetSort)
 
 const showActions = computed(() => props.capabilities.includes('mutate-row'))
 const showEdit = computed(() => {
-  if (!showActions.value) return false
+  if (!showActions.value)
+    return false
   const hasSub = props.capabilities.includes('mutate-row::edit') || props.capabilities.includes('mutate-row::delete')
   return !hasSub || props.capabilities.includes('mutate-row::edit')
 })
 const showDelete = computed(() => {
-  if (!showActions.value) return false
+  if (!showActions.value)
+    return false
   const hasSub = props.capabilities.includes('mutate-row::edit') || props.capabilities.includes('mutate-row::delete')
   return !hasSub || props.capabilities.includes('mutate-row::delete')
 })
@@ -67,7 +69,8 @@ function togglePin(key) {
 
 const tableColumns = computed(() => {
   let cols = props.payload.columns || []
-  if (!Array.isArray(cols)) cols = Array.from(cols)
+  if (!Array.isArray(cols))
+    cols = Array.from(cols)
 
   const built = cols.map((c, idx) => {
     const name = c.name || `col${idx}`
@@ -81,7 +84,8 @@ const tableColumns = computed(() => {
         typeString = meta.type.replace(/\(.*\)$/, '').trim()
         typeColor = getDataTypeColor(typeString)
       }
-      if (meta?.primary_key) isPK = true
+      if (meta?.primary_key)
+        isPK = true
     }
 
     // Width must accommodate: name text + type badge + PK icon + sort indicator + pin + padding
@@ -111,6 +115,13 @@ const totalWidth = computed(() =>
   tableColumns.value.reduce((s, c) => s + c.width, 0),
 )
 
+// Single grid-template string used by header + every data row via a CSS
+// custom property on a shared parent. Computed once per column change, so
+// rows do not produce new style objects during scroll.
+const gridTemplate = computed(() =>
+  tableColumns.value.map(c => `${c.width}px`).join(' '),
+)
+
 // ─── row data ────────────────────────────────────────────────────────────────
 
 const rowOverrides = ref(new Map())
@@ -118,24 +129,30 @@ const rowOverrides = ref(new Map())
 const tableData = computed(() => {
   const source = sortedPayload.value || props.payload
   let cols = source.columns || []
-  if (!Array.isArray(cols)) cols = Array.from(cols)
+  if (!Array.isArray(cols))
+    cols = Array.from(cols)
   let rows = source.rows || []
-  if (!Array.isArray(rows)) rows = Array.from(rows)
+  if (!Array.isArray(rows))
+    rows = Array.from(rows)
 
   return rows.map((r, rowIdx) => {
     const obj = { key: rowIdx }
     let vals = []
     if (r) {
-      if (Array.isArray(r.values)) vals = r.values
-      else if (Array.isArray(r.Values)) vals = r.Values
-      else if (typeof r.getValues === 'function') vals = r.getValues()
+      if (Array.isArray(r.values))
+        vals = r.values
+      else if (Array.isArray(r.Values))
+        vals = r.Values
+      else if (typeof r.getValues === 'function')
+        vals = r.getValues()
     }
     ;(vals || []).forEach((v, i) => {
       const colName = (cols[i]?.name) ? cols[i].name : `col${i}`
       obj[colName] = v
     })
     const overrides = rowOverrides.value.get(rowIdx)
-    if (overrides) Object.assign(obj, overrides)
+    if (overrides)
+      Object.assign(obj, overrides)
     return obj
   })
 })
@@ -161,19 +178,34 @@ const offsetY = computed(() => startIndex.value * ROW_HEIGHT)
 // Visual offset for the fixed Actions panel (not inside the scroll container)
 const actionsOffsetY = computed(() => offsetY.value - scrollTop.value)
 
+// rAF-coalesce scroll updates so reactive recompute runs at most once per frame.
+// Without this, fast wheel events trigger dozens of recomputes per frame.
+let scrollRaf = 0
 function onScroll() {
-  if (bodyRef.value) scrollTop.value = bodyRef.value.scrollTop
+  if (scrollRaf)
+    return
+  scrollRaf = requestAnimationFrame(() => {
+    scrollRaf = 0
+    if (bodyRef.value)
+      scrollTop.value = bodyRef.value.scrollTop
+  })
 }
 
 let ro
 onMounted(() => {
   ro = new ResizeObserver(([entry]) => {
     const h = Math.floor(entry.contentRect.height)
-    if (h > 0) viewportHeight.value = h
+    if (h > 0)
+      viewportHeight.value = h
   })
-  if (bodyRef.value) ro.observe(bodyRef.value)
+  if (bodyRef.value)
+    ro.observe(bodyRef.value)
 })
-onBeforeUnmount(() => ro?.disconnect())
+onBeforeUnmount(() => {
+  ro?.disconnect()
+  if (scrollRaf)
+    cancelAnimationFrame(scrollRaf)
+})
 
 // ─── column sort ─────────────────────────────────────────────────────────────
 
@@ -186,8 +218,9 @@ function handleColumnSort(col) {
 // ─── row mutations ────────────────────────────────────────────────────────────
 
 function escapeSqlValue(val) {
-  if (val === null || val === undefined) return 'NULL'
-  return String(val).replace(/'/g, "''")
+  if (val === null || val === undefined)
+    return 'NULL'
+  return String(val).replace(/'/g, '\'\'')
 }
 
 function defaultFilterFor(row) {
@@ -204,7 +237,8 @@ function defaultFilterFor(row) {
 function pkFilterFor(row) {
   const schemaCols = Array.isArray(props.schema?.columns) ? props.schema.columns : []
   const pkNames = schemaCols.filter(c => c.primary_key).map(c => c.name)
-  if (pkNames.length === 0) return defaultFilterFor(row)
+  if (pkNames.length === 0)
+    return defaultFilterFor(row)
   const parts = []
   for (const key in row) {
     if (pkNames.includes(key)) {
@@ -244,11 +278,14 @@ async function refreshRow(rowKey, source, filter) {
   try {
     const connMap = {}
     const cred = await GetCredential(props.connection.id)
-    if (cred) connMap.credential_blob = cred
-    if (source?.includes('.')) connMap.database = source.split('.')[0]
+    if (cred)
+      connMap.credential_blob = cred
+    if (source?.includes('.'))
+      connMap.database = source.split('.')[0]
     const res = await ExecPlugin(props.connection.driver_type, connMap, `SELECT * FROM ${source} WHERE ${filter} LIMIT 1`, {})
     let pl = res?.result?.Payload ?? {}
-    if (pl.Sql) pl = pl.Sql
+    if (pl.Sql)
+      pl = pl.Sql
     const rows = Array.isArray(pl.Rows) ? pl.Rows : []
     if (rows.length === 0) { emit('mutated'); return }
     const freshVals = rows[0].Values ?? rows[0].values ?? []
@@ -263,7 +300,8 @@ async function refreshRow(rowKey, source, filter) {
 async function handleMutation(params) {
   const capturedRowKey = editorRowKey.value
   await performMutation(props.connection, params, ({ operation, source, filter } = {}) => {
-    if (operation === 'delete') emit('mutated')
+    if (operation === 'delete')
+      emit('mutated')
     else refreshRow(capturedRowKey, source, filter)
   })
 }
@@ -286,14 +324,13 @@ async function handleMutation(params) {
       class="min-h-0 flex-1 overflow-auto pb-10"
       @scroll.passive="onScroll"
     >
-      <div :style="{ minWidth: `${totalWidth}px` }">
+      <div :style="{ 'minWidth': `${totalWidth}px`, '--grid-cols': gridTemplate, '--row-h': `${ROW_HEIGHT}px` }">
         <!-- Sticky header -->
-        <div class="sticky top-0 z-10 flex border-b border-gray-200 bg-slate-50 text-xs font-semibold text-gray-600">
+        <div class="header-row sticky top-0 z-10 border-b border-gray-200 bg-slate-50 text-xs font-semibold text-gray-600">
           <div
             v-for="col in tableColumns"
             :key="col.key"
-            class="flex h-8 shrink-0 cursor-pointer select-none items-center gap-1 border-r border-gray-200 px-2 hover:bg-slate-100"
-            :style="{ width: `${col.width}px` }"
+            class="flex h-8 cursor-pointer select-none items-center gap-1 border-r border-gray-200 px-2 hover:bg-slate-100"
             :title="col.title"
             @click="handleColumnSort(col)"
           >
@@ -330,17 +367,16 @@ async function handleMutation(params) {
         <div :style="{ height: `${totalHeight}px`, position: 'relative' }">
           <div :style="{ transform: `translateY(${offsetY}px)` }">
             <div
-              v-for="(row, i) in renderedRows"
+              v-for="row in renderedRows"
               :key="row.key"
-              class="flex border-b border-gray-100 hover:bg-blue-50/40"
-              :class="(startIndex + i) % 2 === 1 ? 'bg-gray-50/60' : 'bg-white'"
-              :style="{ height: `${ROW_HEIGHT}px` }"
+              v-memo="[row, tableColumns]"
+              class="data-row border-b border-gray-100 hover:bg-blue-50/40"
+              :class="row.key % 2 === 1 ? 'bg-gray-50/60' : 'bg-white'"
             >
               <div
                 v-for="col in tableColumns"
                 :key="col.key"
-                class="flex shrink-0 items-center overflow-hidden border-r border-gray-100 px-2 text-xs"
-                :style="{ width: `${col.width}px` }"
+                class="flex items-center overflow-hidden border-r border-gray-100 px-2 text-xs"
                 :title="String(row[col.key] ?? '')"
               >
                 <span class="truncate">{{ row[col.key] ?? '' }}</span>
@@ -364,10 +400,11 @@ async function handleMutation(params) {
       <div class="relative flex-1 overflow-hidden">
         <div :style="{ transform: `translateY(${actionsOffsetY}px)` }">
           <div
-            v-for="(row, i) in renderedRows"
+            v-for="row in renderedRows"
             :key="row.key"
+            v-memo="[row, showEdit, showDelete]"
             class="flex items-center justify-center gap-1 border-b border-gray-100"
-            :class="(startIndex + i) % 2 === 1 ? 'bg-gray-50/60' : 'bg-white'"
+            :class="row.key % 2 === 1 ? 'bg-gray-50/60' : 'bg-white'"
             :style="{ height: `${ROW_HEIGHT}px` }"
           >
             <NButton
@@ -423,5 +460,13 @@ async function handleMutation(params) {
 }
 .pin-btn.is-pinned {
   color: var(--n-loading-color, #18a058);
+}
+.header-row,
+.data-row {
+  display: grid;
+  grid-template-columns: var(--grid-cols);
+}
+.data-row {
+  height: var(--row-h);
 }
 </style>

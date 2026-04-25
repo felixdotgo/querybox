@@ -1,7 +1,8 @@
-import { Events } from '@wailsio/runtime'
-import { onUnmounted, type Ref } from 'vue'
-import { ListConnections } from '@/bindings/github.com/felixdotgo/querybox/services/connectionservice'
+import type { Ref } from 'vue'
 import type { Connection } from '@/lib/types'
+import { Events } from '@wailsio/runtime'
+import { onUnmounted } from 'vue'
+import { ListConnections } from '@/bindings/github.com/felixdotgo/querybox/services/connectionservice'
 
 interface ConnectionEventsOptions {
   connections: Ref<Connection[]>
@@ -15,7 +16,11 @@ interface ConnectionEventsOptions {
 
 /**
  * Subscribes to backend connection domain events (created, updated, deleted)
- * and keeps local state in sync. Automatically unsubscribes on unmount.
+ * and keeps local state in sync without disturbing already-open connections.
+ *
+ * - loadConnections() refreshes the array only (used for initial load).
+ * - created/updated/deleted handlers mutate the array and per-id caches in place,
+ *   leaving the active connection's tree/schema cache untouched.
  */
 export function useConnectionEvents(opts: ConnectionEventsOptions) {
   const {
@@ -31,40 +36,27 @@ export function useConnectionEvents(opts: ConnectionEventsOptions) {
   async function loadConnections() {
     try {
       connections.value = (await ListConnections()) || []
-      Object.keys(connectionTrees).forEach(k => delete connectionTrees[k])
-      Object.keys(schemaCache).forEach(k => delete schemaCache[k])
     }
     catch (err) {
       console.error('ListConnections', err)
       connections.value = []
-      Object.keys(connectionTrees).forEach(k => delete connectionTrees[k])
-      Object.keys(schemaCache).forEach(k => delete schemaCache[k])
     }
   }
 
-  const offConnectionCreated = Events.On('connection:created', async (event: any) => {
-    const conn = (event?.data ?? event)?.connection
-    if (!conn)
+  const offConnectionCreated = Events.On('connection:created', (event: any) => {
+    const conn = (event?.data ?? event)?.connection as Connection | undefined
+    if (!conn?.id)
       return
-    try {
-      await loadConnections()
-      filter.value = ''
-    }
-    catch (err) {
-      console.error('connection:created handler loadConnections', err)
-    }
+    if (!connections.value.some(c => c.id === conn.id))
+      connections.value = [...connections.value, conn]
+    filter.value = ''
   })
 
-  const offConnectionDeleted = Events.On('connection:deleted', async (event: any) => {
+  const offConnectionDeleted = Events.On('connection:deleted', (event: any) => {
     const id = (event?.data ?? event)?.id
     if (!id)
       return
-    try {
-      await loadConnections()
-    }
-    catch (err) {
-      console.error('connection:deleted handler loadConnections', err)
-    }
+    connections.value = connections.value.filter(c => c.id !== id)
     delete connectionTrees[id]
     delete schemaCache[id]
     if (selectedConnection.value?.id === id)
@@ -76,18 +68,19 @@ export function useConnectionEvents(opts: ConnectionEventsOptions) {
     })
   })
 
-  const offConnectionUpdated = Events.On('connection:updated', async (event: any) => {
-    const id = (event?.data ?? event)?.connection?.id
-    if (id) {
-      delete connectionTrees[id]
-      delete schemaCache[id]
+  const offConnectionUpdated = Events.On('connection:updated', (event: any) => {
+    const conn = (event?.data ?? event)?.connection as Connection | undefined
+    const id = conn?.id
+    if (!id)
+      return
+    const idx = connections.value.findIndex(c => c.id === id)
+    if (idx !== -1) {
+      const next = connections.value.slice()
+      next[idx] = conn
+      connections.value = next
     }
-    try {
-      await loadConnections()
-    }
-    catch (err) {
-      console.error('connection:updated handler loadConnections', err)
-    }
+    delete connectionTrees[id]
+    delete schemaCache[id]
   })
 
   onUnmounted(() => {
