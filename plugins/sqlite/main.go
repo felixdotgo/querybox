@@ -25,13 +25,13 @@ func (m *sqlitePlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoReques
 	return &plugin.InfoResponse{
 		Type:        plugin.TypeDriver,
 		Name:        "SQLite",
-		Version:     "0.1.0",
+		Version:     "0.1.1",
 		Description: "SQLite database driver",
 		Url:         "https://www.sqlite.org/",
-		Author:      "SQLite Consortium",
+		Author:      "QueryBox Team",
 		Capabilities: []string{"query", "explain-query", "mutate-row", "describe-schema"},
 		Tags:        []string{"sql", "relational"},
-		License:     "Public Domain",
+		License:     "MIT",
 		IconUrl:     "https://www.sqlite.org/images/logo-square.jpg",
 	}, nil
 }
@@ -200,18 +200,18 @@ func (m *sqlitePlugin) ConnectionTree(ctx context.Context, req *plugin.Connectio
 
 	driver, dsn, err := driverDSN(c)
 	if err != nil {
-		return &plugin.ConnectionTreeResponse{}, nil
+		return nil, fmt.Errorf("sqlite: invalid connection: %w", err)
 	}
 
 	db, err := sql.Open(driver, dsn)
 	if err != nil {
-		return &plugin.ConnectionTreeResponse{}, nil
+		return nil, fmt.Errorf("sqlite: connect failed: %w", err)
 	}
 	defer db.Close()
 
 	rows, err := db.Query("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
 	if err != nil {
-		return &plugin.ConnectionTreeResponse{}, nil
+		return nil, fmt.Errorf("sqlite: list tables failed: %w", err)
 	}
 	defer rows.Close()
 

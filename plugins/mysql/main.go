@@ -25,13 +25,13 @@ func (m *mysqlPlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRequest
 	return &plugin.InfoResponse{
 		Type:        plugin.TypeDriver,
 		Name:        "MySQL",
-		Version:     "0.1.0",
+		Version:     "0.1.1",
 		Description: "MySQL database driver",
 		Url:         "https://www.mysql.com/",
-		Author:      "Oracle",
+		Author:      "QueryBox Team",
 		Capabilities: []string{"query", "explain-query", "mutate-row", "describe-schema"},
 		Tags:        []string{"sql", "relational"},
-		License:     "GPL-2.0",
+		License:     "MIT",
 		IconUrl:     "https://www.mysql.com/common/logos/logo-mysql-170x115.png",
 	}, nil
 }
@@ -343,15 +343,20 @@ func (m *mysqlPlugin) Exec(ctx context.Context, req *plugin.ExecRequest) (*plugi
 // ConnectionTree returns a server root node, a list of databases, and their
 // tables for browsing.  Each level exposes DDL actions so the user can create
 // or drop databases and tables directly from the connection tree.  If the
-// connection is invalid or the query fails an empty tree is returned.
+// connection is invalid or the underlying query fails, an error is returned
+// so callers (and the UI) can surface the failure instead of seeing an
+// indistinguishable empty tree.
 func (m *mysqlPlugin) ConnectionTree(ctx context.Context, req *plugin.ConnectionTreeRequest) (*plugin.ConnectionTreeResponse, error) {
 	dsn, err := buildDSN(req.Connection)
 	if err != nil || dsn == "" {
-		return &plugin.ConnectionTreeResponse{}, nil
+		if err == nil {
+			err = fmt.Errorf("empty DSN")
+		}
+		return nil, fmt.Errorf("mysql: invalid connection: %w", err)
 	}
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
-		return &plugin.ConnectionTreeResponse{}, nil
+		return nil, fmt.Errorf("mysql: connect failed: %w", err)
 	}
 	defer db.Close()
 
@@ -360,7 +365,7 @@ func (m *mysqlPlugin) ConnectionTree(ctx context.Context, req *plugin.Connection
 
 	rows, err := db.Query("SHOW DATABASES")
 	if err != nil {
-		return &plugin.ConnectionTreeResponse{}, nil
+		return nil, fmt.Errorf("mysql: list databases failed: %w", err)
 	}
 	defer rows.Close()
 

@@ -25,13 +25,13 @@ func (m *postgresqlPlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRe
 	return &plugin.InfoResponse{
 		Type:        plugin.TypeDriver,
 		Name:        "PostgreSQL",
-		Version:     "0.1.0",
+		Version:     "0.1.1",
 		Description: "PostgreSQL database driver",
 		Url:         "https://www.postgresql.org/",
-		Author:      "PostgreSQL Global Development Group",
+		Author:      "QueryBox Team",
 		Capabilities: []string{"query", "explain-query", "mutate-row", "describe-schema"},
 		Tags:        []string{"sql", "relational"},
-		License:     "PostgreSQL",
+		License:     "MIT",
 		IconUrl:     "https://www.postgresql.org/media/img/about/press/elephant.png",
 	}, nil
 }
@@ -531,13 +531,16 @@ func (m *postgresqlPlugin) ConnectionTree(ctx context.Context, req *plugin.Conne
 	dsn, err := buildConnString(req.Connection)
 	if err != nil || dsn == "" {
 		fmt.Fprintf(os.Stderr, "postgresql: ConnectionTree: DSN error: %v dsn=%q\n", err, dsn)
-		return &plugin.ConnectionTreeResponse{}, nil
+		if err == nil {
+			err = fmt.Errorf("empty DSN")
+		}
+		return nil, fmt.Errorf("postgresql: invalid connection: %w", err)
 	}
 
 	db, err := openPostgresDB(dsn)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "postgresql: ConnectionTree: open error: %v\n", err)
-		return &plugin.ConnectionTreeResponse{}, nil
+		return nil, fmt.Errorf("postgresql: connect failed: %w", err)
 	}
 	defer db.Close()
 

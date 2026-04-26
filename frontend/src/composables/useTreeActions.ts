@@ -84,10 +84,19 @@ export function useTreeActions({
       const params: Record<string, string> = {}
       if (cred)
         params.credential_blob = cred
-      await ExecPlugin(conn.driver_type, params, 'SELECT 1', {})
+      const res = await ExecPlugin(conn.driver_type, params, 'SELECT 1', {})
+      if (res && (res as { error?: string }).error) {
+        throw new Error((res as { error?: string }).error)
+      }
     }
     catch (err: unknown) {
       console.error('connection check', conn.id, err)
+      notification.error({
+        title: 'Connection failed',
+        content: (err as Error)?.message || String(err),
+        duration: 5000,
+      })
+      throw err
     }
   }
 
@@ -324,7 +333,7 @@ export function useTreeActions({
     selectedConnection.value = conn
     delete connectionTrees[conn.id]
     delete schemaCache[conn.id]
-    checkConnection(conn)
+    checkConnection(conn).catch(() => { /* notification already shown */ })
     emit('connection-opened', conn)
   }
 
