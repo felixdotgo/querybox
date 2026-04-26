@@ -25,21 +25,11 @@ wails3 dev
 
 ## Build & Release
 
-```bash
-# 1. Build plugins
-task build:plugins
-
-# 2. Build desktop app for target platform
-# (platform-specific Taskfile in build/<platform>/Taskfile.yml)
-task -d build/windows   # Windows
-task -d build/darwin    # macOS
-task -d build/linux     # Linux
-
-# 3. Verify the binary launches and can connect to a test database
-# 4. Tag release + update VERSION and changelog
-```
-
-Cross-platform builds are documented in `build/*/Taskfile.yml`.
+See **[docs/releasing.md](releasing.md)** for the full release process, including:
+- App release steps and version embedding
+- Plugin independent release steps
+- Update check mechanism and cache behaviour
+- Release checklists
 
 ---
 

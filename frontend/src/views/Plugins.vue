@@ -1,7 +1,8 @@
 <script setup>
 import { Events } from '@wailsio/runtime'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { ClosePluginsWindow } from '@/bindings/github.com/felixdotgo/querybox/services/app'
+import { Call } from '@wailsio/runtime'
+import { ClosePluginsWindow, OpenURL } from '@/bindings/github.com/felixdotgo/querybox/services/app'
 import { Rescan } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
 import { SafeZone } from '@/components/layout'
 import { usePlugins } from '@/composables/usePlugins'
@@ -12,6 +13,33 @@ const filter = ref('')
 const loading = ref(false)
 const loadError = ref('')
 const selected = ref(null)
+const updateStatus = ref(null)
+
+function semverGreater(a, b) {
+  const parse = v => (v || '').split('.').map(Number)
+  const [am, ai, ap] = parse(a)
+  const [bm, bi, bp] = parse(b)
+  if (am !== bm) return am > bm
+  if (ai !== bi) return ai > bi
+  return ap > bp
+}
+
+function pluginHasUpdate(plugin) {
+  if (!updateStatus.value?.pluginRegistry) return false
+  const entry = updateStatus.value.pluginRegistry[plugin.name?.toLowerCase()]
+  if (!entry) return false
+  return semverGreater(entry.version, plugin.version)
+}
+
+function pluginLatestVersion(plugin) {
+  return updateStatus.value?.pluginRegistry?.[plugin.name?.toLowerCase()]?.version
+}
+
+function pluginReleaseURL(plugin) {
+  const v = pluginLatestVersion(plugin)
+  if (!v) return ''
+  return `https://github.com/felixdotgo/querybox/releases/tag/plugin-${plugin.name?.toLowerCase()}-v${v}`
+}
 
 // keep the off-function so we can deregister on unmount
 let offPluginsOpened = null
@@ -54,6 +82,7 @@ onMounted(async () => {
   await load()
   offPluginsOpened = Events.On('plugins-window:opened', load)
   window.addEventListener('focus', load)
+  Call.ByName('updater.Updater.GetUpdateStatus').then(s => { updateStatus.value = s }).catch(() => {})
 })
 
 onUnmounted(() => {
@@ -83,6 +112,12 @@ function typeLabel(type) {
       <n-button size="small" quaternary :loading="loading" @click="load">
         Refresh
       </n-button>
+    </div>
+
+    <!-- App update banner -->
+    <div v-if="updateStatus?.appUpdateAvailable" class="shrink-0 text-xs text-amber-800 bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center justify-between">
+      <span>QueryBox {{ updateStatus.appLatestVersion }} is available (current: {{ updateStatus.appCurrentVersion }})</span>
+      <button class="ml-4 underline hover:no-underline" @click="OpenURL(updateStatus.appReleaseUrl)">Download →</button>
     </div>
 
     <!-- Error banner -->
@@ -125,8 +160,9 @@ function typeLabel(type) {
             :class="selected?.id === p.id ? 'bg-blue-50 border-l-2 border-l-blue-500' : 'border-l-2 border-l-transparent'"
             @click="selected = p"
           >
-            <div class="font-medium text-slate-800 truncate">
-              {{ p.name || p.id }}
+            <div class="flex items-center gap-1.5">
+              <span class="font-medium text-slate-800 truncate">{{ p.name || p.id }}</span>
+              <span v-if="pluginHasUpdate(p)" class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" title="Update available" />
             </div>
             <div class="text-xs text-slate-400 truncate mt-0.5">
               {{ p.version ? `v${p.version}` : '' }}
@@ -168,6 +204,12 @@ function typeLabel(type) {
           <p v-if="selected.description" class="text-slate-600 text-xs leading-relaxed mb-5">
             {{ selected.description }}
           </p>
+
+          <!-- Update available notice -->
+          <div v-if="pluginHasUpdate(selected)" class="mb-5 text-xs bg-amber-50 border border-amber-200 rounded px-3 py-2 flex items-center justify-between">
+            <span class="text-amber-800">Version {{ pluginLatestVersion(selected) }} available</span>
+            <button class="ml-4 underline text-amber-700 hover:no-underline" @click="OpenURL(pluginReleaseURL(selected))">View release →</button>
+          </div>
 
           <!-- Key/value grid -->
           <div class="grid grid-cols-[120px_1fr] gap-x-4 gap-y-2 text-xs">

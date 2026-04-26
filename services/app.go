@@ -1,6 +1,7 @@
 package services
 
 import (
+	"github.com/felixdotgo/querybox/pkg/version"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 )
@@ -233,6 +234,6 @@ func (a *App) OpenURL(url string) {
 func (a *App) ShowAboutDialog() {
 	a.App.Dialog.Info().
 		SetTitle("About QueryBox").
-		SetMessage("QueryBox\nVersion 0.1.0\n\n© 2024 Felixdotgo").
+		SetMessage("QueryBox\nVersion " + version.Version + "\n\n© 2024 QueryBox Team").
 		Show()
 }

@@ -41,7 +41,8 @@ jobs:
         run: |
           CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
           go build -tags production -trimpath -buildvcs=false \
-          -ldflags="-w -s" -o bin/querybox .
+          -ldflags="-w -s -X github.com/felixdotgo/querybox/pkg/version.Version=${{ github.ref_name }}" \
+          -o bin/querybox .
 
       - name: Package
         run: |
@@ -85,14 +86,16 @@ jobs:
           CGO_LDFLAGS="-mmacosx-version-min=10.15" \
           MACOSX_DEPLOYMENT_TARGET=10.15 \
           go build -tags production -trimpath -buildvcs=false \
-          -ldflags="-w -s" -o bin/querybox-amd64 .
+          -ldflags="-w -s -X github.com/felixdotgo/querybox/pkg/version.Version=${{ github.ref_name }}" \
+          -o bin/querybox-amd64 .
 
           CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 \
           CGO_CFLAGS="-mmacosx-version-min=10.15" \
           CGO_LDFLAGS="-mmacosx-version-min=10.15" \
           MACOSX_DEPLOYMENT_TARGET=10.15 \
           go build -tags production -trimpath -buildvcs=false \
-          -ldflags="-w -s" -o bin/querybox-arm64 .
+          -ldflags="-w -s -X github.com/felixdotgo/querybox/pkg/version.Version=${{ github.ref_name }}" \
+          -o bin/querybox-arm64 .
 
           lipo -create -output bin/querybox bin/querybox-amd64 bin/querybox-arm64
 
@@ -157,7 +160,8 @@ jobs:
           $env:GOOS = "windows"
           $env:GOARCH = "amd64"
           go build -tags production -trimpath -buildvcs=false `
-            -ldflags="-w -s -H windowsgui" -o bin/querybox.exe .
+            -ldflags="-w -s -H windowsgui -X github.com/felixdotgo/querybox/pkg/version.Version=${{ github.ref_name }}" `
+            -o bin/querybox.exe .
 
       - name: Generate WebView2 bootstrapper
         run: wails3 generate webview2bootstrapper -dir build/windows/nsis

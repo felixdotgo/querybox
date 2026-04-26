@@ -8,6 +8,7 @@ import (
 
 	"github.com/felixdotgo/querybox/services"
 	"github.com/felixdotgo/querybox/services/pluginmgr"
+	"github.com/felixdotgo/querybox/services/updater"
 )
 
 // Wails uses Go's `embed` package to embed the frontend files into the binary.
@@ -44,6 +45,7 @@ func main() {
 		log.Fatalf("failed to initialize connection service: %v", err)
 	}
 	mgr := pluginmgr.New()
+	updaterSvc := updater.New()
 
 	// Create a new Wails application by providing the necessary options.
 	// Variables 'Name' and 'Description' are for application metadata.
@@ -57,6 +59,7 @@ func main() {
 		Services: []application.Service{
 			application.NewService(connSvc),
 			application.NewService(mgr),
+			application.NewService(updaterSvc),
 			application.NewService(app), // Bind the App struct to allow frontend to call its methods (e.g. ShowConnections)
 		},
 		// Expose App methods (e.g. ShowConnections) to the frontend via bindings.
@@ -71,6 +74,7 @@ func main() {
 	// Inject the Wails app reference so services can emit log events to the frontend.
 	connSvc.SetApp(app.App)
 	mgr.SetApp(app.App)
+	updaterSvc.SetApp(app.App)
 
 	// Create default windows for the application.
 	// The main window is the primary interface,
