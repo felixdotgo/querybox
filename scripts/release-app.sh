@@ -33,17 +33,17 @@ git fetch --tags --quiet
 [[ -z "$(git tag -l "$VERSION")" ]] || die "Tag '$VERSION' already exists."
 
 # ── show changes since last tag ───────────────────────────────────────────────
-LAST_TAG="$(git describe --tags --abbrev=0 --match='v[0-9]*' 2>/dev/null || echo '')"
+LAST_TAG="$(git tag --sort=-version:refname -l 'v[0-9]*' | head -1)"
 
 echo ""
 bold "App release: $VERSION"
 echo ""
 if [[ -n "$LAST_TAG" ]]; then
   echo "Changes since $LAST_TAG:"
-  git log --oneline "$LAST_TAG..HEAD"
+  git log --oneline "$LAST_TAG..HEAD" || true
 else
   echo "No previous app tag found — this will be the first release."
-  git log --oneline | head -20
+  git log --oneline | head -20 || true
 fi
 
 # ── confirm ───────────────────────────────────────────────────────────────────

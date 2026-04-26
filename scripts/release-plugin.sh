@@ -63,7 +63,7 @@ git fetch --tags --quiet
 [[ -z "$(git tag -l "$TAG")" ]] || die "Tag '$TAG' already exists."
 
 # ── show changes since last tag ───────────────────────────────────────────────
-LAST_TAG="$(git describe --tags --abbrev=0 --match="plugin-$PLUGIN-v*" 2>/dev/null || echo '')"
+LAST_TAG="$(git tag --sort=-version:refname -l "plugin-$PLUGIN-v*" | head -1)"
 
 echo ""
 bold "Plugin release: $TAG"
@@ -76,10 +76,10 @@ echo ""
 
 if [[ -n "$LAST_TAG" ]]; then
   echo "Changes since $LAST_TAG:"
-  git log --oneline "$LAST_TAG..HEAD" -- "$PLUGIN_DIR" plugins/registry.json
+  git log --oneline "$LAST_TAG..HEAD" -- "$PLUGIN_DIR" plugins/registry.json || true
 else
   echo "No previous tag found for plugin '$PLUGIN' — this will be the first release."
-  git log --oneline -- "$PLUGIN_DIR" plugins/registry.json | head -20
+  git log --oneline -- "$PLUGIN_DIR" plugins/registry.json | head -20 || true
 fi
 
 # ── confirm ───────────────────────────────────────────────────────────────────
