@@ -1,7 +1,13 @@
 {
   "plugins": {
-    "mysql": { "version": "0.1.1" },
-    "postgresql": { "version": "0.1.1" },
-    "sqlite": { "version": "0.1.1" }
+    "mysql": {
+      "version": "0.0.2"
+    },
+    "postgresql": {
+      "version": "0.0.2"
+    },
+    "sqlite": {
+      "version": "0.0.2"
+    }
   }
 }

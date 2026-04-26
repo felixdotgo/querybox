@@ -25,7 +25,7 @@ func (m *postgresqlPlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRe
 	return &plugin.InfoResponse{
 		Type:        plugin.TypeDriver,
 		Name:        "PostgreSQL",
-		Version:     "0.1.1",
+		Version:     "0.0.2",
 		Description: "PostgreSQL database driver",
 		Url:         "https://www.postgresql.org/",
 		Author:      "QueryBox Team",
