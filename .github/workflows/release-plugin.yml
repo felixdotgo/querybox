@@ -80,72 +80,8 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: darwin-arm64-artifact
-          path: bin/plugins/
-
-  build-darwin-amd64:
-    name: Build (macOS amd64)
-    runs-on: macos-13
-    outputs:
-      plugin: ${{ steps.meta.outputs.plugin }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: .go-version
-
-      - name: Extract plugin name
-        id: meta
-        run: |
-          TAG="${{ github.ref_name }}"
-          AFTER="${TAG#plugin-}"
-          PLUGIN="${AFTER%-v*}"
-          echo "plugin=$PLUGIN" >> "$GITHUB_OUTPUT"
-
-      - name: Build plugin (amd64)
-        run: |
-          PLUGIN="${{ steps.meta.outputs.plugin }}"
-          CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 \
-          CGO_CFLAGS="-mmacosx-version-min=10.15" \
-          CGO_LDFLAGS="-mmacosx-version-min=10.15" \
-          go build -trimpath -buildvcs=false -ldflags="-w -s" \
-          -o bin/plugins/${PLUGIN}-darwin-amd64 ./plugins/${PLUGIN}
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: darwin-amd64-artifact
-          path: bin/plugins/
-
-  build-darwin-universal:
-    name: Build (macOS universal)
-    runs-on: macos-latest
-    needs: [build-darwin-arm64, build-darwin-amd64]
-    steps:
-      - name: Download arm64 artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: darwin-arm64-artifact
-          path: bin/plugins/
-
-      - name: Download amd64 artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: darwin-amd64-artifact
-          path: bin/plugins/
-
-      - name: Create universal binary
-        run: |
-          PLUGIN="${{ needs.build-darwin-arm64.outputs.plugin }}"
-          lipo -create \
-            -output bin/plugins/${PLUGIN}-darwin-universal \
-            bin/plugins/${PLUGIN}-darwin-arm64 \
-            bin/plugins/${PLUGIN}-darwin-amd64
-
-      - uses: actions/upload-artifact@v4
-        with:
           name: darwin-artifact
-          path: bin/plugins/*-darwin-universal
+          path: bin/plugins/
 
   build-windows:
     name: Build (Windows)
@@ -184,7 +120,7 @@ jobs:
   release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: [build-linux, build-darwin-universal, build-windows]
+    needs: [build-linux, build-darwin-arm64, build-windows]
     steps:
       - uses: actions/download-artifact@v4
         with:
