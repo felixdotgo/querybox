@@ -79,25 +79,15 @@ jobs:
       - name: Build plugins
         run: bash scripts/build-plugins.sh
 
-      - name: Build universal binary
+      - name: Build binary
         run: |
-          CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 \
-          CGO_CFLAGS="-mmacosx-version-min=10.15" \
-          CGO_LDFLAGS="-mmacosx-version-min=10.15" \
-          MACOSX_DEPLOYMENT_TARGET=10.15 \
-          go build -tags production -trimpath -buildvcs=false \
-          -ldflags="-w -s -X github.com/felixdotgo/querybox/pkg/version.Version=${{ github.ref_name }}" \
-          -o bin/querybox-amd64 .
-
           CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 \
           CGO_CFLAGS="-mmacosx-version-min=10.15" \
           CGO_LDFLAGS="-mmacosx-version-min=10.15" \
           MACOSX_DEPLOYMENT_TARGET=10.15 \
           go build -tags production -trimpath -buildvcs=false \
           -ldflags="-w -s -X github.com/felixdotgo/querybox/pkg/version.Version=${{ github.ref_name }}" \
-          -o bin/querybox-arm64 .
-
-          lipo -create -output bin/querybox bin/querybox-amd64 bin/querybox-arm64
+          -o bin/querybox .
 
       - name: Create .app bundle
         run: |
@@ -111,12 +101,12 @@ jobs:
           codesign --force --deep --sign - bin/querybox.app
 
       - name: Package
-        run: cd bin && zip -r ../querybox-darwin-universal.zip querybox.app
+        run: cd bin && zip -r ../querybox-darwin-arm64.zip querybox.app
 
       - uses: actions/upload-artifact@v4
         with:
           name: darwin-artifact
-          path: querybox-darwin-universal.zip
+          path: querybox-darwin-arm64.zip
 
   build-windows:
     name: Build (Windows)
@@ -176,10 +166,14 @@ jobs:
             "-DARG_WAILS_PLUGINS_DIR=$root\bin\plugins" `
             "build\windows\nsis\project.nsi"
 
+      - name: Stage installer
+        shell: pwsh
+        run: Copy-Item bin\querybox-amd64-installer.exe querybox-amd64-installer.exe
+
       - uses: actions/upload-artifact@v4
         with:
           name: windows-artifact
-          path: bin/querybox-amd64-installer.exe
+          path: querybox-amd64-installer.exe
 
   release:
     name: Create Release
@@ -196,7 +190,7 @@ jobs:
           generate_release_notes: true
           files: |
             querybox-linux-amd64.tar.gz
-            querybox-darwin-universal.zip
+            querybox-darwin-arm64.zip
             querybox-amd64-installer.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
