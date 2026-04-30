@@ -26,7 +26,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc libgtk-3-dev libwebkit2gtk-4.1-dev
+          sudo apt-get install -y gcc libgtk-3-dev libwebkit2gtk-4.1-dev rpm
 
       - name: Install wails3 CLI
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
@@ -44,17 +44,40 @@ jobs:
           -ldflags="-w -s -X github.com/felixdotgo/querybox/pkg/version.Version=${{ github.ref_name }}" \
           -o bin/querybox .
 
-      - name: Package
+      - name: Package tar.gz
         run: |
           mkdir -p staging/bin/plugins
           cp bin/querybox staging/
           cp bin/plugins/* staging/bin/plugins/
           tar -czf querybox-linux-amd64.tar.gz -C staging .
 
+      - name: Package .deb
+        run: |
+          APP_VERSION="${{ github.ref_name }}"
+          APP_VERSION="${APP_VERSION#v}"
+          APP_VERSION="$APP_VERSION" GOARCH=amd64 wails3 tool package \
+            -name querybox -format deb \
+            -config ./build/linux/nfpm/nfpm.yaml \
+            -out ./bin
+          cp bin/querybox_*.deb querybox-linux-amd64.deb
+
+      - name: Package .rpm
+        run: |
+          APP_VERSION="${{ github.ref_name }}"
+          APP_VERSION="${APP_VERSION#v}"
+          APP_VERSION="$APP_VERSION" GOARCH=amd64 wails3 tool package \
+            -name querybox -format rpm \
+            -config ./build/linux/nfpm/nfpm.yaml \
+            -out ./bin
+          cp bin/querybox-*.rpm querybox-linux-amd64.rpm
+
       - uses: actions/upload-artifact@v4
         with:
           name: linux-artifact
-          path: querybox-linux-amd64.tar.gz
+          path: |
+            querybox-linux-amd64.tar.gz
+            querybox-linux-amd64.deb
+            querybox-linux-amd64.rpm
 
   build-darwin:
     name: Build (macOS)
@@ -76,10 +99,7 @@ jobs:
       - name: Build frontend
         run: cd frontend && npm ci && npm run build
 
-      - name: Build plugins
-        run: bash scripts/build-plugins.sh
-
-      - name: Build binary
+      - name: Build binary (arm64)
         run: |
           CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 \
           CGO_CFLAGS="-mmacosx-version-min=10.15" \
@@ -87,7 +107,33 @@ jobs:
           MACOSX_DEPLOYMENT_TARGET=10.15 \
           go build -tags production -trimpath -buildvcs=false \
           -ldflags="-w -s -X github.com/felixdotgo/querybox/pkg/version.Version=${{ github.ref_name }}" \
-          -o bin/querybox .
+          -o bin/querybox-arm64 .
+
+      - name: Build binary (amd64)
+        run: |
+          CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 \
+          CGO_CFLAGS="-mmacosx-version-min=10.15" \
+          CGO_LDFLAGS="-mmacosx-version-min=10.15" \
+          MACOSX_DEPLOYMENT_TARGET=10.15 \
+          go build -tags production -trimpath -buildvcs=false \
+          -ldflags="-w -s -X github.com/felixdotgo/querybox/pkg/version.Version=${{ github.ref_name }}" \
+          -o bin/querybox-amd64 .
+
+      - name: Create universal binary
+        run: lipo -create -output bin/querybox bin/querybox-arm64 bin/querybox-amd64
+
+      - name: Build plugins (universal)
+        run: |
+          GOOS=darwin GOARCH=arm64 bash scripts/build-plugins.sh
+          mkdir -p bin/plugins-arm64 && cp bin/plugins/* bin/plugins-arm64/
+          GOOS=darwin GOARCH=amd64 bash scripts/build-plugins.sh
+          mkdir -p bin/plugins-amd64 && cp bin/plugins/* bin/plugins-amd64/
+          rm -rf bin/plugins && mkdir -p bin/plugins
+          for f in bin/plugins-arm64/*; do
+            name=$(basename "$f")
+            lipo -create -output "bin/plugins/$name" \
+              "bin/plugins-arm64/$name" "bin/plugins-amd64/$name"
+          done
 
       - name: Create .app bundle
         run: |
@@ -101,12 +147,12 @@ jobs:
           codesign --force --deep --sign - bin/querybox.app
 
       - name: Package
-        run: cd bin && zip -r ../querybox-darwin-arm64.zip querybox.app
+        run: cd bin && zip -r ../querybox-darwin-universal.zip querybox.app
 
       - uses: actions/upload-artifact@v4
         with:
           name: darwin-artifact
-          path: querybox-darwin-arm64.zip
+          path: querybox-darwin-universal.zip
 
   build-windows:
     name: Build (Windows)
@@ -168,12 +214,12 @@ jobs:
 
       - name: Stage installer
         shell: pwsh
-        run: Copy-Item bin\querybox-amd64-installer.exe querybox-amd64-installer.exe
+        run: Copy-Item bin\querybox-amd64-installer.exe querybox-windows-amd64-installer.exe
 
       - uses: actions/upload-artifact@v4
         with:
           name: windows-artifact
-          path: querybox-amd64-installer.exe
+          path: querybox-windows-amd64-installer.exe
 
   release:
     name: Create Release
@@ -190,7 +236,9 @@ jobs:
           generate_release_notes: true
           files: |
             querybox-linux-amd64.tar.gz
-            querybox-darwin-arm64.zip
-            querybox-amd64-installer.exe
+            querybox-linux-amd64.deb
+            querybox-linux-amd64.rpm
+            querybox-darwin-universal.zip
+            querybox-windows-amd64-installer.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
