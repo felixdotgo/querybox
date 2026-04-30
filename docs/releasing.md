@@ -56,7 +56,7 @@ Both the app and plugins follow [Semantic Versioning](https://semver.org/) (`MAJ
 
 5. **Verify the release** at `https://github.com/felixdotgo/querybox/releases`:
    - All 3 platform artifacts are attached
-   - Release notes are auto-generated from commit messages
+   - Release notes are auto-generated from commits between the previous app tag (`v*`) and the new tag
 
 ### What gets embedded
 
