@@ -52,24 +52,22 @@ jobs:
           tar -czf querybox-linux-amd64.tar.gz -C staging .
 
       - name: Package .deb
+        env:
+          GOARCH: amd64
         run: |
-          APP_VERSION="${{ github.ref_name }}"
-          APP_VERSION="${APP_VERSION#v}"
-          APP_VERSION="$APP_VERSION" GOARCH=amd64 wails3 tool package \
-            -name querybox -format deb \
-            -config ./build/linux/nfpm/nfpm.yaml \
-            -out ./bin
-          cp bin/querybox_*.deb querybox-linux-amd64.deb
+          TAG="${{ github.ref_name }}"
+          APP_VERSION="${TAG#v}" wails3 tool package -name querybox -format deb \
+            -config ./build/linux/nfpm/nfpm.yaml -out ./bin
+          cp bin/querybox.deb querybox-linux-amd64.deb
 
       - name: Package .rpm
+        env:
+          GOARCH: amd64
         run: |
-          APP_VERSION="${{ github.ref_name }}"
-          APP_VERSION="${APP_VERSION#v}"
-          APP_VERSION="$APP_VERSION" GOARCH=amd64 wails3 tool package \
-            -name querybox -format rpm \
-            -config ./build/linux/nfpm/nfpm.yaml \
-            -out ./bin
-          cp bin/querybox-*.rpm querybox-linux-amd64.rpm
+          TAG="${{ github.ref_name }}"
+          APP_VERSION="${TAG#v}" wails3 tool package -name querybox -format rpm \
+            -config ./build/linux/nfpm/nfpm.yaml -out ./bin
+          cp bin/querybox.rpm querybox-linux-amd64.rpm
 
       - uses: actions/upload-artifact@v4
         with:
@@ -99,7 +97,10 @@ jobs:
       - name: Build frontend
         run: cd frontend && npm ci && npm run build
 
-      - name: Build binary (arm64)
+      - name: Build plugins
+        run: bash scripts/build-plugins.sh
+
+      - name: Build binary
         run: |
           CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 \
           CGO_CFLAGS="-mmacosx-version-min=10.15" \
@@ -107,33 +108,7 @@ jobs:
           MACOSX_DEPLOYMENT_TARGET=10.15 \
           go build -tags production -trimpath -buildvcs=false \
           -ldflags="-w -s -X github.com/felixdotgo/querybox/pkg/version.Version=${{ github.ref_name }}" \
-          -o bin/querybox-arm64 .
-
-      - name: Build binary (amd64)
-        run: |
-          CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 \
-          CGO_CFLAGS="-mmacosx-version-min=10.15" \
-          CGO_LDFLAGS="-mmacosx-version-min=10.15" \
-          MACOSX_DEPLOYMENT_TARGET=10.15 \
-          go build -tags production -trimpath -buildvcs=false \
-          -ldflags="-w -s -X github.com/felixdotgo/querybox/pkg/version.Version=${{ github.ref_name }}" \
-          -o bin/querybox-amd64 .
-
-      - name: Create universal binary
-        run: lipo -create -output bin/querybox bin/querybox-arm64 bin/querybox-amd64
-
-      - name: Build plugins (universal)
-        run: |
-          GOOS=darwin GOARCH=arm64 bash scripts/build-plugins.sh
-          mkdir -p bin/plugins-arm64 && cp bin/plugins/* bin/plugins-arm64/
-          GOOS=darwin GOARCH=amd64 bash scripts/build-plugins.sh
-          mkdir -p bin/plugins-amd64 && cp bin/plugins/* bin/plugins-amd64/
-          rm -rf bin/plugins && mkdir -p bin/plugins
-          for f in bin/plugins-arm64/*; do
-            name=$(basename "$f")
-            lipo -create -output "bin/plugins/$name" \
-              "bin/plugins-arm64/$name" "bin/plugins-amd64/$name"
-          done
+          -o bin/querybox .
 
       - name: Create .app bundle
         run: |
@@ -147,12 +122,12 @@ jobs:
           codesign --force --deep --sign - bin/querybox.app
 
       - name: Package
-        run: cd bin && zip -r ../querybox-darwin-universal.zip querybox.app
+        run: cd bin && zip -r ../querybox-darwin-arm64.zip querybox.app
 
       - uses: actions/upload-artifact@v4
         with:
           name: darwin-artifact
-          path: querybox-darwin-universal.zip
+          path: querybox-darwin-arm64.zip
 
   build-windows:
     name: Build (Windows)
@@ -238,7 +213,7 @@ jobs:
             querybox-linux-amd64.tar.gz
             querybox-linux-amd64.deb
             querybox-linux-amd64.rpm
-            querybox-darwin-universal.zip
+            querybox-darwin-arm64.zip
             querybox-windows-amd64-installer.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
