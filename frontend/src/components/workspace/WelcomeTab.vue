@@ -27,10 +27,10 @@ import { Flash, Layers, Server, Terminal } from '@/lib/icons'
           </n-icon>
           <div>
             <p class="text-sm font-medium text-slate-700">
-              Add a connection
+              Add a profile
             </p>
             <p class="text-sm text-slate-400 mt-0.5 leading-relaxed">
-              Click <span class="font-semibold text-slate-500">+</span> in the Connections panel to configure a database.
+              Click <span class="font-semibold text-slate-500">+</span> in the Connections panel to configure access to a system.
             </p>
           </div>
         </div>
@@ -40,10 +40,10 @@ import { Flash, Layers, Server, Terminal } from '@/lib/icons'
           </n-icon>
           <div>
             <p class="text-sm font-medium text-slate-700">
-              Browse your schema
+              Browse resources
             </p>
             <p class="text-sm text-slate-400 mt-0.5 leading-relaxed">
-              Expand the tree to explore databases, tables and columns.
+              Expand the tree to inspect the resources exposed by the selected plugin.
             </p>
           </div>
         </div>
@@ -53,12 +53,12 @@ import { Flash, Layers, Server, Terminal } from '@/lib/icons'
           </n-icon>
           <div>
             <p class="text-sm font-medium text-slate-700">
-              Run a query
+              Run a query or action
             </p>
             <p class="text-sm text-slate-400 mt-0.5 leading-relaxed">
               Open a query tab and press
               <kbd class="inline-flex items-center px-1 py-px rounded bg-slate-100 border border-slate-300 text-[10px] font-mono text-slate-500 mx-0.5">Ctrl</kbd>+<kbd class="inline-flex items-center px-1 py-px rounded bg-slate-100 border border-slate-300 text-[10px] font-mono text-slate-500 mx-0.5">Enter</kbd>
-              to execute.
+              to execute, or trigger an action from the resource tree.
             </p>
           </div>
         </div>

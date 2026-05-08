@@ -1,8 +1,18 @@
 # QueryBox
 
-**QueryBox** is a plugin-based database app for running core database actions, querying and viewing data across multiple systems. It is built for focused data work rather than complex database administration workflows.
+**QueryBox** is a local-first operational workspace for backend engineers who need to inspect, query, debug, and operate data systems from one desktop app. It uses plugins to expose system-specific resources and actions while keeping runtime execution on the user's machine.
 
 ![QueryBox Desktop](docs/querybox-development.png)
+
+Today's implementation is still strongest on database workflows, but the product direction is broader than a database GUI. QueryBox is intentionally focused on operational workflows rather than becoming a general-purpose admin console or an AI-first product.
+
+## Product Direction
+
+- **Target user:** backend engineers working across databases, queues, object stores, logs, and other operational systems.
+- **Primary workflows:** inspect, query, debug, and operate systems through a single local workspace.
+- **Runtime principle:** local-first by default. No account, control plane, or cloud dependency is required for core usage.
+- **Product boundary:** optimize for resource-oriented workflows, not broad infrastructure administration.
+- **Terminology direction:** `connection/profile -> resource graph -> actions -> results/streams`.
 
 ## Prerequisites
 
@@ -91,6 +101,8 @@ Binaries are placed in `bin/plugins/` (Windows builds get `.exe`) and picked up 
    - `exec` — execute a query and return results
    - `connection-tree` — return a browsable object hierarchy
 
+   The current shipping contract is still centered on `connection-tree` and query-style execution. The roadmap is moving toward `resource.graph`, resource actions, and results/streams while preserving compatibility for existing plugins.
+
 3. Build and drop the binary:
    ```bash
    task build:plugins
@@ -114,7 +126,8 @@ See [docs/features/02-plugin-system.md](docs/features/02-plugin-system.md) for t
 ├── contracts/plugin/v1/        # Protobuf definitions
 ├── rpc/contracts/plugin/v1/    # Generated Go code (pluginpb)
 ├── frontend/                   # Vue 3 frontend
-├── docs/                       # Design and architecture documentation
+├── docs/                       # Design, ADR, and architecture documentation
+│   └── adr/                    # Architecture decision records
 ├── scripts/                    # Build helper scripts
 └── build/                      # Platform-specific build configuration
 ```
@@ -123,6 +136,7 @@ See [docs/features/02-plugin-system.md](docs/features/02-plugin-system.md) for t
 
 See [docs/README.md](docs/README.md) for the full reading order. Quick links:
 
+- [ADR-001: QueryBox as Operational Runtime](docs/adr/ADR-001-querybox-as-operational-runtime.md)
 - [Plugin system](docs/features/02-plugin-system.md)
 - [Query editor auto‑completion](docs/features/06-query-editor-autocomplete.md)
 
