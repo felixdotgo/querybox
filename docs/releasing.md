@@ -11,7 +11,7 @@ QueryBox has two independent release tracks:
 | Track | Tag format | Triggers | Artifacts |
 |---|---|---|---|
 | **App** | `v1.2.3` | `.github/workflows/release.yml` | Linux tar.gz, macOS .zip, Windows installer |
-| **Plugin** | `plugin-{name}-v1.2.3` | `.github/workflows/release-plugin.yml` | Per-platform plugin binaries |
+| **Plugin** | `plugin-{name}-v1.2.3` | `.github/workflows/release-plugin.yml` | Per-platform `.zip` archives containing the plugin binary and manifest sidecar |
 
 These tracks are decoupled — a plugin can be updated without shipping a new app version.
 
@@ -27,7 +27,10 @@ Both the app and plugins follow [Semantic Versioning](https://semver.org/) (`MAJ
 | New features, new capabilities, behavior changes | MINOR (`0.1.0 → 0.2.0`) |
 | Breaking changes to the plugin contract or API | MAJOR (`0.1.0 → 1.0.0`) |
 
-**Rule**: Any code change to a plugin requires a version bump in both the plugin's `Info()` function and in `plugins/registry.json` before pushing the release tag. See the [Plugin Version Bump rule in CLAUDE.md](../CLAUDE.md).
+**Rule**: Any code change to a plugin requires a version bump in three places before pushing the release tag:
+- the plugin's `Info()` function in `plugins/{name}/main.go`
+- the manifest version in `plugins/{name}/plugin.json`
+- the published version in `plugins/registry.json`
 
 ---
 
@@ -50,13 +53,15 @@ Both the app and plugins follow [Semantic Versioning](https://semver.org/) (`MAJ
    ```
 
 4. **GitHub Actions builds automatically** on tag push:
-   - Compiles the app for Linux (amd64), macOS (universal), and Windows (amd64)
-   - Embeds the version string via `-X github.com/felixdotgo/querybox/pkg/version.Version=v1.2.3`
-   - Packages artifacts and creates a GitHub Release
+  - Compiles the app for Linux (amd64), macOS (universal), and Windows (amd64)
+  - Embeds the version string via `-X github.com/felixdotgo/querybox/pkg/version.Version=v1.2.3`
+  - Packages artifacts and creates a GitHub Release
+  - Bundles built-in plugin binaries together with their `.manifest.json` sidecars on Linux, macOS, and Windows
 
 5. **Verify the release** at `https://github.com/felixdotgo/querybox/releases`:
-   - All 3 platform artifacts are attached
-   - Release notes are auto-generated from commits between the previous app tag (`v*`) and the new tag
+  - All 3 platform artifacts are attached
+  - Release notes are auto-generated from commits between the previous app tag (`v*`) and the new tag
+  - Installed app can still discover bundled plugins without manifest errors
 
 ### What gets embedded
 
@@ -71,20 +76,28 @@ Local/dev builds use `"dev"` as the version.
 
 ## Releasing a Plugin
 
-Plugins are released independently. Each plugin release creates a separate GitHub Release with per-platform binaries.
+Plugins are released independently. Each plugin release creates a separate GitHub Release with per-platform archives. Each archive must contain both the plugin binary and the adjacent manifest sidecar (`<binary>.manifest.json`), because runtime discovery is manifest-first.
 
 ### Steps
 
 1. **Make and commit your plugin changes.**
 
-2. **Bump the version** in two places:
+2. **Bump the version** in three places:
 
    a. In the plugin's `Info()` function (`plugins/{name}/main.go`):
    ```go
    Version: "0.1.2",
    ```
 
-   b. In `plugins/registry.json`:
+   b. In the plugin manifest (`plugins/{name}/plugin.json`):
+   ```json
+   {
+     "id": "mysql",
+     "version": "0.1.2"
+   }
+   ```
+
+   c. In `plugins/registry.json`:
    ```json
    {
      "plugins": {
@@ -93,9 +106,9 @@ Plugins are released independently. Each plugin release creates a separate GitHu
    }
    ```
 
-3. **Commit both changes together:**
+3. **Commit all version changes together:**
    ```bash
-   git add plugins/mysql/main.go plugins/registry.json
+   git add plugins/mysql/main.go plugins/mysql/plugin.json plugins/registry.json
    git commit -m "feat(plugin/mysql): ..."
    ```
 
@@ -106,9 +119,12 @@ Plugins are released independently. Each plugin release creates a separate GitHu
    ```
 
 5. **GitHub Actions builds automatically:**
+   - Validates that `main.go`, `plugin.json`, `plugins/registry.json`, and the tag all point to the same version
    - Builds `mysql` binary for Linux (amd64), macOS (universal via lipo), and Windows (amd64)
+   - Copies `plugins/mysql/plugin.json` beside each binary as `<binary>.manifest.json`
+   - Packages each platform as a `.zip` archive so users do not download the binary without its manifest
    - Creates a GitHub Release named `Plugin mysql v0.1.2`
-   - Attaches binaries: `mysql-linux-amd64`, `mysql-darwin-universal`, `mysql-windows-amd64.exe`
+   - Attaches archives: `mysql-linux-amd64.zip`, `mysql-darwin-universal.zip`, `mysql-windows-amd64.zip`
 
 6. **Users with the app already installed** will see an update badge in the Plugins window on their next app startup (checked once per day, see [Update Check Mechanism](#update-check-mechanism)).
 
@@ -123,13 +139,24 @@ Examples:
   plugin-sqlite-v0.1.1
 ```
 
-### Binary asset names
+### Plugin archive contents
 
-| Platform | Binary name |
+Each plugin release archive contains exactly two files:
+- the platform binary
+- the platform-specific manifest sidecar with the same base name plus `.manifest.json`
+
+Examples:
+- `mysql-linux-amd64.zip` → `mysql-linux-amd64` + `mysql-linux-amd64.manifest.json`
+- `mysql-darwin-universal.zip` → `mysql-darwin-universal` + `mysql-darwin-universal.manifest.json`
+- `mysql-windows-amd64.zip` → `mysql-windows-amd64.exe` + `mysql-windows-amd64.exe.manifest.json`
+
+### Plugin archive names
+
+| Platform | Archive name |
 |---|---|
-| Linux amd64 | `{name}-linux-amd64` |
-| macOS universal | `{name}-darwin-universal` |
-| Windows amd64 | `{name}-windows-amd64.exe` |
+| Linux amd64 | `{name}-linux-amd64.zip` |
+| macOS universal | `{name}-darwin-universal.zip` |
+| Windows amd64 | `{name}-windows-amd64.zip` |
 
 ---
 
@@ -176,7 +203,7 @@ On startup the app runs a background update check (non-blocking):
 }
 ```
 
-Keys must match `plugin.name.toLowerCase()` as returned by the plugin's `Info()` response.
+Keys must match the plugin identifier used in the manifest (`plugin.json -> id`). For the built-in plugins this is the same lowercase key currently shown in the UI.
 
 ---
 
@@ -188,13 +215,16 @@ Keys must match `plugin.name.toLowerCase()` as returned by the plugin's `Info()`
 - [ ] `git tag v1.2.3 && git push origin v1.2.3`
 - [ ] CI passes on all 3 platforms
 - [ ] GitHub Release has all 3 artifacts
+- [ ] Installed app still discovers bundled plugins without missing-manifest errors
 - [ ] About dialog shows correct version on a test install
 
 ### Plugin release checklist
 
 - [ ] Version bumped in `plugins/{name}/main.go` → `Info()` → `Version` field
+- [ ] Version bumped in `plugins/{name}/plugin.json`
 - [ ] Version bumped in `plugins/registry.json`
-- [ ] Both changes committed before tagging
+- [ ] All three version changes committed before tagging
 - [ ] `git tag plugin-{name}-v{version} && git push origin plugin-{name}-v{version}`
-- [ ] CI builds all 3 platform binaries successfully
-- [ ] GitHub Release `plugin-{name}-v{version}` exists with correct assets
+- [ ] CI validates manifest/registry/tag version consistency and builds all 3 platform archives successfully
+- [ ] GitHub Release `plugin-{name}-v{version}` exists with correct `.zip` assets
+- [ ] Extracting a release asset yields both the plugin binary and its `.manifest.json` sidecar

@@ -9,8 +9,8 @@ permissions:
   contents: write
 
 jobs:
-  build-linux:
-    name: Build (Linux)
+  prepare:
+    name: Prepare release metadata
     runs-on: ubuntu-latest
     outputs:
       plugin: ${{ steps.meta.outputs.plugin }}
@@ -32,28 +32,13 @@ jobs:
           echo "plugin=$PLUGIN" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc
+      - name: Validate plugin release metadata
+        run: bash scripts/check-plugin-release.sh "${{ steps.meta.outputs.plugin }}" "${{ steps.meta.outputs.version }}"
 
-      - name: Build plugin
-        run: |
-          PLUGIN="${{ steps.meta.outputs.plugin }}"
-          CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
-          go build -trimpath -buildvcs=false -ldflags="-w -s" \
-          -o bin/plugins/${PLUGIN}-linux-amd64 ./plugins/${PLUGIN}
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: linux-artifact
-          path: bin/plugins/
-
-  build-darwin:
-    name: Build (macOS universal)
-    runs-on: macos-latest
-    outputs:
-      plugin: ${{ steps.meta.outputs.plugin }}
+  build-linux:
+    name: Build (Linux)
+    runs-on: ubuntu-latest
+    needs: prepare
     steps:
       - uses: actions/checkout@v4
 
@@ -61,17 +46,50 @@ jobs:
         with:
           go-version-file: .go-version
 
-      - name: Extract plugin name
-        id: meta
+      - name: Install system dependencies
         run: |
-          TAG="${{ github.ref_name }}"
-          AFTER="${TAG#plugin-}"
-          PLUGIN="${AFTER%-v*}"
-          echo "plugin=$PLUGIN" >> "$GITHUB_OUTPUT"
+          sudo apt-get update
+          sudo apt-get install -y gcc
+
+      - name: Build plugin
+        run: |
+          PLUGIN="${{ needs.prepare.outputs.plugin }}"
+          CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
+          go build -trimpath -buildvcs=false -ldflags="-w -s" \
+          -o bin/plugins/${PLUGIN}-linux-amd64 ./plugins/${PLUGIN}
+
+      - name: Copy manifest sidecar
+        run: |
+          PLUGIN="${{ needs.prepare.outputs.plugin }}"
+          cp plugins/${PLUGIN}/plugin.json bin/plugins/${PLUGIN}-linux-amd64.manifest.json
+
+      - name: Package release asset
+        run: |
+          PLUGIN="${{ needs.prepare.outputs.plugin }}"
+          mkdir -p dist
+          zip -j "dist/${PLUGIN}-linux-amd64.zip" \
+            "bin/plugins/${PLUGIN}-linux-amd64" \
+            "bin/plugins/${PLUGIN}-linux-amd64.manifest.json"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-artifact
+          path: dist/*.zip
+
+  build-darwin:
+    name: Build (macOS universal)
+    runs-on: macos-latest
+    needs: prepare
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: .go-version
 
       - name: Build plugin (arm64)
         run: |
-          PLUGIN="${{ steps.meta.outputs.plugin }}"
+          PLUGIN="${{ needs.prepare.outputs.plugin }}"
           CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 \
           CGO_CFLAGS="-mmacosx-version-min=10.15" \
           CGO_LDFLAGS="-mmacosx-version-min=10.15" \
@@ -80,7 +98,7 @@ jobs:
 
       - name: Build plugin (amd64)
         run: |
-          PLUGIN="${{ steps.meta.outputs.plugin }}"
+          PLUGIN="${{ needs.prepare.outputs.plugin }}"
           CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 \
           CGO_CFLAGS="-mmacosx-version-min=10.15" \
           CGO_LDFLAGS="-mmacosx-version-min=10.15" \
@@ -89,23 +107,35 @@ jobs:
 
       - name: Create universal plugin binary
         run: |
-          PLUGIN="${{ steps.meta.outputs.plugin }}"
+          PLUGIN="${{ needs.prepare.outputs.plugin }}"
           lipo -create \
             -output bin/plugins/${PLUGIN}-darwin-universal \
             bin/plugins/${PLUGIN}-darwin-arm64 \
             bin/plugins/${PLUGIN}-darwin-amd64
           rm bin/plugins/${PLUGIN}-darwin-arm64 bin/plugins/${PLUGIN}-darwin-amd64
 
+      - name: Copy manifest sidecar
+        run: |
+          PLUGIN="${{ needs.prepare.outputs.plugin }}"
+          cp plugins/${PLUGIN}/plugin.json bin/plugins/${PLUGIN}-darwin-universal.manifest.json
+
+      - name: Package release asset
+        run: |
+          PLUGIN="${{ needs.prepare.outputs.plugin }}"
+          mkdir -p dist
+          zip -j "dist/${PLUGIN}-darwin-universal.zip" \
+            "bin/plugins/${PLUGIN}-darwin-universal" \
+            "bin/plugins/${PLUGIN}-darwin-universal.manifest.json"
+
       - uses: actions/upload-artifact@v4
         with:
           name: darwin-artifact
-          path: bin/plugins/
+          path: dist/*.zip
 
   build-windows:
     name: Build (Windows)
     runs-on: windows-latest
-    outputs:
-      plugin: ${{ steps.meta.outputs.plugin }}
+    needs: prepare
     steps:
       - uses: actions/checkout@v4
 
@@ -113,32 +143,39 @@ jobs:
         with:
           go-version-file: .go-version
 
-      - name: Extract plugin name
-        id: meta
-        shell: bash
-        run: |
-          TAG="${{ github.ref_name }}"
-          AFTER="${TAG#plugin-}"
-          PLUGIN="${AFTER%-v*}"
-          echo "plugin=$PLUGIN" >> "$GITHUB_OUTPUT"
-
       - name: Build plugin
         shell: bash
         run: |
-          PLUGIN="${{ steps.meta.outputs.plugin }}"
+          PLUGIN="${{ needs.prepare.outputs.plugin }}"
           CGO_ENABLED=0 GOOS=windows GOARCH=amd64 \
           go build -trimpath -buildvcs=false -ldflags="-w -s" \
           -o bin/plugins/${PLUGIN}-windows-amd64.exe ./plugins/${PLUGIN}
 
+      - name: Copy manifest sidecar
+        shell: bash
+        run: |
+          PLUGIN="${{ needs.prepare.outputs.plugin }}"
+          cp plugins/${PLUGIN}/plugin.json bin/plugins/${PLUGIN}-windows-amd64.exe.manifest.json
+
+      - name: Package release asset
+        shell: pwsh
+        run: |
+          $plugin = "${{ needs.prepare.outputs.plugin }}"
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path @(
+            "bin/plugins/$plugin-windows-amd64.exe",
+            "bin/plugins/$plugin-windows-amd64.exe.manifest.json"
+          ) -DestinationPath "dist/$plugin-windows-amd64.zip"
+
       - uses: actions/upload-artifact@v4
         with:
           name: windows-artifact
-          path: bin/plugins/
+          path: dist/*.zip
 
   release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: [build-linux, build-darwin, build-windows]
+    needs: [prepare, build-linux, build-darwin, build-windows]
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -147,7 +184,8 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
-          name: Plugin ${{ needs.build-linux.outputs.plugin }} v${{ needs.build-linux.outputs.version }}
+          name: Plugin ${{ needs.prepare.outputs.plugin }} v${{ needs.prepare.outputs.version }}
+          tag_name: ${{ github.ref_name }}
           generate_release_notes: false
           files: artifacts/*
         env:

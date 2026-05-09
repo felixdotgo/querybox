@@ -41,6 +41,12 @@ for d in "$PLUGINS_DIR"/*; do
     continue
   fi
 
+  manifest_src="$PLUGINS_DIR/$name/plugin.json"
+  if [ ! -f "$manifest_src" ]; then
+    echo "  Missing required manifest: $manifest_src" >&2
+    exit 1
+  fi
+
   # determine final output path; on Windows add .exe if not already
   out_path="$OUT_DIR/$name"
 
@@ -65,13 +71,8 @@ for d in "$PLUGINS_DIR"/*; do
   if GOOS=${GOOS:-} GOARCH=${GOARCH:-} go build -o "$out_path" "${build_target:-./plugins/$name}"; then
     # make executable and preserve extension
     chmod +x "$out_path" || true
-    manifest_src="$PLUGINS_DIR/$name/plugin.json"
     manifest_dst="${out_path}.manifest.json"
-    if [ -f "$manifest_src" ]; then
-      cp "$manifest_src" "$manifest_dst"
-    else
-      rm -f "$manifest_dst"
-    fi
+    cp "$manifest_src" "$manifest_dst"
     built=$((built+1))
   else
     echo "  Failed to build $name" >&2

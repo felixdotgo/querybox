@@ -91,6 +91,7 @@ Section
     !ifdef ARG_WAILS_PLUGINS_DIR
         SetOutPath "$INSTDIR\bin\plugins"
         File "${ARG_WAILS_PLUGINS_DIR}\*.exe"
+        File "${ARG_WAILS_PLUGINS_DIR}\*.manifest.json"
         SetOutPath "$INSTDIR"
     !endif
 

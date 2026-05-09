@@ -6,7 +6,7 @@ IFS=$'\n\t'
 # Example: scripts/release-plugin.sh mysql
 #
 # Version is read from plugins/registry.json.
-# Both registry.json and the plugin's Info() must have matching versions before running this script.
+# registry.json, plugin.json, and the plugin's Info() must have matching versions before running this script.
 #
 # Creates the release tag locally. Push manually after review:
 #   git push origin plugin-<name>-v<version>
@@ -27,6 +27,7 @@ PLUGIN="${1:-}"
 PLUGIN_DIR="plugins/$PLUGIN"
 [[ -d "$PLUGIN_DIR" ]]       || die "Plugin directory '$PLUGIN_DIR' not found."
 [[ -f "$PLUGIN_DIR/main.go" ]] || die "No main.go found in '$PLUGIN_DIR'."
+[[ -f "$PLUGIN_DIR/plugin.json" ]] || die "No plugin.json found in '$PLUGIN_DIR'."
 
 # ── read versions ─────────────────────────────────────────────────────────────
 REGISTRY_VERSION="$(python3 -c "
@@ -42,11 +43,19 @@ INFO_VERSION="$(grep -oE 'Version:[[:space:]]*"[0-9]+\.[0-9]+\.[0-9]+"' "$PLUGIN
   | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')" \
   || die "Could not find Version field in $PLUGIN_DIR/main.go."
 
+MANIFEST_VERSION="$(python3 -c "
+import json
+print(json.load(open('$PLUGIN_DIR/plugin.json'))['version'])
+")" || die "Could not read version from $PLUGIN_DIR/plugin.json."
+
+bash "$ROOT_DIR/scripts/check-plugin-release.sh" "$PLUGIN"
+
 # ── validate consistency ──────────────────────────────────────────────────────
-if [[ "$REGISTRY_VERSION" != "$INFO_VERSION" ]]; then
-  die "Version mismatch — both must match before releasing:
+if [[ "$REGISTRY_VERSION" != "$INFO_VERSION" || "$REGISTRY_VERSION" != "$MANIFEST_VERSION" ]]; then
+  die "Version mismatch — all release sources must match before releasing:
   plugins/registry.json  →  $REGISTRY_VERSION
-  $PLUGIN_DIR/main.go   →  $INFO_VERSION"
+  $PLUGIN_DIR/plugin.json →  $MANIFEST_VERSION
+  $PLUGIN_DIR/main.go     →  $INFO_VERSION"
 fi
 
 VERSION="$REGISTRY_VERSION"
@@ -71,6 +80,7 @@ echo ""
 printf "  %-24s %s\n" "Plugin:" "$PLUGIN"
 printf "  %-24s %s\n" "Version:" "$VERSION"
 printf "  %-24s %s ✓\n" "registry.json:" "$REGISTRY_VERSION"
+printf "  %-24s %s ✓\n" "plugin.json:" "$MANIFEST_VERSION"
 printf "  %-24s %s ✓\n" "Info() in main.go:" "$INFO_VERSION"
 echo ""
 
