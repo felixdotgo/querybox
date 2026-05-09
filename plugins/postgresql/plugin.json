@@ -11,7 +11,9 @@
     "resource.graph",
     "connection.test",
     "query.execute",
-    "schema.inspect"
+    "schema.inspect",
+    "explain-query",
+    "mutate-row"
   ],
   "permissions": [
     {

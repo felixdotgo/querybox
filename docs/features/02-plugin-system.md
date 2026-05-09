@@ -88,6 +88,10 @@ The currently supported capability taxonomy is:
 - `stream.read`
 - `connection.test`
 - `schema.inspect`
+- `explain-query`
+- `mutate-row`
+- `mutate-row::edit`
+- `mutate-row::delete`
 
 Bundled plugins are expected to ship a manifest. Discovery fails fast when the
 manifest is missing or invalid.
@@ -178,9 +182,9 @@ Plugins strip any existing `ORDER BY` clause before appending the new one (using
 
 | Plugin | Commands | Capabilities | Notes |
 |--------|----------|-------------|-------|
-| `mysql` | info, exec, authforms, resource-graph, test-connection, describe-schema, completion-fields | `resource.graph`, `query.execute`, `connection.test`, `schema.inspect`; `explain-query` via info metadata | Browse path is native `resource-graph` |
-| `postgresql` | info, exec, authforms, resource-graph, test-connection, describe-schema, completion-fields | `resource.graph`, `query.execute`, `connection.test`, `schema.inspect`; `explain-query` via info metadata | Browse path is native `resource-graph` |
-| `sqlite` | info, exec, authforms, resource-graph, test-connection, describe-schema, completion-fields | `resource.graph`, `query.execute`, `connection.test`, `schema.inspect`; `explain-query` via info metadata | Browse path is native `resource-graph` |
+| `mysql` | info, exec, authforms, resource-graph, test-connection, describe-schema, completion-fields, mutate-row | `resource.graph`, `query.execute`, `connection.test`, `schema.inspect`, `explain-query`, `mutate-row` | Browse path is native `resource-graph` |
+| `postgresql` | info, exec, authforms, resource-graph, test-connection, describe-schema, completion-fields, mutate-row | `resource.graph`, `query.execute`, `connection.test`, `schema.inspect`, `explain-query`, `mutate-row` | Browse path is native `resource-graph` |
+| `sqlite` | info, exec, authforms, resource-graph, test-connection, describe-schema, completion-fields, mutate-row | `resource.graph`, `query.execute`, `connection.test`, `schema.inspect`, `explain-query`, `mutate-row` | Browse path is native `resource-graph` |
 | `mongodb` | exec, authforms, connection-tree, test-connection, completion-fields | — | Two auth forms: basic (host/port/password/db/auth-db) + URI string; fields derived by sampling documents |
 | `redis` | exec, authforms | — | Two auth forms: basic (host/port/password/db) + URL string; no field metadata (key-value store) |
 | `arangodb` | exec, authforms, completion-fields | — | Multi-model (documents, graphs); basic auth form; ATTRIBUTES() comment for editor autocompletion |

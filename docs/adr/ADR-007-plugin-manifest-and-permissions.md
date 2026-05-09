@@ -29,6 +29,10 @@ The current supported capability taxonomy is:
 - `stream.read`
 - `connection.test`
 - `schema.inspect`
+- `explain-query`
+- `mutate-row`
+- `mutate-row::edit`
+- `mutate-row::delete`
 
 Discovery loads and validates the manifest before execution. If no manifest exists, QueryBox falls back to the legacy `info` command so old plugins still work.
 
