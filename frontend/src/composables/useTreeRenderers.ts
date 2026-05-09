@@ -1,11 +1,12 @@
+import type { ComputedRef, Ref } from 'vue'
+import type { Connection, PluginInfo } from '@/lib/types'
 import { NButton, NIcon, NSpin } from 'naive-ui'
-import { h, type ComputedRef, type Ref } from 'vue'
-import DbIcon from '@/components/DbIcon.vue'
+import { h } from 'vue'
 import ConnectionEntryLabel from '@/components/connections/ConnectionEntryLabel.vue'
 import ConnectionTreeItemLabel from '@/components/connections/ConnectionTreeItemLabel.vue'
+import DbIcon from '@/components/DbIcon.vue'
 import { getIconNameForDriver } from '@/lib/dbIcons'
 import { nodeTypeFallbackIcon, nodeTypeIconMap } from '@/lib/icons'
-import type { Connection, PluginInfo } from '@/lib/types'
 
 interface TreeRenderOptions {
   connections: Ref<Connection[]>
@@ -58,10 +59,11 @@ export function useTreeRenderers(opts: TreeRenderOptions) {
 
   function renderLabel({ option }: { option: any }) {
     const conn = connections.value.find((c: Connection) => c.id === option.key)
+    const nodeKind = option.kind ?? option.node_type
 
     // "action" leaf nodes
-    if (!conn && option.node_type === 'action') {
-      const actionIcon = (nodeTypeIconMap as Record<string, any>)[option.node_type] ?? nodeTypeFallbackIcon
+    if (!conn && nodeKind === 'action') {
+      const actionIcon = (nodeTypeIconMap as Record<string, any>)[nodeKind] ?? nodeTypeFallbackIcon
       return h(
         NButton,
         { size: 'tiny', secondary: true, style: 'margin: 1px 0', type: 'primary' },
@@ -88,7 +90,7 @@ export function useTreeRenderers(opts: TreeRenderOptions) {
     }
 
     if (!conn)
-      return option.label
+      return option.label ?? option.name ?? option.id
 
     return h(ConnectionEntryLabel, {
       label: option.label,
@@ -119,7 +121,9 @@ export function useTreeRenderers(opts: TreeRenderOptions) {
       return h(NSpin, { size: 14 })
     }
 
-    if (option.node_type === 'action')
+    const nodeKind = option.kind ?? option.node_type
+
+    if (nodeKind === 'action')
       return null
 
     const conn = connections.value.find((c: Connection) => c.id === option.key)
@@ -130,7 +134,7 @@ export function useTreeRenderers(opts: TreeRenderOptions) {
       return h(DbIcon, { driver: iconName, size: 14 })
     }
 
-    const icon = (nodeTypeIconMap as Record<string, any>)[option.node_type] ?? nodeTypeFallbackIcon
+    const icon = (nodeTypeIconMap as Record<string, any>)[nodeKind] ?? nodeTypeFallbackIcon
     const iconNode = h(NIcon, { size: 14 }, { default: () => h(icon) })
 
     if (conn && activeConnectionId.value === (conn as Connection).id) {

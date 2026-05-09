@@ -65,6 +65,13 @@ for d in "$PLUGINS_DIR"/*; do
   if GOOS=${GOOS:-} GOARCH=${GOARCH:-} go build -o "$out_path" "${build_target:-./plugins/$name}"; then
     # make executable and preserve extension
     chmod +x "$out_path" || true
+    manifest_src="$PLUGINS_DIR/$name/plugin.json"
+    manifest_dst="${out_path}.manifest.json"
+    if [ -f "$manifest_src" ]; then
+      cp "$manifest_src" "$manifest_dst"
+    else
+      rm -f "$manifest_dst"
+    fi
     built=$((built+1))
   else
     echo "  Failed to build $name" >&2

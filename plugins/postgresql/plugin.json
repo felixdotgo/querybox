@@ -1,0 +1,25 @@
+{
+  "id": "postgresql",
+  "name": "PostgreSQL",
+  "description": "Built-in PostgreSQL driver plugin for QueryBox.",
+  "version": "0.0.2",
+  "runtime": {
+    "kind": "local"
+  },
+  "capabilities": [
+    "connection.test",
+    "query.execute",
+    "schema.inspect"
+  ],
+  "permissions": [
+    {
+      "name": "network"
+    }
+  ],
+  "limits": {
+    "timeout_seconds": 30
+  },
+  "metadata": {
+    "legacy_tree_adapter": "connection-tree"
+  }
+}

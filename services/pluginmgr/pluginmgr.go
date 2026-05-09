@@ -2,6 +2,7 @@ package pluginmgr
 
 import (
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -22,23 +23,27 @@ import (
 // filesystem extension such as ".exe" so that the same value appears on all
 // OSes.
 type PluginInfo struct {
-	ID          string            `json:"id"`
-	Name        string            `json:"name"`
-	Path        string            `json:"path"`
-	Running     bool              `json:"running"`        // always false in on-demand model
-	Type        int               `json:"type,omitempty"` // follows PluginV1.Type enum (DRIVER = 1)
-	Version     string            `json:"version,omitempty"`
-	Description string            `json:"description,omitempty"`
-	URL         string            `json:"url,omitempty"`
-	Author      string            `json:"author,omitempty"`
-	Capabilities []string         `json:"capabilities,omitempty"`
-	Tags        []string          `json:"tags,omitempty"`
-	License     string            `json:"license,omitempty"`
-	IconURL     string            `json:"icon_url,omitempty"`
-	Contact     string            `json:"contact,omitempty"`
-	Metadata    map[string]string `json:"metadata,omitempty"`
-	Settings    map[string]string `json:"settings,omitempty"`
-	LastError   string            `json:"lastError,omitempty"`
+	ID           string                  `json:"id"`
+	Name         string                  `json:"name"`
+	Path         string                  `json:"path"`
+	ManifestPath string                  `json:"manifest_path,omitempty"`
+	Running      bool                    `json:"running"`        // always false in on-demand model
+	Type         int                     `json:"type,omitempty"` // follows PluginV1.Type enum (DRIVER = 1)
+	Version      string                  `json:"version,omitempty"`
+	Description  string                  `json:"description,omitempty"`
+	URL          string                  `json:"url,omitempty"`
+	Author       string                  `json:"author,omitempty"`
+	Capabilities []string                `json:"capabilities,omitempty"`
+	Permissions  []plugin.PermissionDecl `json:"permissions,omitempty"`
+	Limits       *plugin.Limits          `json:"limits,omitempty"`
+	Runtime      *plugin.RuntimeSpec     `json:"runtime,omitempty"`
+	Tags         []string                `json:"tags,omitempty"`
+	License      string                  `json:"license,omitempty"`
+	IconURL      string                  `json:"icon_url,omitempty"`
+	Contact      string                  `json:"contact,omitempty"`
+	Metadata     map[string]string       `json:"metadata,omitempty"`
+	Settings     map[string]string       `json:"settings,omitempty"`
+	LastError    string                  `json:"lastError,omitempty"`
 }
 
 // Manager discovers executables under one or more plugin directories and
@@ -48,26 +53,28 @@ type PluginInfo struct {
 // used instead. Plugins found in an earlier directory mask identical names in
 // later directories. The Manager does NOT manage long-running plugin processes.
 type Manager struct {
-    // Dir is the directory that should be treated as the canonical plugin
-    // location; it is kept for backwards compatibility and exported bindings.
-    // In practice this will equal the first element of dirs (usually the
-    // per-user config directory when available).
-    Dir string
+	// Dir is the directory that should be treated as the canonical plugin
+	// location; it is kept for backwards compatibility and exported bindings.
+	// In practice this will equal the first element of dirs (usually the
+	// per-user config directory when available).
+	Dir string
 
-    // dirs holds the ordered list of directories that will be scanned when
-    // looking for plugins. The first entry has precedence in the event of
-    // name collisions. The slice may contain one or two elements depending on
-    // whether a user directory could be computed.
-    dirs []string
+	// dirs holds the ordered list of directories that will be scanned when
+	// looking for plugins. The first entry has precedence in the event of
+	// name collisions. The slice may contain one or two elements depending on
+	// whether a user directory could be computed.
+	dirs []string
 
-    // fallbackDir holds the bundled path, primarily for tests and logging.
-    // It is equal to bundledPluginsDir() and may be empty if the user dir
-    // took precedence and the bundled path is not present.
-    fallbackDir string
+	// fallbackDir holds the bundled path, primarily for tests and logging.
+	// It is equal to bundledPluginsDir() and may be empty if the user dir
+	// took precedence and the bundled path is not present.
+	fallbackDir string
 
-	mu      sync.Mutex
-	scanMu  sync.Mutex // serializes scanOnce calls so concurrent Rescan/init don't interleave
-	plugins map[string]PluginInfo
+	mu       sync.Mutex
+	scanMu   sync.Mutex // serializes scanOnce calls so concurrent Rescan/init don't interleave
+	plugins  map[string]PluginInfo
+	registry *PluginRegistry
+	runtime  *RuntimeManager
 
 	emitter    services.EventEmitter
 	appReadyCh chan struct{} // closed by SetApp once the Wails app is available
@@ -114,18 +121,18 @@ type execRequest struct {
 	// opaque options forwarded from the frontend; currently used for
 	// explain-query=yes requests.  This mirrors the protobuf ExecRequest
 	// `options` field and allows the host to signal driver-specific flags.
-	Options    map[string]string `json:"options,omitempty"`
+	Options map[string]string `json:"options,omitempty"`
 }
 
 // mutateRowRequest mirrors the protobuf MutateRowRequest but uses simple
 // Go types for CLI JSON encoding.  The `Operation` field reuses the
 // alias defined in pkg/plugin so the enum names are consistent.
 type mutateRowRequest struct {
-	Connection map[string]string        `json:"connection"`
-	Operation  plugin.OperationType     `json:"operation"`
-	Source     string                   `json:"source"`
-	Values     map[string]string        `json:"values"`
-	Filter     string                   `json:"filter"`
+	Connection map[string]string    `json:"connection"`
+	Operation  plugin.OperationType `json:"operation"`
+	Source     string               `json:"source"`
+	Values     map[string]string    `json:"values"`
+	Filter     string               `json:"filter"`
 }
 
 // We reuse the generated protobuf alias for the response so we stay in sync
@@ -142,44 +149,47 @@ type mutateRowRequest struct {
 // location beside the executable. The returned Manager populates Dir, dirs,
 // and fallbackDir accordingly.
 func New() *Manager {
-    userDir, err := userPluginsDir()
-    bundle := bundledPluginsDirFunc()
+	userDir, err := userPluginsDir()
+	bundle := bundledPluginsDirFunc()
 
-    m := &Manager{
-        plugins:    make(map[string]PluginInfo),
-        appReadyCh: make(chan struct{}),
-        fallbackDir: bundle,
-    }
+	m := &Manager{
+		plugins:     make(map[string]PluginInfo),
+		appReadyCh:  make(chan struct{}),
+		fallbackDir: bundle,
+	}
 
-    if err == nil && userDir != "" {
-        // if the user directory exists or can be created, use it as primary
-        // and copy bundled plugins into it every run. This keeps the user
-        // directory in sync with whatever shipped in the bundle; bundle files
-        // will replace any existing copies.
-        if err2 := os.MkdirAll(userDir, 0o755); err2 == nil {
-            populateUserDir(userDir, bundle)
-        }
-        m.dirs = append(m.dirs, userDir)
-        m.Dir = userDir
-    }
+	if err == nil && userDir != "" {
+		// if the user directory exists or can be created, use it as primary
+		// and copy bundled plugins into it every run. This keeps the user
+		// directory in sync with whatever shipped in the bundle; bundle files
+		// will replace any existing copies.
+		if err2 := os.MkdirAll(userDir, 0o755); err2 == nil {
+			populateUserDir(userDir, bundle)
+		}
+		m.dirs = append(m.dirs, userDir)
+		m.Dir = userDir
+	}
 
-    if bundle != "" {
-        // always include bundle location as fallback so that built-in plugins
-        // remain usable even if the user directory is populated later.
-        m.dirs = append(m.dirs, bundle)
-        if m.Dir == "" {
-            // if no user dir, make bundle the canonical Dir
-            m.Dir = bundle
-        }
-    }
+	if bundle != "" {
+		// always include bundle location as fallback so that built-in plugins
+		// remain usable even if the user directory is populated later.
+		m.dirs = append(m.dirs, bundle)
+		if m.Dir == "" {
+			// if no user dir, make bundle the canonical Dir
+			m.Dir = bundle
+		}
+	}
 
-    // ensure we at least have something to scan
-    if m.Dir == "" {
-        // last resort: use old behaviour
-        m.Dir = bundle
-        m.dirs = []string{bundle}
-        _ = os.MkdirAll(m.Dir, 0o755)
-    }
+	// ensure we at least have something to scan
+	if m.Dir == "" {
+		// last resort: use old behaviour
+		m.Dir = bundle
+		m.dirs = []string{bundle}
+		_ = os.MkdirAll(m.Dir, 0o755)
+	}
+
+	m.registry = NewPluginRegistry(m.dirs)
+	m.runtime = NewRuntimeManager()
 
 	// Probing each plugin binary can take up to 2 seconds (timeout), and with
 	// several plugins this adds up before Wails even initialises its windows.
@@ -190,6 +200,46 @@ func New() *Manager {
 		m.emitPluginsReady()
 	}()
 	return m
+}
+
+func (m *Manager) ensureRegistry() *PluginRegistry {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.plugins == nil {
+		m.plugins = make(map[string]PluginInfo)
+	}
+	if m.registry == nil {
+		m.registry = NewPluginRegistry(m.dirs)
+	} else {
+		m.registry.SetDirs(m.dirs)
+	}
+	return m.registry
+}
+
+func (m *Manager) ensureRuntime() *RuntimeManager {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.runtime == nil {
+		m.runtime = NewRuntimeManager()
+	}
+	return m.runtime
+}
+
+func (m *Manager) setPlugins(plugins map[string]PluginInfo) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.plugins = make(map[string]PluginInfo, len(plugins))
+	for id, info := range plugins {
+		if info.Runtime != nil && info.Runtime.Entrypoint != "" && !filepath.IsAbs(info.Runtime.Entrypoint) {
+			runtimeCopy := *info.Runtime
+			runtimeCopy.Entrypoint = filepath.Clean(runtimeCopy.Entrypoint)
+			info.Runtime = &runtimeCopy
+		}
+		m.plugins[id] = info
+	}
 }
 
 // emitPluginsReady emits the EventPluginsReady event to inform the frontend

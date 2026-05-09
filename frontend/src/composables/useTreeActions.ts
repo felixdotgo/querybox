@@ -1,6 +1,7 @@
-import { ref } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
+import type { Connection, TreeAction, TreeNode } from '@/lib/types'
 import { useDialog, useNotification } from 'naive-ui'
+import { ref } from 'vue'
 import {
   DeleteConnection,
   GetCredential,
@@ -10,7 +11,6 @@ import {
   ExecTreeAction,
 } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
 import { extractDatabase } from '@/lib/nodeKey'
-import type { Connection, TreeAction, TreeNode } from '@/lib/types'
 
 /** Node types that immediately trigger a select action on click. */
 const INSTANT_SELECT_TYPES = new Set(['table', 'collection', 'key', 'view', 'foreign-table'])
@@ -20,6 +20,14 @@ const PROMPT_ACTION_TYPES = new Set(['create-database', 'create-table'])
 
 /** Action types that require a destructive confirmation dialog. */
 const DESTRUCTIVE_ACTION_TYPES = new Set(['drop-database', 'drop-table', 'drop-collection'])
+
+function actionTypeOf(action: TreeAction | null | undefined): string {
+  return String(action?.type ?? action?.kind ?? action?.id ?? '')
+}
+
+function nodeKindOf(node: TreeNode | null | undefined): string {
+  return String(node?.kind ?? node?.node_type ?? '')
+}
 
 interface UseTreeActionsOptions {
   connections: Ref<Connection[]>
@@ -49,8 +57,8 @@ export function useTreeActions({
   const dialog = useDialog()
   const notification = useNotification()
 
-  const deleteModal = ref<{ visible: boolean; conn: Connection | null }>({ visible: false, conn: null })
-  const actionModal = ref<{ visible: boolean; action: TreeAction | null; conn: Connection | null; node: TreeNode | null }>({
+  const deleteModal = ref<{ visible: boolean, conn: Connection | null }>({ visible: false, conn: null })
+  const actionModal = ref<{ visible: boolean, action: TreeAction | null, conn: Connection | null, node: TreeNode | null }>({
     visible: false,
     action: null,
     conn: null,
@@ -132,7 +140,8 @@ export function useTreeActions({
           action.query || '',
           (extras.options as Record<string, string>) || ((extras.explain) ? { 'explain-query': 'yes' } : {}),
         )
-        if (!res) return
+        if (!res)
+          return
         if (res.error) {
           console.error('runTreeAction [hidden]', action.type, res.error)
           notification.error({ title: 'Action failed', content: res.error, duration: 5000 })
@@ -161,8 +170,9 @@ export function useTreeActions({
           params.database = db
       }
       let queryToRun = action.query || ''
+      const actionType = actionTypeOf(action)
       if (
-        action.type === 'select'
+        actionType === 'select'
         && /^\s*select\b/i.test(queryToRun)
         && !/\blimit\b/i.test(queryToRun)
       ) {
@@ -175,27 +185,26 @@ export function useTreeActions({
         queryToRun,
         (extras.options as Record<string, string>) || ((extras.explain) ? { 'explain-query': 'yes' } : {}),
       )
-      if (!res) return
+      if (!res)
+        return
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let payload: any = res.result || {}
-      if (payload?.Payload) {
-        payload = payload.Payload
+      let payload: unknown = res.result || {}
+      if (payload && typeof payload === 'object' && 'Payload' in payload) {
+        payload = (payload as { Payload?: unknown }).Payload ?? payload
       }
 
-      if (payload.Sql)
-        payload = payload.Sql
-      else if (payload.Document)
-        payload = payload.Document
-      else if (payload.Kv)
-        payload = payload.Kv
+      if (payload && typeof payload === 'object' && 'Sql' in payload)
+        payload = (payload as { Sql?: unknown }).Sql ?? payload
+      else if (payload && typeof payload === 'object' && 'Document' in payload)
+        payload = (payload as { Document?: unknown }).Document ?? payload
+      else if (payload && typeof payload === 'object' && 'Kv' in payload)
+        payload = (payload as { Kv?: unknown }).Kv ?? payload
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const normalizeKeys = (obj: any): any => {
+      const normalizeKeys = (obj: unknown): unknown => {
         if (!obj || typeof obj !== 'object')
           return obj
         const out: Record<string, unknown> = {}
-        for (const key of Object.keys(obj as object)) {
+        for (const key of Object.keys(obj)) {
           const lower = key.charAt(0).toLowerCase() + key.slice(1)
           out[lower] = (obj as Record<string, unknown>)[key]
         }
@@ -231,12 +240,13 @@ export function useTreeActions({
   }
 
   function handleAction(conn: Connection, action: TreeAction, node: TreeNode | null) {
-    if (PROMPT_ACTION_TYPES.has(action.type)) {
+    const actionType = actionTypeOf(action)
+    if (PROMPT_ACTION_TYPES.has(actionType)) {
       actionModal.value = { visible: true, action, conn, node }
       return
     }
 
-    if (DESTRUCTIVE_ACTION_TYPES.has(action.type)) {
+    if (DESTRUCTIVE_ACTION_TYPES.has(actionType)) {
       dialog.error({
         title: action.title ?? 'Confirm action',
         content: `The following query will be executed — this cannot be undone:\n\n${action.query}`,
@@ -262,7 +272,7 @@ export function useTreeActions({
   function handleSelect(
     keys: string[],
     _options: unknown,
-    meta: { node?: TreeNode & { key: string; _connectionId?: string } } | undefined,
+    meta: { node?: TreeNode & { key: string, _connectionId?: string } } | undefined,
   ) {
     const key = meta?.node?.key ?? (Array.isArray(keys) ? keys[0] : keys)
     if (key == null)
@@ -300,7 +310,7 @@ export function useTreeActions({
     if (!parentConn)
       return
 
-    const nodeType = node.node_type
+    const nodeType = nodeKindOf(node)
 
     if (nodeType === 'action' && node.actions && node.actions.length > 0) {
       handleAction(parentConn, node.actions[0], node)
@@ -308,14 +318,14 @@ export function useTreeActions({
     }
 
     if (INSTANT_SELECT_TYPES.has(String(nodeType))) {
-      const selectAction = node.actions?.find(a => a.type === 'select')
+      const selectAction = node.actions?.find(a => actionTypeOf(a) === 'select')
       if (selectAction)
         handleAction(parentConn, selectAction, node)
       return
     }
 
     const hasChildren = Array.isArray(node.children) && node.children.length > 0
-    const hasSelectAction = node.actions?.some(a => a.type === 'select')
+    const hasSelectAction = node.actions?.some(a => actionTypeOf(a) === 'select')
     if (hasChildren && !hasSelectAction) {
       const idx = expandedKeys.value.indexOf(node.key)
       if (idx === -1) {

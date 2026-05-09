@@ -30,16 +30,19 @@ export interface PluginInfo {
 }
 
 /** A single action exposed by a connection tree node. */
-export interface TreeAction {
+export interface ResourceAction {
+  id?: string
+  kind?: string
   type: string
   title?: string
   query?: string
   new_tab?: boolean
-  fields?: TreeActionField[]
+  metadata?: Record<string, string>
+  fields?: ResourceActionField[]
 }
 
 /** An input field definition for tree actions that require user input. */
-export interface TreeActionField {
+export interface ResourceActionField {
   name: string
   label?: string
   placeholder?: string
@@ -47,15 +50,24 @@ export interface TreeActionField {
 }
 
 /** A node in the hierarchical connection tree returned by plugins. */
-export interface TreeNode {
+export interface ResourceNode {
+  id?: string
+  name?: string
+  kind?: string
+  path?: string
   key: string
   label: string
   node_type: string | number
-  children?: TreeNode[]
-  actions?: TreeAction[]
+  metadata?: Record<string, string>
+  children?: ResourceNode[]
+  actions?: ResourceAction[]
   /** Injected by tagWithConnId — the owning connection ID. */
   _connectionId?: string
 }
+
+export type TreeAction = ResourceAction
+export type TreeActionField = ResourceActionField
+export type TreeNode = ResourceNode
 
 /** Execution context attached to a workspace tab. */
 export interface TabContext {

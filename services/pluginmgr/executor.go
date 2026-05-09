@@ -1,12 +1,8 @@
 package pluginmgr
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"os"
-	"os/exec"
 	"strings"
 	"time"
 
@@ -51,67 +47,26 @@ func (m *Manager) RunCommand(name, command string, timeout time.Duration, req []
 // would emit numeric enum values and Go field names instead of proto names,
 // causing parse errors on the plugin side.
 func (m *Manager) runPluginCommand(caller, name, command string, timeout time.Duration, reqBytes []byte) ([]byte, error) {
-	name = driverid.Normalize(name)
-	m.mu.Lock()
-	info, ok := m.plugins[name]
-	m.mu.Unlock()
+	info, ok := m.lookupPlugin(name)
 	if !ok {
+		name = driverid.Normalize(name)
 		m.emitLog(services.LogLevelError, fmt.Sprintf("%s: plugin '%s' not found", caller, name))
 		return nil, fmt.Errorf("%s: plugin %s not found", caller, name)
 	}
-	full := info.Path
-	if !isExecutable(full) {
-		m.emitLog(services.LogLevelError, fmt.Sprintf("%s: plugin '%s' is not executable", caller, name))
-		return nil, fmt.Errorf("%s: plugin %s is not executable", caller, name)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, full, command)
-	hideWindow(cmd)
-	cmd.Env = append(os.Environ(), "QUERYBOX_PLUGIN_NAME="+name)
-
-	stdin, err := cmd.StdinPipe()
+	outB, err := m.ensureRuntime().Run(info, command, timeout, reqBytes)
 	if err != nil {
-		m.emitLog(services.LogLevelError, fmt.Sprintf("%s: stdin pipe error for plugin '%s': %v", caller, name, err))
-		return nil, fmt.Errorf("%s: stdin pipe error: %w", caller, err)
+		m.emitLog(services.LogLevelError, fmt.Sprintf("%s: plugin '%s' failed: %v", caller, info.ID, err))
+		return nil, fmt.Errorf("%s: %w", caller, err)
 	}
-	stdoutPipe, err := cmd.StdoutPipe()
-	if err != nil {
-		m.emitLog(services.LogLevelError, fmt.Sprintf("%s: stdout pipe error for plugin '%s': %v", caller, name, err))
-		return nil, fmt.Errorf("%s: stdout pipe error: %w", caller, err)
-	}
-	stderrPipe, err := cmd.StderrPipe()
-	if err != nil {
-		m.emitLog(services.LogLevelError, fmt.Sprintf("%s: stderr pipe error for plugin '%s': %v", caller, name, err))
-		return nil, fmt.Errorf("%s: stderr pipe error: %w", caller, err)
-	}
-
-	if err := cmd.Start(); err != nil {
-		m.emitLog(services.LogLevelError, fmt.Sprintf("%s: failed to start plugin '%s': %v", caller, name, err))
-		return nil, fmt.Errorf("%s: start error: %w", caller, err)
-	}
-
-	if _, werr := stdin.Write(reqBytes); werr != nil {
-		m.emitLog(services.LogLevelError, fmt.Sprintf("%s: stdin write error for plugin '%s': %v", caller, name, werr))
-	}
-	if cerr := stdin.Close(); cerr != nil {
-		m.emitLog(services.LogLevelError, fmt.Sprintf("%s: stdin close error for plugin '%s': %v", caller, name, cerr))
-	}
-
-	outB, _ := io.ReadAll(stdoutPipe)
-	errB, _ := io.ReadAll(stderrPipe)
-
-	if err := cmd.Wait(); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			m.emitLog(services.LogLevelError, fmt.Sprintf("%s: plugin '%s' timed out after %s", caller, name, timeout))
-			return nil, fmt.Errorf("%s: plugin timed out after %s", caller, timeout)
-		}
-		m.emitLog(services.LogLevelError, fmt.Sprintf("%s: plugin '%s' exited with error: %v", caller, name, err))
-		return nil, fmt.Errorf("%s: plugin exited: %w - stderr: %s", caller, err, string(errB))
-	}
-
 	return outB, nil
+}
+
+func (m *Manager) lookupPlugin(name string) (PluginInfo, bool) {
+	name = driverid.Normalize(name)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	info, ok := m.plugins[name]
+	return info, ok
 }
 
 // ExecPlugin runs the named plugin with the provided connection info, query
@@ -209,6 +164,25 @@ func (m *Manager) ExecPlugin(name string, connection map[string]string, query st
 func (m *Manager) GetConnectionTree(name string, connection map[string]string) (*plugin.ConnectionTreeResponse, error) {
 	m.emitLog(services.LogLevelInfo, fmt.Sprintf("GetConnectionTree: fetching tree (driver: %s)", name))
 
+	if info, ok := m.lookupPlugin(name); ok && supportsCapability(info.Capabilities, "resource.graph") {
+		req := plugin.ResourceGraphRequest{Connection: connection}
+		b, err := json.Marshal(&req)
+		if err != nil {
+			return nil, fmt.Errorf("GetConnectionTree: marshal graph request: %w", err)
+		}
+		out, execErr := m.runPluginCommand("GetConnectionTree", name, "resource-graph", defaultPluginTimeout, b)
+		if execErr == nil {
+			graph, err := decodeResourceGraphJSON(out)
+			if err != nil {
+				return nil, fmt.Errorf("GetConnectionTree: invalid graph json: %w", err)
+			}
+			tree := adaptResourceGraph(graph)
+			m.emitLog(services.LogLevelInfo, fmt.Sprintf("GetConnectionTree: adapted %d graph node(s) from native resource.graph", len(tree.Nodes)))
+			return tree, nil
+		}
+		m.emitLog(services.LogLevelInfo, fmt.Sprintf("GetConnectionTree: legacy fallback for %s after graph error: %v", name, execErr))
+	}
+
 	req := plugin.ConnectionTreeRequest{Connection: connection}
 	b, err := json.Marshal(&req)
 	if err != nil {
@@ -220,12 +194,8 @@ func (m *Manager) GetConnectionTree(name string, connection map[string]string) (
 		return nil, err
 	}
 
-	resp := &plugin.ConnectionTreeResponse{}
-	if len(outB) == 0 {
-		m.emitLog(services.LogLevelInfo, fmt.Sprintf("GetConnectionTree: (driver: %s) returned empty tree", name))
-		return resp, nil
-	}
-	if err := protojson.Unmarshal(outB, resp); err != nil {
+	resp, err := decodeConnectionTreeJSON(outB)
+	if err != nil {
 		m.emitLog(services.LogLevelError, fmt.Sprintf("GetConnectionTree: invalid tree JSON from '%s': %v", name, err))
 		return nil, fmt.Errorf("GetConnectionTree: invalid tree json: %w", err)
 	}

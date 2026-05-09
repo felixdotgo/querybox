@@ -1,8 +1,16 @@
 import type { Ref } from 'vue'
+import type { ColumnSchema, Connection, ResourceAction, ResourceNode, TableSchema, TreeNode } from '@/lib/types'
 import { reactive, ref, watch } from 'vue'
 import { GetCredential } from '@/bindings/github.com/felixdotgo/querybox/services/connectionservice'
 import { DescribeSchema, GetConnectionTree } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
-import type { ColumnSchema, Connection, TableSchema, TreeNode } from '@/lib/types'
+
+type RawTreeNode = Partial<ResourceNode> & {
+  key?: string
+  label?: string
+  node_type?: string | number
+  actions?: Array<Partial<ResourceAction> | null> | null
+  children?: Array<RawTreeNode | null> | null
+}
 
 // global reactive cache mapping connection id -> nodes array
 const treeCache: Record<string, TreeNode[]> = reactive({})
@@ -26,6 +34,52 @@ export const NODE_TYPE_ENUM_MAP: Record<number, string> = {
   9: 'group',
 }
 
+function normalizeAction(action: Partial<ResourceAction> | null | undefined): ResourceAction | null {
+  if (!action)
+    return null
+  const type = String(action.type ?? action.kind ?? action.id ?? 'action')
+  return {
+    ...action,
+    id: action.id ?? type,
+    kind: action.kind ?? type,
+    type,
+    metadata: action.metadata ?? {},
+    fields: Array.isArray(action.fields) ? action.fields : [],
+  }
+}
+
+function normalizeNode(node: RawTreeNode | null | undefined): TreeNode | null {
+  if (!node)
+    return null
+
+  const rawType = node.kind ?? node.node_type ?? 'resource'
+  const nodeType = typeof rawType === 'number'
+    ? (NODE_TYPE_ENUM_MAP[rawType] ?? String(rawType))
+    : String(rawType || 'resource')
+  const key = String(node.key ?? node.path ?? node.id ?? node.name ?? node.label ?? nodeType)
+  const label = String(node.label ?? node.name ?? node.id ?? key)
+  const children = Array.isArray(node.children)
+    ? node.children.map(child => normalizeNode(child)).filter(Boolean) as TreeNode[]
+    : []
+  const actions = Array.isArray(node.actions)
+    ? node.actions.map(action => normalizeAction(action)).filter(Boolean) as ResourceAction[]
+    : []
+
+  return {
+    ...node,
+    id: node.id ?? key,
+    name: node.name ?? label,
+    kind: node.kind ?? nodeType,
+    path: node.path ?? key,
+    key,
+    label,
+    node_type: nodeType,
+    metadata: node.metadata ?? {},
+    children,
+    actions,
+  }
+}
+
 // Recursively tag every node with its owning connection id, normalize the
 // `node_type` value, and sort/uniq siblings.  This mirrors nearly identical
 // logic previously in ConnectionsPanel.tagWithConnId; moving it here makes it
@@ -39,22 +93,22 @@ export function tagWithConnId(nodes: TreeNode[], connId: string, _prefix?: strin
   const prefix = _prefix !== undefined ? _prefix : connId
   const seenKeys = new Set<string>()
 
-  const tagged = nodes.map((n) => {
-    const nodeType = typeof n.node_type === 'number'
-      ? (NODE_TYPE_ENUM_MAP[n.node_type] ?? String(n.node_type))
-      : n.node_type
-
-    const base: TreeNode = {
-      ...n,
-      key: `${prefix}:${n.key}`,
-      _connectionId: connId,
-      node_type: nodeType,
-    }
-    if (n.children) {
-      base.children = tagWithConnId(n.children, connId, base.key)
-    }
-    return base
-  })
+  const tagged = nodes
+    .map((n) => {
+      const normalized = normalizeNode(n)
+      if (!normalized)
+        return null
+      const base: TreeNode = {
+        ...normalized,
+        key: `${prefix}:${normalized.key}`,
+        _connectionId: connId,
+      }
+      if (normalized.children) {
+        base.children = tagWithConnId(normalized.children, connId, base.key)
+      }
+      return base
+    })
+    .filter(Boolean) as TreeNode[]
 
   // deduplicate siblings by key preserving original order
   const out: TreeNode[] = []
@@ -80,16 +134,9 @@ export function tagWithConnId(nodes: TreeNode[], connId: string, _prefix?: strin
 }
 
 function normalizeNodes(nodes: TreeNode[]): TreeNode[] {
-  return nodes.map((n) => {
-    const type = typeof n.node_type === 'number'
-      ? NODE_TYPE_ENUM_MAP[n.node_type] || String(n.node_type)
-      : n.node_type
-    return {
-      ...n,
-      node_type: type,
-      children: Array.isArray(n.children) ? normalizeNodes(n.children) : n.children,
-    }
-  })
+  return nodes
+    .map(node => normalizeNode(node))
+    .filter(Boolean) as TreeNode[]
 }
 
 /**

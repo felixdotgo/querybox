@@ -13,13 +13,14 @@
 | **Operational Workspace** | The target product shape for QueryBox: a local-first desktop workspace where backend engineers inspect, query, debug, and operate data systems. |
 | **On-Demand Execution** | Plugin invocation model: one subprocess per request, exit after response. No persistent processes. |
 | **OS Keyring** | Platform-native secure store accessed via `go-keyring` (macOS Keychain, Windows Credential Manager, Linux Secret Service). |
-| **Plugin** | Standalone executable under `bin/plugins/` implementing the CLI JSON contract (`info`, `exec`, `authforms`, optionally `connection-tree`, `test-connection`). Today this contract is still database-oriented in places; the runtime direction is to standardize around capabilities, resource graphs, actions, and streams. |
-| **Plugin Capabilities** | Optional string array in `info` response advertising extra features a plugin supports (e.g. "explain-query", "mutate-row"). This is the current precursor to a stricter capability taxonomy. |
-| **PluginManager** | Go service (`services/pluginmgr/pluginmgr.go`) that discovers plugin executables, maintains an in-memory registry, and executes plugins on-demand with timeout enforcement. |
-| **Plugin Registry** | In-memory map of discovered plugins keyed by name, containing full metadata. |
+| **Plugin** | Standalone executable under `bin/plugins/` (or the per-user plugin directory) that implements the CLI JSON contract. In Phase 1 it may also ship a sidecar manifest `<binary>.manifest.json` declaring runtime, capabilities, permissions, and limits. Legacy browse support may still use `connection-tree`; the target browse contract is `resource-graph`. |
+| **Plugin Capabilities** | The supported manifest capability taxonomy in Phase 1: `resource.graph`, `query.execute`, `stream.read`, `connection.test`, `schema.inspect`. Legacy `info.capabilities` strings such as `explain-query` still exist for older feature flags and UI hints. |
+| **PluginManager** | Go service (`services/pluginmgr/pluginmgr.go`) that exposes the public plugin API to the app layer. It delegates discovery to `PluginRegistry` and execution to `RuntimeManager`. |
+| **Plugin Registry** | Discovery/metadata component that scans plugin directories, loads and validates manifests, falls back to `info` for legacy plugins, and caches plugin metadata in memory. |
+| **RuntimeManager** | Execution facade that chooses how a plugin runs. Phase 1 ships only `LocalPluginHost`, but the abstraction is intended to support future remote or sandboxed runtimes. |
 | **Plugin SDK** | `pkg/plugin` — minimal Go package providing `ServeCLI` helper and protobuf type aliases for plugin authors. |
 | **Protobuf Contract** | Canonical API at `contracts/plugin/v1/plugin.proto` (generated Go package: `rpc/contracts/plugin/v1`, package `pluginpb`). |
-| **Resource Graph** | The target browse model that generalizes the current database-specific `connection-tree` into plugin-defined resources, relationships, and actions. |
+| **Resource Graph** | The runtime-neutral browse model returned by `resource-graph`. It generalizes the database-specific `connection-tree` into plugin-defined resources, relationships, actions, and metadata. |
 | **Resource Action** | A user-triggered operation attached to a resource or workspace context, such as inspect, query, open, export, or stream. |
 | **Results / Streams** | Output surfaces for actions. Bounded responses render as results; unbounded or long-lived outputs render as streams. |
 | **Rescan** | Immediate synchronous plugin discovery triggered manually via `PluginManager.Rescan()` or the Rescan button in the Plugins window. Discovery also runs asynchronously once at application startup. Plugin binary changes require a restart or manual Rescan to take effect. |

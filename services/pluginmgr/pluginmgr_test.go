@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/felixdotgo/querybox/pkg/plugin"
 	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
 )
 
@@ -23,6 +24,14 @@ func pluginName(base string) string {
 		return base + ".exe"
 	}
 	return base
+}
+
+type LocalPluginHostMock struct {
+	RunFunc func(info PluginInfo, command string, timeout time.Duration, req []byte) ([]byte, error)
+}
+
+func (m *LocalPluginHostMock) Run(info PluginInfo, command string, timeout time.Duration, req []byte) ([]byte, error) {
+	return m.RunFunc(info, command, timeout, req)
 }
 
 func TestUserPluginsDirBehavior(t *testing.T) {
@@ -51,19 +60,19 @@ func TestProbeInfoDecoding(t *testing.T) {
 	// prepare a fake JSON as plugin binary would emit (camelCase keys are
 	// what protojson generates).
 	raw := map[string]interface{}{
-		"type": 1,
-		"name": "foo",
-		"version": "1.2.3",
-		"description": "the foo driver",
-		"url": "https://example.org/foo",
-		"author": "Foo Corp",
+		"type":         1,
+		"name":         "foo",
+		"version":      "1.2.3",
+		"description":  "the foo driver",
+		"url":          "https://example.org/foo",
+		"author":       "Foo Corp",
 		"capabilities": []string{"transactions"},
-		"tags": []string{"sql"},
-		"license": "MIT",
-		"iconUrl": "https://example.org/icon.png",
-		"contact": "support@example.org",
-		"metadata": map[string]string{"key": "val", "simple_icon": "postgresql"},
-		"settings": map[string]string{"k2": "v2"},
+		"tags":         []string{"sql"},
+		"license":      "MIT",
+		"iconUrl":      "https://example.org/icon.png",
+		"contact":      "support@example.org",
+		"metadata":     map[string]string{"key": "val", "simple_icon": "postgresql"},
+		"settings":     map[string]string{"k2": "v2"},
 	}
 	b, err := json.Marshal(raw)
 	if err != nil {
@@ -395,6 +404,7 @@ func TestScanOnceConcurrent(t *testing.T) {
 		t.Errorf("remaining plugin should be %s", "p2")
 	}
 }
+
 // TestPluginsReadyCallback ensures that the onPluginsReady hook is invoked
 // when the manager emits the ready event. By constructing a manager manually
 // we can set the hook before the notification is fired.
@@ -444,6 +454,7 @@ func TestRescanFiresPluginsReady(t *testing.T) {
 		t.Fatal("plugins ready callback not invoked after rescan")
 	}
 }
+
 // TestPopulateUserDir verifies the standalone populateUserDir helper. It
 // simulates the bundle and user filesystem paths directly, avoiding New() so
 // the behaviour is easy to control.
@@ -469,6 +480,9 @@ func TestPopulateUserDir(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(bundle, fname), initial, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(bundle, fname)+plugin.ManifestFileSuffix, []byte(`{"id":"bundled","version":"0.0.1","runtime":{"kind":"local"},"capabilities":["query.execute"],"permissions":[],"limits":{"timeout_seconds":30}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	// ensure the target user directory exists
 	if err := os.MkdirAll(userDir, 0o755); err != nil {
 		t.Fatalf("failed to create userDir: %v", err)
@@ -480,6 +494,9 @@ func TestPopulateUserDir(t *testing.T) {
 		t.Fatalf("expected file copied to user dir: %v", err)
 	} else if !bytes.Equal(data, initial) {
 		t.Errorf("unexpected initial content: %s", string(data))
+	}
+	if _, err := os.Stat(filepath.Join(userDir, fname) + plugin.ManifestFileSuffix); err != nil {
+		t.Fatalf("expected manifest copied to user dir: %v", err)
 	}
 
 	// ensure executable detection works
@@ -605,6 +622,105 @@ func TestUserDirPrecedence(t *testing.T) {
 	}
 }
 
+func TestScanOnceLoadsManifestMetadata(t *testing.T) {
+	dir, err := os.MkdirTemp("", "pmgrmanifest")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	name := pluginName("manifested")
+	fullpath := filepath.Join(dir, name)
+	if err := os.WriteFile(fullpath, []byte(""), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	manifest := `{"id":"manifested","name":"Manifested Plugin","description":"manifest-first plugin","version":"1.2.3","runtime":{"kind":"local"},"capabilities":["query.execute","connection.test"],"permissions":[{"name":"network"}],"limits":{"timeout_seconds":12},"metadata":{"legacy_tree_adapter":"connection-tree"}}`
+	if err := os.WriteFile(fullpath+plugin.ManifestFileSuffix, []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	orig := probeInfoFunc
+	defer func() { probeInfoFunc = orig }()
+	probeInfoFunc = func(fullpath string) (PluginInfo, error) {
+		return PluginInfo{Name: "ignored", Type: int(pluginpb.PluginV1_DRIVER)}, fmt.Errorf("info disabled")
+	}
+
+	m := &Manager{
+		plugins:    make(map[string]PluginInfo),
+		appReadyCh: make(chan struct{}),
+		dirs:       []string{dir},
+		Dir:        dir,
+	}
+
+	m.scanOnce()
+	info, ok := m.plugins["manifested"]
+	if !ok {
+		t.Fatalf("manifested plugin not discovered")
+	}
+	if info.Name != "Manifested Plugin" {
+		t.Fatalf("expected manifest name, got %q", info.Name)
+	}
+	if info.ManifestPath == "" || !strings.HasSuffix(info.ManifestPath, plugin.ManifestFileSuffix) {
+		t.Fatalf("expected manifest path, got %q", info.ManifestPath)
+	}
+	if info.Runtime == nil || info.Runtime.Kind != plugin.RuntimeKindLocal {
+		t.Fatalf("expected local runtime, got %#v", info.Runtime)
+	}
+	if len(info.Capabilities) != 2 || info.Capabilities[0] != "query.execute" {
+		t.Fatalf("unexpected capabilities: %#v", info.Capabilities)
+	}
+	if info.Limits == nil || info.Limits.TimeoutSeconds != 12 {
+		t.Fatalf("unexpected limits: %#v", info.Limits)
+	}
+	if info.LastError != "" {
+		t.Fatalf("expected manifest-first discovery without error, got %q", info.LastError)
+	}
+}
+
+func TestGetResourceGraphAdaptsLegacyConnectionTree(t *testing.T) {
+	m := &Manager{
+		plugins: map[string]PluginInfo{
+			"legacy": {
+				ID:   "legacy",
+				Path: "/tmp/legacy",
+			},
+		},
+	}
+
+	origRuntime := m.runtime
+	m.runtime = &RuntimeManager{
+		local: &LocalPluginHost{},
+	}
+
+	orig := m.runtime.local
+	m.runtime.local = &LocalPluginHostMock{
+		RunFunc: func(info PluginInfo, command string, timeout time.Duration, req []byte) ([]byte, error) {
+			if command != "connection-tree" {
+				return nil, fmt.Errorf("unexpected command %q", command)
+			}
+			return []byte(`{"nodes":[{"key":"db","label":"DB","node_type":"NODE_TYPE_DATABASE","children":[{"key":"table:users","label":"users","node_type":"NODE_TYPE_TABLE"}]}]}`), nil
+		},
+	}
+	defer func() {
+		m.runtime.local = orig
+		m.runtime = origRuntime
+	}()
+
+	graph, err := m.GetResourceGraph("legacy", nil)
+	if err != nil {
+		t.Fatalf("GetResourceGraph error: %v", err)
+	}
+	if len(graph.Nodes) != 1 {
+		t.Fatalf("expected 1 node, got %d", len(graph.Nodes))
+	}
+	root := graph.Nodes[0]
+	if root.Kind != "database" || root.Name != "DB" {
+		t.Fatalf("unexpected root node: %#v", root)
+	}
+	if len(root.Children) != 1 || root.Children[0].Kind != "table" {
+		t.Fatalf("unexpected child nodes: %#v", root.Children)
+	}
+}
 
 // helper extracted from probeInfo so we can call without executing command
 func probeInfoFromRaw(raw map[string]interface{}) (PluginInfo, error) {
@@ -634,36 +750,36 @@ func probeInfoFromRaw(raw map[string]interface{}) (PluginInfo, error) {
 	}
 
 	var resp struct {
-		Name        string            `json:"name"`
-		Version     string            `json:"version"`
-		Description string            `json:"description"`
-		URL         string            `json:"url"`
-		Author      string            `json:"author"`
-		Capabilities []string         `json:"capabilities"`
-		Tags        []string          `json:"tags"`
-		License     string            `json:"license"`
-		IconURL     string            `json:"icon_url"`
-		Contact     string            `json:"contact"`
-		Metadata    map[string]string `json:"metadata"`
-		Settings    map[string]string `json:"settings"`
+		Name         string            `json:"name"`
+		Version      string            `json:"version"`
+		Description  string            `json:"description"`
+		URL          string            `json:"url"`
+		Author       string            `json:"author"`
+		Capabilities []string          `json:"capabilities"`
+		Tags         []string          `json:"tags"`
+		License      string            `json:"license"`
+		IconURL      string            `json:"icon_url"`
+		Contact      string            `json:"contact"`
+		Metadata     map[string]string `json:"metadata"`
+		Settings     map[string]string `json:"settings"`
 	}
 	if b2, err2 := json.Marshal(raw); err2 == nil {
 		_ = json.Unmarshal(b2, &resp)
 	}
 
 	return PluginInfo{
-		Name:        resp.Name,
-		Type:        typ,
-		Version:     resp.Version,
-		Description: resp.Description,
-		URL:         resp.URL,
-		Author:      resp.Author,
+		Name:         resp.Name,
+		Type:         typ,
+		Version:      resp.Version,
+		Description:  resp.Description,
+		URL:          resp.URL,
+		Author:       resp.Author,
 		Capabilities: resp.Capabilities,
-		Tags:        resp.Tags,
-		License:     resp.License,
-		IconURL:     resp.IconURL,
-		Contact:     resp.Contact,
-		Metadata:    resp.Metadata,
-		Settings:    resp.Settings,
+		Tags:         resp.Tags,
+		License:      resp.License,
+		IconURL:      resp.IconURL,
+		Contact:      resp.Contact,
+		Metadata:     resp.Metadata,
+		Settings:     resp.Settings,
 	}, nil
 }

@@ -7,10 +7,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sync"
 	"time"
 
-	"github.com/felixdotgo/querybox/pkg/driverid"
+	"github.com/felixdotgo/querybox/pkg/plugin"
 	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
 )
 
@@ -24,10 +23,10 @@ var userPluginDirFunc = os.UserConfigDir
 // specific to the plugin subsystem. When UserConfigDir fails or returns an
 // empty string we return an empty path.
 func userPluginsDir() (string, error) {
-    if dir, err := userPluginDirFunc(); err == nil && dir != "" {
-        return filepath.Join(dir, "querybox", "plugins"), nil
-    }
-    return "", fmt.Errorf("user config dir unavailable")
+	if dir, err := userPluginDirFunc(); err == nil && dir != "" {
+		return filepath.Join(dir, "querybox", "plugins"), nil
+	}
+	return "", fmt.Errorf("user config dir unavailable")
 }
 
 // bundledPluginsDir returns the location of the built-in plugins that were
@@ -92,127 +91,21 @@ func populateUserDir(userDir, bundle string) {
 				_ = os.Chmod(tmp, srcInfo.Mode())
 				// rename into place; on Windows this will replace existing file only
 				_ = os.Rename(tmp, dst)
+				copyManifestSidecar(src, dst)
 			}
 		}
 	}
 }
 
-// scanOnce updates the in-memory plugin registry by inspecting the folder. For
-// newly discovered executables, it will attempt to probe `plugin info` for
-// metadata. Failures are recorded in PluginInfo.LastError but do not prevent
-// discovery.
+// scanOnce delegates discovery to PluginRegistry and mirrors the result onto
+// the legacy Manager.plugins field so existing bindings and tests keep
+// functioning while discovery/validation are owned by the registry.
 func (m *Manager) scanOnce() {
 	m.scanMu.Lock()
 	defer m.scanMu.Unlock()
 
-	// iterate through each configured directory in order; user directory
-	// entries mask any identically named binaries in a later directory.
-	found := map[string]struct{}{}
-	type candidate struct {
-		name   string
-		full   string
-		dirIdx int // index in m.dirs where this candidate came from
-	}
-	var toProbe []candidate
-
-	m.mu.Lock()
-	for idx, dir := range m.dirs {
-		files, err := os.ReadDir(dir)
-		if err != nil {
-			continue // missing/ unreadable dirs are simply skipped
-		}
-		for _, f := range files {
-			if f.IsDir() {
-				continue
-			}
-			origName := f.Name()
-			// normalize plugin identifier by stripping any filesystem extension
-			name := driverid.Normalize(origName)
-			if _, seen := found[name]; seen {
-				// already discovered in a higher‑precedence directory
-				continue
-			}
-			full := filepath.Join(dir, origName)
-			if !isExecutable(full) {
-				continue
-			}
-			found[name] = struct{}{}
-			existing, exists := m.plugins[name]
-			if !exists || existing.LastError != "" {
-				toProbe = append(toProbe, candidate{name: name, full: full, dirIdx: idx})
-			}
-		}
-	}
-	m.mu.Unlock()
-
-	// probe metadata concurrently (same as before)
-	type result struct {
-		name string
-		info PluginInfo
-	}
-	resCh := make(chan result, len(toProbe))
-	var wg sync.WaitGroup
-	for _, cand := range toProbe {
-		wg.Add(1)
-		go func(c candidate) {
-			defer wg.Done()
-			// Use normalized `name` (no extension) for ID; keep the original
-			// filename as a fallback for display if plugin metadata doesn't
-			// provide a nicer human name.
-			info := PluginInfo{ID: c.name, Name: c.name, Path: c.full, Running: false}
-			meta, err := probeInfoFunc(c.full)
-			if err != nil && c.dirIdx == 0 && len(m.dirs) > 1 {
-				// primary directory probe failed; try fallback bundle entry if present
-				alt := filepath.Join(m.dirs[len(m.dirs)-1], c.name)
-				if alt != c.full && isExecutable(alt) {
-					if meta2, err2 := probeInfoFunc(alt); err2 == nil {
-						meta = meta2
-						err = nil
-						info.Path = alt // keep bundle path since user copy is bad
-					}
-				}
-			}
-			if err != nil {
-				info.LastError = err.Error()
-			} else {
-				if meta.Name != "" {
-					info.Name = meta.Name
-				}
-				info.Type = meta.Type
-				info.Version = meta.Version
-				info.Description = meta.Description
-				info.URL = meta.URL
-				info.Author = meta.Author
-				info.Capabilities = meta.Capabilities
-				info.Tags = meta.Tags
-				info.License = meta.License
-				info.IconURL = meta.IconURL
-				info.Contact = meta.Contact
-				// copy through whatever metadata the plugin provided.  The frontend
-				// may look for specific hints such as `simple_icon` (a key that
-				// indicates a simple-icons glyph to render for the driver) when
-				// building the connection UI.
-				info.Metadata = meta.Metadata
-				info.Settings = meta.Settings
-				info.LastError = ""
-			}
-			resCh <- result{name: c.name, info: info}
-		}(cand)
-	}
-	wg.Wait()
-	close(resCh)
-
-	// update map and prune missing entries
-	m.mu.Lock()
-	for r := range resCh {
-		m.plugins[r.name] = r.info
-	}
-	for name := range m.plugins {
-		if _, ok := found[name]; !ok {
-			delete(m.plugins, name)
-		}
-	}
-	m.mu.Unlock()
+	registry := m.ensureRegistry()
+	m.setPlugins(registry.Scan())
 }
 
 // isExecutable checks whether the given path looks like an executable file.
@@ -253,20 +146,20 @@ func probeInfo(fullpath string) (PluginInfo, error) {
 	// special handling because newer plugins emit it as a string enum
 	// (via protojson) while older ones used a numeric value.
 	var resp struct {
-		Name        string            `json:"name"`
-		Version     string            `json:"version"`
-		Description string            `json:"description"`
-		URL         string            `json:"url"`
-		Author      string            `json:"author"`
-		Capabilities []string         `json:"capabilities"`
-		Tags        []string          `json:"tags"`
-		License     string            `json:"license"`
-		IconURL     string            `json:"icon_url"`
-		Contact     string            `json:"contact"`
-		Metadata    map[string]string `json:"metadata"`
-		Settings    map[string]string `json:"settings"`
+		Name         string            `json:"name"`
+		Version      string            `json:"version"`
+		Description  string            `json:"description"`
+		URL          string            `json:"url"`
+		Author       string            `json:"author"`
+		Capabilities []string          `json:"capabilities"`
+		Tags         []string          `json:"tags"`
+		License      string            `json:"license"`
+		IconURL      string            `json:"icon_url"`
+		Contact      string            `json:"contact"`
+		Metadata     map[string]string `json:"metadata"`
+		Settings     map[string]string `json:"settings"`
 		// Type is decoded as json.RawMessage to handle both numeric and string enum values.
-		RawType     json.RawMessage   `json:"type"`
+		RawType json.RawMessage `json:"type"`
 	}
 	if err := json.Unmarshal(out, &resp); err != nil {
 		return PluginInfo{}, fmt.Errorf("invalid info json: %w", err)
@@ -289,19 +182,19 @@ func probeInfo(fullpath string) (PluginInfo, error) {
 	}
 
 	return PluginInfo{
-		Name:        resp.Name,
-		Type:        typ,
-		Version:     resp.Version,
-		Description: resp.Description,
-		URL:         resp.URL,
-		Author:      resp.Author,
+		Name:         resp.Name,
+		Type:         typ,
+		Version:      resp.Version,
+		Description:  resp.Description,
+		URL:          resp.URL,
+		Author:       resp.Author,
 		Capabilities: resp.Capabilities,
-		Tags:        resp.Tags,
-		License:     resp.License,
-		IconURL:     resp.IconURL,
-		Contact:     resp.Contact,
-		Metadata:    resp.Metadata,
-		Settings:    resp.Settings,
+		Tags:         resp.Tags,
+		License:      resp.License,
+		IconURL:      resp.IconURL,
+		Contact:      resp.Contact,
+		Metadata:     resp.Metadata,
+		Settings:     resp.Settings,
 	}, nil
 }
 
@@ -309,13 +202,31 @@ func probeInfo(fullpath string) (PluginInfo, error) {
 // plugins directory. This ensures that any metadata changes to existing
 // plugins are picked up (e.g. after a plugin update).
 func (m *Manager) Rescan() error {
-	m.mu.Lock()
-	m.plugins = make(map[string]PluginInfo)
-	m.mu.Unlock()
+	if registry := m.ensureRegistry(); registry != nil {
+		registry.Reset()
+	}
+	m.setPlugins(map[string]PluginInfo{})
 	m.scanOnce()
 	// after a manual rescan we also fire the ready event so listeners can
 	// reload without needing a restart.  The event is synchronous here but
 	// that's acceptable since Rescan is called from the UI with a spinner.
 	m.emitPluginsReady()
 	return nil
+}
+
+func copyManifestSidecar(src, dst string) {
+	manifestSrc := src + plugin.ManifestFileSuffix
+	info, err := os.Stat(manifestSrc)
+	if err != nil || info.IsDir() {
+		return
+	}
+	manifestDst := dst + plugin.ManifestFileSuffix
+	if dstInfo, err := os.Stat(manifestDst); err == nil {
+		if dstInfo.Size() == info.Size() && !dstInfo.ModTime().Before(info.ModTime()) {
+			return
+		}
+	}
+	if data, err := os.ReadFile(manifestSrc); err == nil {
+		_ = os.WriteFile(manifestDst, data, 0o644)
+	}
 }

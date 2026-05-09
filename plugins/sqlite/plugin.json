@@ -1,0 +1,25 @@
+{
+  "id": "sqlite",
+  "name": "SQLite",
+  "description": "Built-in SQLite driver plugin for QueryBox.",
+  "version": "0.0.2",
+  "runtime": {
+    "kind": "local"
+  },
+  "capabilities": [
+    "connection.test",
+    "query.execute",
+    "schema.inspect"
+  ],
+  "permissions": [
+    {
+      "name": "filesystem"
+    }
+  ],
+  "limits": {
+    "timeout_seconds": 30
+  },
+  "metadata": {
+    "legacy_tree_adapter": "connection-tree"
+  }
+}

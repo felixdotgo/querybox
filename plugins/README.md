@@ -8,4 +8,6 @@ Plugins are out-of-process executables placed under `bin/plugins/` and invoked o
   - `plugin info` → prints JSON `{name, version, description}`
   - `plugin exec` → reads JSON `{connection, query}` from stdin and writes JSON `{result, error}` to stdout
 
+Each plugin source folder should also ship a `plugin.json` manifest declaring runtime, capabilities, permissions, and limits. The build script copies it beside the compiled binary as `<plugin>.manifest.json`.
+
 See `plugins/template` for a minimal example that follows the on-demand contract.

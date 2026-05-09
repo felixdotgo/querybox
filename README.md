@@ -95,7 +95,11 @@ Binaries are placed in `bin/plugins/` (Windows builds get `.exe`) and picked up 
    cp -r plugins/template plugins/<your-plugin-name>
    ```
 
-2. Edit `plugins/<your-plugin-name>/main.go` — implement the four commands:
+2. Edit `plugins/<your-plugin-name>/plugin.json` to declare the manifest v1 metadata:
+   - `id`, `version`, `runtime`
+   - `capabilities`, `permissions`, `limits`
+
+3. Edit `plugins/<your-plugin-name>/main.go` — implement the four commands:
    - `info` — return plugin metadata (name, version, type)
    - `authforms` — return auth form definitions for the UI
    - `exec` — execute a query and return results
@@ -103,12 +107,12 @@ Binaries are placed in `bin/plugins/` (Windows builds get `.exe`) and picked up 
 
    The current shipping contract is still centered on `connection-tree` and query-style execution. The roadmap is moving toward `resource.graph`, resource actions, and results/streams while preserving compatibility for existing plugins.
 
-3. Build and drop the binary:
+4. Build and drop the binary:
    ```bash
    task build:plugins
    ```
 
-4. The running app will discover the new plugin automatically (no restart needed).
+5. The running app will discover the new plugin automatically (no restart needed).
 
 See [docs/features/02-plugin-system.md](docs/features/02-plugin-system.md) for the full plugin contract and examples.
 

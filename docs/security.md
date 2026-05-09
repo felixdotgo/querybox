@@ -17,13 +17,13 @@
 
 | Property | Detail |
 |----------|--------|
-| Timeout | 30s per `exec`/`connection-tree`/`tree-action`; 15s for `test-connection`; 2s for `info` |
-| Process lifecycle | Spawned per-request, exits after response — no persistent processes |
+| Timeout | Default 30s per `exec`/`resource-graph`/legacy `connection-tree`/`tree-action`; 15s for `test-connection`; 5s for `info`. Manifest `limits.timeout_seconds` may tighten the execution ceiling per plugin. |
+| Process lifecycle | `RuntimeManager` delegates to `LocalPluginHost`, which spawns one process per request and exits after response. No persistent plugin processes yet. |
 | Credential transit | Passed via stdin (ephemeral, not logged, not in process env/args) |
 | stderr capture | Captured for debugging; must not contain secrets |
-| Trust model | Plugins run with the same OS privileges as the host app |
+| Trust model | Plugins run with the same OS privileges as the host app. Manifest permissions are declarative in Phase 1; they are not a strong sandbox boundary yet. |
 | Sandboxing | None (future enhancement) |
-| Plugin directory | per-user config path (`.../querybox/plugins`) and `bin/plugins/` — user-controlled; no code signing enforced |
+| Plugin directory | per-user config path (`.../querybox/plugins`) and `bin/plugins/` — user-controlled; binaries and sidecar manifests are discovered together; no code signing enforced |
 
 ---
 
@@ -33,10 +33,10 @@
 |--------|-----------|--------|
 | Credentials stolen from disk | OS keyring encryption; only `credential_key` in SQLite | ✅ |
 | Credentials in logs | Passed via stdin; no secret logging | ✅ |
-| Malicious plugin | User-controlled directory; 30s exec timeout | ⚠️ No sandboxing |
+| Malicious plugin | User-controlled directory; manifest validation + timeout limits | ⚠️ No sandboxing / declarative permissions only |
 | Memory dump exposes credentials | Short-lived plugin processes | ⚠️ Best-effort |
 | Cross-user credential access | OS keyring per-user isolation | ✅ OS-dependent |
-| Plugin resource exhaustion | Context timeout enforcement | ✅ |
+| Plugin resource exhaustion | Context timeout enforcement + per-plugin manifest limits | ✅ |
 | Keyring unavailable on server/CI | Automatic fallback to `data/credentials.db` | ✅ Acceptable tradeoff |
 
 ---
@@ -63,6 +63,7 @@ No audit logging. No telemetry. No external data transmission. All data is local
 
 ## Future Enhancements
 
+- Enforced permission model based on manifest declarations
 - Plugin sandboxing (seccomp / namespaces / WebAssembly)
 - Plugin code signing enforcement
 - Audit logging (session IDs only — no credentials/queries)

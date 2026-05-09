@@ -1,0 +1,17 @@
+{
+  "id": "template",
+  "name": "Template Plugin",
+  "description": "Template manifest for new QueryBox plugins.",
+  "version": "0.0.1",
+  "runtime": {
+    "kind": "local"
+  },
+  "capabilities": [
+    "connection.test",
+    "query.execute"
+  ],
+  "permissions": [],
+  "limits": {
+    "timeout_seconds": 30
+  }
+}

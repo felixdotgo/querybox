@@ -120,6 +120,15 @@ export const nodeTypeIconMap = {
   group: Folder,
   table: Grid,
   column: CodeSlash,
+  bucket: Folder,
+  collection: Folder,
+  document: Documents,
+  key: Key,
+  object: Folder,
+  pod: Library,
+  resource: Documents,
+  stream: Flash,
+  topic: Flash,
   action: AddCircle,
 }
 
