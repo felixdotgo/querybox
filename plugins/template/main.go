@@ -15,17 +15,17 @@ type templatePlugin struct {
 
 func (t *templatePlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRequest) (*plugin.InfoResponse, error) {
 	return &plugin.InfoResponse{
-		Type:        plugin.TypeDriver,
-		Name:        "template",
-		Version:     "0.1.0",
-		Description: "Template plugin (on-demand)",
-		Url:         "https://example.com/template-plugin",
-		Author:      "Querybox Core Team",
-		Capabilities: []string{"demo", "example", "mutate-row"},
-		Tags:        []string{"template", "sample"},
-		License:     "MIT",
-		IconUrl:     "https://example.com/icon.png",
-		Contact:     "support@example.com",
+		Type:         plugin.TypeDriver,
+		Name:         "template",
+		Version:      "0.1.0",
+		Description:  "Template plugin (on-demand)",
+		Url:          "https://example.com/template-plugin",
+		Author:       "Querybox Core Team",
+		Capabilities: []string{"query.execute", "resource.graph", "mutate-row"},
+		Tags:         []string{"template", "sample"},
+		License:      "MIT",
+		IconUrl:      "https://example.com/icon.png",
+		Contact:      "support@example.com",
 		// `Metadata` is an arbitrary key/value map exposed via the plugin
 		// manager.  It can be used by the frontend for driver-specific hints;
 		// for example, supplying
@@ -81,6 +81,22 @@ func (t *templatePlugin) ConnectionTree(ctx context.Context, req *plugin.Connect
 				Label: "Dummy node",
 				Actions: []*plugin.ConnectionTreeAction{
 					{Type: plugin.ConnectionTreeActionSelect, Title: "Echo query", Query: "SELECT 1"},
+				},
+			},
+		},
+	}, nil
+}
+
+func (t *templatePlugin) ResourceGraph(ctx context.Context, req *plugin.ResourceGraphRequest) (*plugin.ResourceGraphResponse, error) {
+	return &plugin.ResourceGraphResponse{
+		Nodes: []*plugin.ResourceNode{
+			{
+				ID:   "dummy",
+				Name: "Dummy node",
+				Kind: "resource",
+				Path: "dummy",
+				Actions: []*plugin.ResourceAction{
+					{ID: "select", Kind: "select", Title: "Echo query", Query: "SELECT 1"},
 				},
 			},
 		},

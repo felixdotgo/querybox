@@ -2,7 +2,6 @@ package pluginmgr
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -136,25 +135,11 @@ func discoverPlugin(fullpath, fallbackName string) (PluginInfo, error) {
 	}
 
 	manifestPath := fullpath + plugin.ManifestFileSuffix
-	manifest, manifestErr := loadManifestFile(manifestPath, fallbackName)
-	switch {
-	case manifestErr == nil:
-		applyManifest(&info, manifestPath, manifest)
-	case errors.Is(manifestErr, os.ErrNotExist):
-		manifest = nil
-	default:
-		return info, fmt.Errorf("load manifest: %w", manifestErr)
-	}
-
-	meta, err := probeInfoFunc(fullpath)
+	manifest, err := loadManifestFile(manifestPath, fallbackName)
 	if err != nil {
-		if manifest == nil {
-			return info, err
-		}
-		return info, nil
+		return info, fmt.Errorf("load manifest: %w", err)
 	}
-
-	mergeInfo(&info, meta)
+	applyManifest(&info, manifestPath, manifest)
 	return info, nil
 }
 
@@ -186,6 +171,7 @@ func applyManifest(info *PluginInfo, manifestPath string, manifest *plugin.Manif
 		info.Description = manifest.Description
 	}
 	info.Version = manifest.Version
+	info.Type = manifest.Type
 	info.Capabilities = append([]string(nil), manifest.Capabilities...)
 	info.Permissions = append([]plugin.PermissionDecl(nil), manifest.Permissions...)
 	limitsCopy := manifest.Limits

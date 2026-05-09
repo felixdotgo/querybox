@@ -17,7 +17,7 @@
 
 | Property | Detail |
 |----------|--------|
-| Timeout | Default 30s per `exec`/`resource-graph`/legacy `connection-tree`/`tree-action`; 15s for `test-connection`; 5s for `info`. Manifest `limits.timeout_seconds` may tighten the execution ceiling per plugin. |
+| Timeout | Default 30s per `exec`/`resource-graph`/`tree-action`; 15s for `test-connection`; 5s for `info`. Manifest `limits.timeout_seconds` may tighten the execution ceiling per plugin. |
 | Process lifecycle | `RuntimeManager` delegates to `LocalPluginHost`, which spawns one process per request and exits after response. No persistent plugin processes yet. |
 | Credential transit | Passed via stdin (ephemeral, not logged, not in process env/args) |
 | stderr capture | Captured for debugging; must not contain secrets |

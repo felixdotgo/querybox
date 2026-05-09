@@ -8,7 +8,14 @@ export {
     DescribeSchemaResponse,
     ExecResponse,
     GetCompletionFieldsResponse,
+    Limits,
     MutateRowResponse,
+    PermissionDecl,
+    ResourceAction,
+    ResourceField,
+    ResourceGraphResponse,
+    ResourceNode,
+    RuntimeSpec,
     TestConnectionResponse
 } from "./models.js";
 

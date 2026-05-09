@@ -23,23 +23,23 @@ type postgresqlPlugin struct {
 
 func (m *postgresqlPlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRequest) (*plugin.InfoResponse, error) {
 	return &plugin.InfoResponse{
-		Type:        plugin.TypeDriver,
-		Name:        "PostgreSQL",
-		Version:     "0.0.2",
-		Description: "PostgreSQL database driver",
-		Url:         "https://www.postgresql.org/",
-		Author:      "QueryBox Team",
+		Type:         plugin.TypeDriver,
+		Name:         "PostgreSQL",
+		Version:      "0.0.2",
+		Description:  "PostgreSQL database driver",
+		Url:          "https://www.postgresql.org/",
+		Author:       "QueryBox Team",
 		Capabilities: []string{"query", "explain-query", "mutate-row", "describe-schema"},
-		Tags:        []string{"sql", "relational"},
-		License:     "MIT",
-		IconUrl:     "https://www.postgresql.org/media/img/about/press/elephant.png",
+		Tags:         []string{"sql", "relational"},
+		License:      "MIT",
+		IconUrl:      "https://www.postgresql.org/media/img/about/press/elephant.png",
 	}, nil
 }
 
 func (m *postgresqlPlugin) AuthForms(ctx context.Context, _ *plugin.AuthFormsRequest) (*plugin.AuthFormsResponse, error) {
 	// Provide two options: a `basic` property-based form and a `dsn` fallback.
 	basic := plugin.AuthForm{
-		Key: "basic",
+		Key:  "basic",
 		Name: "Basic",
 		Fields: []*plugin.AuthField{
 			{Type: plugin.AuthFieldText, Name: "host", Label: "Host", Required: true, Placeholder: "127.0.0.1", Value: "localhost"},
@@ -112,28 +112,28 @@ func ensureSSLMode(dsn string) string {
 // setSSLMode forces the supplied sslmode into the DSN, overwriting any existing
 // value.  It handles both URL and keyword‑style strings.
 func setSSLMode(dsn, mode string) string {
-    if mode == "" {
-        return dsn
-    }
-    if u, err := url.Parse(dsn); err == nil && (u.Scheme == "postgres" || u.Scheme == "postgresql") {
-        q := u.Query()
-        q.Del("sslmode")
-        q.Set("sslmode", mode)
-        u.RawQuery = q.Encode()
-        return u.String()
-    }
-    parts := strings.Fields(dsn)
-    var kept []string
-    for _, p := range parts {
-        if strings.HasPrefix(p, "sslmode=") {
-            continue
-        }
-        kept = append(kept, p)
-    }
-    if len(kept) > 0 {
-        return strings.Join(kept, " ") + " sslmode=" + mode
-    }
-    return dsn + " sslmode=" + mode
+	if mode == "" {
+		return dsn
+	}
+	if u, err := url.Parse(dsn); err == nil && (u.Scheme == "postgres" || u.Scheme == "postgresql") {
+		q := u.Query()
+		q.Del("sslmode")
+		q.Set("sslmode", mode)
+		u.RawQuery = q.Encode()
+		return u.String()
+	}
+	parts := strings.Fields(dsn)
+	var kept []string
+	for _, p := range parts {
+		if strings.HasPrefix(p, "sslmode=") {
+			continue
+		}
+		kept = append(kept, p)
+	}
+	if len(kept) > 0 {
+		return strings.Join(kept, " ") + " sslmode=" + mode
+	}
+	return dsn + " sslmode=" + mode
 }
 
 // buildConnString constructs a postgres keyword=value connection string from
@@ -166,85 +166,85 @@ func buildConnString(connection map[string]string) (string, error) {
 	dsn, ok := connection["dsn"]
 	if !ok || dsn == "" {
 		if cred, err := plugin.ParseCredentialBlob(connection); err == nil {
-				if v, ok := cred.Values["dsn"]; ok && v != "" {
-					dsn = ensureSSLMode(v)
-				} else {
-					host := cred.Values["host"]
-					user := cred.Values["user"]
-					pass := cred.Values["password"]
-					port := cred.Values["port"]
-					dbname := cred.Values["database"]
-					// The "tls" form field carries a postgres sslmode value
-					// (disable / require / verify-ca / verify-full).
-					sslmode := cred.Values["tls"]
-					if port == "" {
-						port = "5432"
-					}
-					if sslmode == "" {
-						sslmode = "disable"
-					}
-
-					if host != "" {
-						// build keyword-style DSN; omit dbname when blank.  Including
-						// an empty "dbname=" followed by a space could cause lib/pq to
-						// treat the next token (e.g. "sslmode=disable") as the
-						// database name, which is what was reported by users.
-						parts := []string{
-							"host=" + host,
-							"port=" + port,
-							"user=" + user,
-							"password=" + pass,
-						}
-						if dbname != "" {
-							parts = append(parts, "dbname="+dbname)
-						}
-						parts = append(parts, "sslmode="+sslmode)
-						dsn = strings.Join(parts, " ")
-					}
+			if v, ok := cred.Values["dsn"]; ok && v != "" {
+				dsn = ensureSSLMode(v)
+			} else {
+				host := cred.Values["host"]
+				user := cred.Values["user"]
+				pass := cred.Values["password"]
+				port := cred.Values["port"]
+				dbname := cred.Values["database"]
+				// The "tls" form field carries a postgres sslmode value
+				// (disable / require / verify-ca / verify-full).
+				sslmode := cred.Values["tls"]
+				if port == "" {
+					port = "5432"
+				}
+				if sslmode == "" {
+					sslmode = "disable"
 				}
 
-				// Append extra postgres DSN params as space-separated key=value
-				// pairs.  The "tls", "params", and core credential fields are
-				// excluded here because they are handled above or parsed below.
-				if dsn != "" {
-					skip := map[string]bool{
-						"host": true, "user": true, "password": true,
-						"port": true, "database": true, "dsn": true,
-						"tls": true, "params": true,
+				if host != "" {
+					// build keyword-style DSN; omit dbname when blank.  Including
+					// an empty "dbname=" followed by a space could cause lib/pq to
+					// treat the next token (e.g. "sslmode=disable") as the
+					// database name, which is what was reported by users.
+					parts := []string{
+						"host=" + host,
+						"port=" + port,
+						"user=" + user,
+						"password=" + pass,
 					}
-					var extra []string
-					for k, v := range cred.Values {
-						if skip[k] || v == "" {
-							continue
+					if dbname != "" {
+						parts = append(parts, "dbname="+dbname)
+					}
+					parts = append(parts, "sslmode="+sslmode)
+					dsn = strings.Join(parts, " ")
+				}
+			}
+
+			// Append extra postgres DSN params as space-separated key=value
+			// pairs.  The "tls", "params", and core credential fields are
+			// excluded here because they are handled above or parsed below.
+			if dsn != "" {
+				skip := map[string]bool{
+					"host": true, "user": true, "password": true,
+					"port": true, "database": true, "dsn": true,
+					"tls": true, "params": true,
+				}
+				var extra []string
+				for k, v := range cred.Values {
+					if skip[k] || v == "" {
+						continue
+					}
+					extra = append(extra, fmt.Sprintf("%s=%s", k, v))
+				}
+				// The "params" field lets users supply additional DSN
+				// key=value pairs separated by spaces or "&".
+				if raw := cred.Values["params"]; raw != "" {
+					for _, part := range strings.FieldsFunc(raw, func(r rune) bool {
+						return r == '&' || r == ' '
+					}) {
+						if kv := strings.SplitN(part, "=", 2); len(kv) == 2 && kv[1] != "" {
+							extra = append(extra, fmt.Sprintf("%s=%s", kv[0], kv[1]))
 						}
-						extra = append(extra, fmt.Sprintf("%s=%s", k, v))
-					}
-					// The "params" field lets users supply additional DSN
-					// key=value pairs separated by spaces or "&".
-					if raw := cred.Values["params"]; raw != "" {
-						for _, part := range strings.FieldsFunc(raw, func(r rune) bool {
-							return r == '&' || r == ' '
-						}) {
-							if kv := strings.SplitN(part, "=", 2); len(kv) == 2 && kv[1] != "" {
-								extra = append(extra, fmt.Sprintf("%s=%s", kv[0], kv[1]))
-							}
-						}
-					}
-					// Ensure a sensible default connect timeout when the caller
-					// has not specified one explicitly.
-					hasTimeout := strings.Contains(dsn, "connect_timeout")
-					for _, e := range extra {
-						if strings.HasPrefix(e, "connect_timeout=") {
-							hasTimeout = true
-						}
-					}
-					if !hasTimeout {
-						extra = append(extra, "connect_timeout=5")
-					}
-					if len(extra) > 0 {
-						dsn = dsn + " " + strings.Join(extra, " ")
 					}
 				}
+				// Ensure a sensible default connect timeout when the caller
+				// has not specified one explicitly.
+				hasTimeout := strings.Contains(dsn, "connect_timeout")
+				for _, e := range extra {
+					if strings.HasPrefix(e, "connect_timeout=") {
+						hasTimeout = true
+					}
+				}
+				if !hasTimeout {
+					extra = append(extra, "connect_timeout=5")
+				}
+				if len(extra) > 0 {
+					dsn = dsn + " " + strings.Join(extra, " ")
+				}
+			}
 		}
 	}
 	// Apply explicit database override that may have been injected by ConnectionTree
@@ -299,6 +299,7 @@ func overrideDatabaseInDSN(dsn, database string) (string, error) {
 	}
 	return strings.Join(out, " "), nil
 }
+
 // openPostgresDB wraps sql.Open so unit tests can replace it with a mock.
 var openPostgresDB = func(dsn string) (*sql.DB, error) {
 	return sql.Open("postgres", dsn)
@@ -349,22 +350,22 @@ func extractDBName(dsn string) string {
 }
 
 func (m *postgresqlPlugin) DescribeSchema(ctx context.Context, req *plugin.DescribeSchemaRequest) (*plugin.DescribeSchemaResponse, error) {
-    dsn, err := buildConnString(req.Connection)
-    if err != nil {
-        return &plugin.DescribeSchemaResponse{}, nil
-    }
-    if dsn == "" {
-        return &plugin.DescribeSchemaResponse{}, nil
-    }
-    db, err := openPostgresDB(dsn)
-    if err != nil {
-        return &plugin.DescribeSchemaResponse{}, nil
-    }
-    defer db.Close()
+	dsn, err := buildConnString(req.Connection)
+	if err != nil {
+		return &plugin.DescribeSchemaResponse{}, nil
+	}
+	if dsn == "" {
+		return &plugin.DescribeSchemaResponse{}, nil
+	}
+	db, err := openPostgresDB(dsn)
+	if err != nil {
+		return &plugin.DescribeSchemaResponse{}, nil
+	}
+	defer db.Close()
 
-    resp := &plugin.DescribeSchemaResponse{}
-    // base tables, excluding Postgres system schemas and partition children
-    query := `SELECT t.table_schema, t.table_name
+	resp := &plugin.DescribeSchemaResponse{}
+	// base tables, excluding Postgres system schemas and partition children
+	query := `SELECT t.table_schema, t.table_name
 FROM information_schema.tables t
 WHERE t.table_type='BASE TABLE'
   AND t.table_schema NOT IN ('pg_catalog','information_schema')
@@ -376,73 +377,73 @@ WHERE t.table_type='BASE TABLE'
       WHERE n2.nspname = t.table_schema
         AND c2.relname = t.table_name
   )`
-    args := []interface{}{}
-    if req.Database != "" {
-        args = append(args, req.Database)
-        query += fmt.Sprintf(" AND t.table_schema = $%d", len(args))
-    }
-    if req.Table != "" {
-        args = append(args, req.Table)
-        query += fmt.Sprintf(" AND t.table_name = $%d", len(args))
-    }
-    rows, err := db.Query(query, args...)
-    if err != nil {
-        return resp, nil
-    }
-    defer rows.Close()
-    for rows.Next() {
-        var schema, tbl string
-        if rows.Scan(&schema, &tbl) != nil {
-            continue
-        }
-        ts := &plugin.TableSchema{Name: schema + "." + tbl}
-        // columns
-        colQ := `SELECT column_name, data_type, is_nullable, ordinal_position, column_default
+	args := []interface{}{}
+	if req.Database != "" {
+		args = append(args, req.Database)
+		query += fmt.Sprintf(" AND t.table_schema = $%d", len(args))
+	}
+	if req.Table != "" {
+		args = append(args, req.Table)
+		query += fmt.Sprintf(" AND t.table_name = $%d", len(args))
+	}
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		return resp, nil
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var schema, tbl string
+		if rows.Scan(&schema, &tbl) != nil {
+			continue
+		}
+		ts := &plugin.TableSchema{Name: schema + "." + tbl}
+		// columns
+		colQ := `SELECT column_name, data_type, is_nullable, ordinal_position, column_default
                  FROM information_schema.columns
                  WHERE table_schema=$1 AND table_name=$2
                  ORDER BY ordinal_position`
-        colRows, err := db.Query(colQ, schema, tbl)
-        if err == nil {
-            defer colRows.Close()
-            for colRows.Next() {
-                var name, dtype, isNull string
-                var pos int32
-                var def sql.NullString
-                if err := colRows.Scan(&name, &dtype, &isNull, &pos, &def); err != nil {
-                    continue
-                }
-                cs := &plugin.ColumnSchema{
-                    Name:       name,
-                    Type:       dtype,
-                    Nullable:   strings.EqualFold(isNull, "YES"),
-                    Ordinal:    pos,
-                }
-                if def.Valid {
-                    cs.Default = def.String
-                }
-                ts.Columns = append(ts.Columns, cs)
-            }
-        }
-        // indexes (basic names and uniqueness)
-        idxQ := `SELECT indexname, indexdef FROM pg_indexes WHERE schemaname=$1 AND tablename=$2`
-        idxRows, err := db.Query(idxQ, schema, tbl)
-        if err == nil {
-            defer idxRows.Close()
-            for idxRows.Next() {
-                var name, def string
-                if idxRows.Scan(&name, &def) != nil {
-                    continue
-                }
-                idx := &plugin.IndexSchema{Name: name}
-                if strings.Contains(def, "UNIQUE") {
-                    idx.Unique = true
-                }
-                ts.Indexes = append(ts.Indexes, idx)
-            }
-        }
-        resp.Tables = append(resp.Tables, ts)
-    }
-    return resp, nil
+		colRows, err := db.Query(colQ, schema, tbl)
+		if err == nil {
+			defer colRows.Close()
+			for colRows.Next() {
+				var name, dtype, isNull string
+				var pos int32
+				var def sql.NullString
+				if err := colRows.Scan(&name, &dtype, &isNull, &pos, &def); err != nil {
+					continue
+				}
+				cs := &plugin.ColumnSchema{
+					Name:     name,
+					Type:     dtype,
+					Nullable: strings.EqualFold(isNull, "YES"),
+					Ordinal:  pos,
+				}
+				if def.Valid {
+					cs.Default = def.String
+				}
+				ts.Columns = append(ts.Columns, cs)
+			}
+		}
+		// indexes (basic names and uniqueness)
+		idxQ := `SELECT indexname, indexdef FROM pg_indexes WHERE schemaname=$1 AND tablename=$2`
+		idxRows, err := db.Query(idxQ, schema, tbl)
+		if err == nil {
+			defer idxRows.Close()
+			for idxRows.Next() {
+				var name, def string
+				if idxRows.Scan(&name, &def) != nil {
+					continue
+				}
+				idx := &plugin.IndexSchema{Name: name}
+				if strings.Contains(def, "UNIQUE") {
+					idx.Unique = true
+				}
+				ts.Indexes = append(ts.Indexes, idx)
+			}
+		}
+		resp.Tables = append(resp.Tables, ts)
+	}
+	return resp, nil
 }
 
 func applySortPQ(query, column, direction string) string {
@@ -516,7 +517,7 @@ func (m *postgresqlPlugin) Exec(ctx context.Context, req *plugin.ExecRequest) (*
 			Payload: &pluginpb.PluginV1_ExecResult_Sql{
 				Sql: &plugin.SqlResult{
 					Columns: colMeta,
-					Rows: rowResults,
+					Rows:    rowResults,
 				},
 			},
 		},
@@ -648,159 +649,159 @@ ORDER BY c.relname`, schemaName); err == nil {
 			}
 
 			// ── Views ────────────────────────────────────────────────────────
-// 			var viewNodes []*plugin.ConnectionTreeNode
-// 			if rows, err := conn.Query(`
-// SELECT c.relname
-// FROM pg_catalog.pg_class c
-// JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-// WHERE n.nspname = $1
-//   AND c.relkind = 'v'
-// ORDER BY c.relname`, schemaName); err == nil {
-// 				for rows.Next() {
-// 					var v string
-// 					if err := rows.Scan(&v); err == nil {
-// 						viewNodes = append(viewNodes, &plugin.ConnectionTreeNode{
-// 							Key:      schemaName + ".v." + v,
-// 							Label:    v,
-// 							NodeType: plugin.ConnectionTreeNodeTypeView,
-// 							Actions: []*plugin.ConnectionTreeAction{
-// 								{
-// 									Type:   plugin.ConnectionTreeActionSelect,
-// 									Title:  "Select rows",
-// 									Query:  fmt.Sprintf(`SELECT * FROM "%s"."%s" LIMIT 100;`, schemaName, v),
-// 									Hidden: true,
-// 									NewTab: true,
-// 								},
-// 							},
-// 						})
-// 					}
-// 				}
-// 				rows.Close()
-// 			}
+			// 			var viewNodes []*plugin.ConnectionTreeNode
+			// 			if rows, err := conn.Query(`
+			// SELECT c.relname
+			// FROM pg_catalog.pg_class c
+			// JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+			// WHERE n.nspname = $1
+			//   AND c.relkind = 'v'
+			// ORDER BY c.relname`, schemaName); err == nil {
+			// 				for rows.Next() {
+			// 					var v string
+			// 					if err := rows.Scan(&v); err == nil {
+			// 						viewNodes = append(viewNodes, &plugin.ConnectionTreeNode{
+			// 							Key:      schemaName + ".v." + v,
+			// 							Label:    v,
+			// 							NodeType: plugin.ConnectionTreeNodeTypeView,
+			// 							Actions: []*plugin.ConnectionTreeAction{
+			// 								{
+			// 									Type:   plugin.ConnectionTreeActionSelect,
+			// 									Title:  "Select rows",
+			// 									Query:  fmt.Sprintf(`SELECT * FROM "%s"."%s" LIMIT 100;`, schemaName, v),
+			// 									Hidden: true,
+			// 									NewTab: true,
+			// 								},
+			// 							},
+			// 						})
+			// 					}
+			// 				}
+			// 				rows.Close()
+			// 			}
 
 			// ── Materialized Views ───────────────────────────────────────────
-// 			var matViewNodes []*plugin.ConnectionTreeNode
-// 			if rows, err := conn.Query(`
-// SELECT c.relname
-// FROM pg_catalog.pg_class c
-// JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-// WHERE n.nspname = $1
-//   AND c.relkind = 'm'
-// ORDER BY c.relname`, schemaName); err == nil {
-// 				for rows.Next() {
-// 					var v string
-// 					if err := rows.Scan(&v); err == nil {
-// 						matViewNodes = append(matViewNodes, &plugin.ConnectionTreeNode{
-// 							Key:      schemaName + ".mv." + v,
-// 							Label:    v,
-// 							NodeType: plugin.ConnectionTreeNodeTypeView,
-// 							Actions: []*plugin.ConnectionTreeAction{
-// 								{
-// 									Type:   plugin.ConnectionTreeActionSelect,
-// 									Title:  "Select rows",
-// 									Query:  fmt.Sprintf(`SELECT * FROM "%s"."%s" LIMIT 100;`, schemaName, v),
-// 									Hidden: true,
-// 									NewTab: true,
-// 								},
-// 							},
-// 						})
-// 					}
-// 				}
-// 				rows.Close()
-// 			}
+			// 			var matViewNodes []*plugin.ConnectionTreeNode
+			// 			if rows, err := conn.Query(`
+			// SELECT c.relname
+			// FROM pg_catalog.pg_class c
+			// JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+			// WHERE n.nspname = $1
+			//   AND c.relkind = 'm'
+			// ORDER BY c.relname`, schemaName); err == nil {
+			// 				for rows.Next() {
+			// 					var v string
+			// 					if err := rows.Scan(&v); err == nil {
+			// 						matViewNodes = append(matViewNodes, &plugin.ConnectionTreeNode{
+			// 							Key:      schemaName + ".mv." + v,
+			// 							Label:    v,
+			// 							NodeType: plugin.ConnectionTreeNodeTypeView,
+			// 							Actions: []*plugin.ConnectionTreeAction{
+			// 								{
+			// 									Type:   plugin.ConnectionTreeActionSelect,
+			// 									Title:  "Select rows",
+			// 									Query:  fmt.Sprintf(`SELECT * FROM "%s"."%s" LIMIT 100;`, schemaName, v),
+			// 									Hidden: true,
+			// 									NewTab: true,
+			// 								},
+			// 							},
+			// 						})
+			// 					}
+			// 				}
+			// 				rows.Close()
+			// 			}
 
 			// ── Foreign Tables ───────────────────────────────────────────────
-// 			var foreignTableNodes []*plugin.ConnectionTreeNode
-// 			if rows, err := conn.Query(`
-// SELECT c.relname
-// FROM pg_catalog.pg_class c
-// JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-// WHERE n.nspname = $1
-//   AND c.relkind = 'f'
-// ORDER BY c.relname`, schemaName); err == nil {
-// 				for rows.Next() {
-// 					var ft string
-// 					if err := rows.Scan(&ft); err == nil {
-// 						foreignTableNodes = append(foreignTableNodes, &plugin.ConnectionTreeNode{
-// 							Key:      schemaName + ".ft." + ft,
-// 							Label:    ft,
-// 							NodeType: plugin.ConnectionTreeNodeTypeTable,
-// 							Actions: []*plugin.ConnectionTreeAction{
-// 								{
-// 									Type:   plugin.ConnectionTreeActionSelect,
-// 									Title:  "Select rows",
-// 									Query:  fmt.Sprintf(`SELECT * FROM "%s"."%s" LIMIT 100;`, schemaName, ft),
-// 									Hidden: true,
-// 									NewTab: true,
-// 								},
-// 							},
-// 						})
-// 					}
-// 				}
-// 				rows.Close()
-// 			}
+			// 			var foreignTableNodes []*plugin.ConnectionTreeNode
+			// 			if rows, err := conn.Query(`
+			// SELECT c.relname
+			// FROM pg_catalog.pg_class c
+			// JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+			// WHERE n.nspname = $1
+			//   AND c.relkind = 'f'
+			// ORDER BY c.relname`, schemaName); err == nil {
+			// 				for rows.Next() {
+			// 					var ft string
+			// 					if err := rows.Scan(&ft); err == nil {
+			// 						foreignTableNodes = append(foreignTableNodes, &plugin.ConnectionTreeNode{
+			// 							Key:      schemaName + ".ft." + ft,
+			// 							Label:    ft,
+			// 							NodeType: plugin.ConnectionTreeNodeTypeTable,
+			// 							Actions: []*plugin.ConnectionTreeAction{
+			// 								{
+			// 									Type:   plugin.ConnectionTreeActionSelect,
+			// 									Title:  "Select rows",
+			// 									Query:  fmt.Sprintf(`SELECT * FROM "%s"."%s" LIMIT 100;`, schemaName, ft),
+			// 									Hidden: true,
+			// 									NewTab: true,
+			// 								},
+			// 							},
+			// 						})
+			// 					}
+			// 				}
+			// 				rows.Close()
+			// 			}
 
 			// ── Indexes ──────────────────────────────────────────────────────
-// 			var indexNodes []*plugin.ConnectionTreeNode
-// 			if rows, err := conn.Query(`
-// SELECT indexname
-// FROM pg_indexes
-// WHERE schemaname = $1
-// ORDER BY indexname`, schemaName); err == nil {
-// 				for rows.Next() {
-// 					var idx string
-// 					if err := rows.Scan(&idx); err == nil {
-// 						indexNodes = append(indexNodes, &plugin.ConnectionTreeNode{
-// 							Key:      schemaName + ".idx." + idx,
-// 							Label:    idx,
-// 							NodeType: plugin.ConnectionTreeNodeTypeGroup,
-// 						})
-// 					}
-// 				}
-// 				rows.Close()
-// 			}
+			// 			var indexNodes []*plugin.ConnectionTreeNode
+			// 			if rows, err := conn.Query(`
+			// SELECT indexname
+			// FROM pg_indexes
+			// WHERE schemaname = $1
+			// ORDER BY indexname`, schemaName); err == nil {
+			// 				for rows.Next() {
+			// 					var idx string
+			// 					if err := rows.Scan(&idx); err == nil {
+			// 						indexNodes = append(indexNodes, &plugin.ConnectionTreeNode{
+			// 							Key:      schemaName + ".idx." + idx,
+			// 							Label:    idx,
+			// 							NodeType: plugin.ConnectionTreeNodeTypeGroup,
+			// 						})
+			// 					}
+			// 				}
+			// 				rows.Close()
+			// 			}
 
 			// ── Functions ────────────────────────────────────────────────────
-// 			var functionNodes []*plugin.ConnectionTreeNode
-// 			if rows, err := conn.Query(`
-// SELECT p.proname || '(' || pg_catalog.pg_get_function_identity_arguments(p.oid) || ')' AS signature
-// FROM pg_catalog.pg_proc p
-// JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
-// WHERE n.nspname = $1
-//   AND p.prokind = 'f'
-// ORDER BY p.proname`, schemaName); err == nil {
-// 				for rows.Next() {
-// 					var sig string
-// 					if err := rows.Scan(&sig); err == nil {
-// 						functionNodes = append(functionNodes, &plugin.ConnectionTreeNode{
-// 							Key:      schemaName + ".fn." + sig,
-// 							Label:    sig,
-// 							NodeType: plugin.ConnectionTreeNodeTypeGroup,
-// 						})
-// 					}
-// 				}
-// 				rows.Close()
-// 			}
+			// 			var functionNodes []*plugin.ConnectionTreeNode
+			// 			if rows, err := conn.Query(`
+			// SELECT p.proname || '(' || pg_catalog.pg_get_function_identity_arguments(p.oid) || ')' AS signature
+			// FROM pg_catalog.pg_proc p
+			// JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
+			// WHERE n.nspname = $1
+			//   AND p.prokind = 'f'
+			// ORDER BY p.proname`, schemaName); err == nil {
+			// 				for rows.Next() {
+			// 					var sig string
+			// 					if err := rows.Scan(&sig); err == nil {
+			// 						functionNodes = append(functionNodes, &plugin.ConnectionTreeNode{
+			// 							Key:      schemaName + ".fn." + sig,
+			// 							Label:    sig,
+			// 							NodeType: plugin.ConnectionTreeNodeTypeGroup,
+			// 						})
+			// 					}
+			// 				}
+			// 				rows.Close()
+			// 			}
 
 			// ── Sequences ────────────────────────────────────────────────────
-// 			var sequenceNodes []*plugin.ConnectionTreeNode
-// 			if rows, err := conn.Query(`
-// SELECT sequence_name
-// FROM information_schema.sequences
-// WHERE sequence_schema = $1
-// ORDER BY sequence_name`, schemaName); err == nil {
-// 				for rows.Next() {
-// 					var seq string
-// 					if err := rows.Scan(&seq); err == nil {
-// 						sequenceNodes = append(sequenceNodes, &plugin.ConnectionTreeNode{
-// 							Key:      schemaName + ".seq." + seq,
-// 							Label:    seq,
-// 							NodeType: plugin.ConnectionTreeNodeTypeGroup,
-// 						})
-// 					}
-// 				}
-// 				rows.Close()
-// 			}
+			// 			var sequenceNodes []*plugin.ConnectionTreeNode
+			// 			if rows, err := conn.Query(`
+			// SELECT sequence_name
+			// FROM information_schema.sequences
+			// WHERE sequence_schema = $1
+			// ORDER BY sequence_name`, schemaName); err == nil {
+			// 				for rows.Next() {
+			// 					var seq string
+			// 					if err := rows.Scan(&seq); err == nil {
+			// 						sequenceNodes = append(sequenceNodes, &plugin.ConnectionTreeNode{
+			// 							Key:      schemaName + ".seq." + seq,
+			// 							Label:    seq,
+			// 							NodeType: plugin.ConnectionTreeNodeTypeGroup,
+			// 						})
+			// 					}
+			// 				}
+			// 				rows.Close()
+			// 			}
 
 			// ── Assemble category group nodes ────────────────────────────────
 			categories := []*plugin.ConnectionTreeNode{
@@ -906,15 +907,27 @@ ORDER BY c.relname`, schemaName); err == nil {
 		NodeType: plugin.ConnectionTreeNodeTypeAction,
 		Actions: []*plugin.ConnectionTreeAction{
 			{
-				Type:  plugin.ConnectionTreeActionCreateDatabase,
-				Title: "Create database",
-				Query: `CREATE DATABASE "new_database";`,
+				Type:   plugin.ConnectionTreeActionCreateDatabase,
+				Title:  "Create database",
+				Query:  `CREATE DATABASE "new_database";`,
 				Hidden: true,
 			},
 		},
 	}
 
 	return &plugin.ConnectionTreeResponse{Nodes: append([]*plugin.ConnectionTreeNode{createNode}, dbNodes...)}, nil
+}
+
+func (m *postgresqlPlugin) ResourceGraph(ctx context.Context, req *plugin.ResourceGraphRequest) (*plugin.ResourceGraphResponse, error) {
+	connection := map[string]string(nil)
+	if req != nil {
+		connection = req.Connection
+	}
+	tree, err := m.ConnectionTree(ctx, &plugin.ConnectionTreeRequest{Connection: connection})
+	if err != nil {
+		return nil, err
+	}
+	return plugin.AdaptConnectionTree(tree), nil
 }
 
 // formatPingError wraps a ping failure with supplemental hints when the
@@ -926,7 +939,6 @@ func formatPingError(err error) string {
 	}
 	return msg
 }
-
 
 // TestConnection opens a PostgreSQL connection and pings the server to verify
 // the supplied credentials are valid. Nothing is persisted.

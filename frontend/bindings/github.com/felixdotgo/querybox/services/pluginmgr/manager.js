@@ -132,12 +132,23 @@ export function GetPluginAuthForms(name) {
 }
 
 /**
+ * @param {string} name
+ * @param {{ [_ in string]?: string }} connection
+ * @returns {$CancellablePromise<plugin$0.ResourceGraphResponse | null>}
+ */
+export function GetResourceGraph(name, connection) {
+    return $Call.ByID(1360511137, name, connection).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType12($result);
+    }));
+}
+
+/**
  * ListPlugins returns the discovered plugins (does not start them).
  * @returns {$CancellablePromise<$models.PluginInfo[]>}
  */
 export function ListPlugins() {
     return $Call.ByID(668942975).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType12($result);
+        return $$createType14($result);
     }));
 }
 
@@ -157,7 +168,7 @@ export function ListPlugins() {
  */
 export function MutateRow(name, connection, operation, source, values, filter) {
     return $Call.ByID(3105031897, name, connection, operation, source, values, filter).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType14($result);
+        return $$createType16($result);
     }));
 }
 
@@ -218,7 +229,7 @@ export function Shutdown() {
  */
 export function TestConnection(name, connection) {
     return $Call.ByID(2822844201, name, connection).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType16($result);
+        return $$createType18($result);
     }));
 }
 
@@ -234,9 +245,11 @@ const $$createType7 = $Create.Nullable($$createType6);
 const $$createType8 = pluginpb$0.PluginV1_AuthForm.createFrom;
 const $$createType9 = $Create.Nullable($$createType8);
 const $$createType10 = $Create.Map($Create.Any, $$createType9);
-const $$createType11 = $models.PluginInfo.createFrom;
-const $$createType12 = $Create.Array($$createType11);
-const $$createType13 = pluginpb$0.PluginV1_MutateRowResponse.createFrom;
-const $$createType14 = $Create.Nullable($$createType13);
-const $$createType15 = pluginpb$0.PluginV1_TestConnectionResponse.createFrom;
+const $$createType11 = plugin$0.ResourceGraphResponse.createFrom;
+const $$createType12 = $Create.Nullable($$createType11);
+const $$createType13 = $models.PluginInfo.createFrom;
+const $$createType14 = $Create.Array($$createType13);
+const $$createType15 = pluginpb$0.PluginV1_MutateRowResponse.createFrom;
 const $$createType16 = $Create.Nullable($$createType15);
+const $$createType17 = pluginpb$0.PluginV1_TestConnectionResponse.createFrom;
+const $$createType18 = $Create.Nullable($$createType17);

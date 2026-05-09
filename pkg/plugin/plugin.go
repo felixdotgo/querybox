@@ -97,10 +97,10 @@ type ConnectionTreeAction = pluginpb.PluginV1_ConnectionTreeAction
 
 // Schema descriptions – returned by the DescribeSchema RPC.
 type DescribeSchemaRequest = pluginpb.PluginV1_DescribeSchemaRequest
- type DescribeSchemaResponse = pluginpb.PluginV1_DescribeSchemaResponse
- type TableSchema = pluginpb.PluginV1_TableSchema
- type ColumnSchema = pluginpb.PluginV1_ColumnSchema
- type IndexSchema = pluginpb.PluginV1_IndexSchema
+type DescribeSchemaResponse = pluginpb.PluginV1_DescribeSchemaResponse
+type TableSchema = pluginpb.PluginV1_TableSchema
+type ColumnSchema = pluginpb.PluginV1_ColumnSchema
+type IndexSchema = pluginpb.PluginV1_IndexSchema
 
 // TestConnectionRequest / TestConnectionResponse are type aliases for the
 // proto-package types defined in rpc/contracts/plugin/v1.  When protoc
@@ -198,23 +198,28 @@ func ServeCLI(s pluginpb.PluginServiceServer) {
 		}
 		b, _ := protojson.Marshal(res)
 		_, _ = os.Stdout.Write(b)
-	case "connection-tree", "tree":
+	case "resource-graph":
+		provider, ok := s.(ResourceGraphProvider)
+		if !ok {
+			fmt.Fprintln(os.Stderr, "plugin: resource-graph not implemented")
+			os.Exit(1)
+		}
 		in, err := io.ReadAll(os.Stdin)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "plugin: failed to read stdin: %v\n", err)
 			os.Exit(1)
 		}
-		var req pluginpb.PluginV1_ConnectionTreeRequest
+		var req ResourceGraphRequest
 		if err := json.Unmarshal(in, &req); err != nil {
-			fmt.Fprintf(os.Stderr, "plugin: invalid tree request json: %v\n", err)
+			fmt.Fprintf(os.Stderr, "plugin: invalid resource-graph request json: %v\n", err)
 			os.Exit(1)
 		}
-		res, err := s.ConnectionTree(context.Background(), &req)
+		res, err := provider.ResourceGraph(context.Background(), &req)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "plugin: connection-tree error: %v\n", err)
+			fmt.Fprintf(os.Stderr, "plugin: resource-graph error: %v\n", err)
 			os.Exit(1)
 		}
-		b, _ := protojson.Marshal(res)
+		b, _ := json.Marshal(res)
 		_, _ = os.Stdout.Write(b)
 	case "test-connection":
 		in, err := io.ReadAll(os.Stdin)
@@ -270,7 +275,7 @@ func ServeCLI(s pluginpb.PluginServiceServer) {
 		}
 		b, _ := protojson.Marshal(res)
 		_, _ = os.Stdout.Write(b)
-case "mutate-row":
+	case "mutate-row":
 		in, err := io.ReadAll(os.Stdin)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "plugin: failed to read stdin: %v\n", err)
@@ -295,5 +300,5 @@ case "mutate-row":
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "Usage: <plugin> info | exec | authforms | connection-tree | test-connection | describe-schema | completion-fields | mutate-row (request on stdin as JSON)")
+	fmt.Fprintln(os.Stderr, "Usage: <plugin> info | exec | authforms | resource-graph | test-connection | describe-schema | completion-fields | mutate-row (request on stdin as JSON)")
 }

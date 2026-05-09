@@ -21,6 +21,7 @@ var SupportedCapabilitiesV1 = map[string]struct{}{
 
 type Manifest struct {
 	ID           string            `json:"id"`
+	Type         int               `json:"type"`
 	Name         string            `json:"name,omitempty"`
 	Description  string            `json:"description,omitempty"`
 	Version      string            `json:"version"`
@@ -60,6 +61,9 @@ func ValidateManifest(manifest Manifest, expectedID string) error {
 	}
 	if strings.TrimSpace(manifest.Version) == "" {
 		return fmt.Errorf("manifest version is required")
+	}
+	if manifest.Type <= 0 {
+		return fmt.Errorf("manifest type is required")
 	}
 	if strings.TrimSpace(manifest.Runtime.Kind) == "" {
 		return fmt.Errorf("manifest runtime.kind is required")

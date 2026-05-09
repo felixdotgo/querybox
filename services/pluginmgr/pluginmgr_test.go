@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -345,31 +344,20 @@ func TestScanOnceConcurrent(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
-	// create two dummy executable files
+	manifest := `{"id":"%s","type":1,"name":"%s","version":"1.0.0","runtime":{"kind":"local"},"capabilities":["query.execute"],"permissions":[],"limits":{"timeout_seconds":5}}`
+
+	// create two dummy executable files with manifests
 	for _, base := range []string{"p1", "p2"} {
 		name := pluginName(base)
 		path := filepath.Join(dir, name)
 		if err := os.WriteFile(path, []byte(""), 0o755); err != nil {
 			t.Fatalf("write dummy plugin %s: %v", name, err)
 		}
-	}
-
-	// instrumentation to ensure probes run in parallel
-	var active, maxActive int32
-	orig := probeInfoFunc
-	probeInfoFunc = func(fullpath string) (PluginInfo, error) {
-		curr := atomic.AddInt32(&active, 1)
-		if curr > atomic.LoadInt32(&maxActive) {
-			atomic.StoreInt32(&maxActive, curr)
+		sidecar := fmt.Sprintf(manifest, base, strings.ToUpper(base))
+		if err := os.WriteFile(path+plugin.ManifestFileSuffix, []byte(sidecar), 0o644); err != nil {
+			t.Fatalf("write manifest for %s: %v", name, err)
 		}
-		// delay so there is opportunity for overlap
-		time.Sleep(25 * time.Millisecond)
-		atomic.AddInt32(&active, -1)
-		base := filepath.Base(fullpath)
-		trim := strings.TrimSuffix(base, filepath.Ext(base))
-		return PluginInfo{ID: trim, Name: trim}, nil
 	}
-	defer func() { probeInfoFunc = orig }()
 
 	// construct a manager that scans only our temp directory
 	m := &Manager{
@@ -382,9 +370,6 @@ func TestScanOnceConcurrent(t *testing.T) {
 	m.scanOnce()
 	if len(m.plugins) != 2 {
 		t.Fatalf("expected 2 plugins, got %d", len(m.plugins))
-	}
-	if atomic.LoadInt32(&maxActive) < 2 {
-		t.Errorf("probe did not execute concurrently, maxActive=%d", maxActive)
 	}
 
 	// map keys should be normalized (no .exe extension)
@@ -545,15 +530,11 @@ func TestFallbackToBundle(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// make probeInfoFunc fail when given the user path but succeed for bundle
-	orig := probeInfoFunc
-	defer func() { probeInfoFunc = orig }()
-	probeInfoFunc = func(fullpath string) (PluginInfo, error) {
-		if strings.HasPrefix(fullpath, user) {
-			return PluginInfo{}, fmt.Errorf("user path broken")
-		}
-		// simulate a valid driver response
-		return PluginInfo{ID: pluginName("dup"), Name: "dup", Type: int(pluginpb.PluginV1_DRIVER)}, nil
+	if err := os.WriteFile(filepath.Join(user, pluginName("dup"))+plugin.ManifestFileSuffix, []byte(`{"id":"dup","type":1,"version":"1.0.0","runtime":{"kind":"unsupported"},"capabilities":["resource.graph"],"permissions":[],"limits":{"timeout_seconds":5}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(bundle, pluginName("dup"))+plugin.ManifestFileSuffix, []byte(`{"id":"dup","type":1,"name":"dup","version":"1.0.0","runtime":{"kind":"local"},"capabilities":["resource.graph"],"permissions":[],"limits":{"timeout_seconds":5}}`), 0o644); err != nil {
+		t.Fatal(err)
 	}
 
 	m := &Manager{
@@ -634,7 +615,7 @@ func TestScanOnceLoadsManifestMetadata(t *testing.T) {
 	if err := os.WriteFile(fullpath, []byte(""), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	manifest := `{"id":"manifested","name":"Manifested Plugin","description":"manifest-first plugin","version":"1.2.3","runtime":{"kind":"local"},"capabilities":["query.execute","connection.test"],"permissions":[{"name":"network"}],"limits":{"timeout_seconds":12},"metadata":{"legacy_tree_adapter":"connection-tree"}}`
+	manifest := `{"id":"manifested","type":1,"name":"Manifested Plugin","description":"manifest-first plugin","version":"1.2.3","runtime":{"kind":"local"},"capabilities":["query.execute","connection.test"],"permissions":[{"name":"network"}],"limits":{"timeout_seconds":12}}`
 	if err := os.WriteFile(fullpath+plugin.ManifestFileSuffix, []byte(manifest), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -666,6 +647,9 @@ func TestScanOnceLoadsManifestMetadata(t *testing.T) {
 	if info.Runtime == nil || info.Runtime.Kind != plugin.RuntimeKindLocal {
 		t.Fatalf("expected local runtime, got %#v", info.Runtime)
 	}
+	if info.Type != int(pluginpb.PluginV1_DRIVER) {
+		t.Fatalf("expected driver type from manifest, got %d", info.Type)
+	}
 	if len(info.Capabilities) != 2 || info.Capabilities[0] != "query.execute" {
 		t.Fatalf("unexpected capabilities: %#v", info.Capabilities)
 	}
@@ -677,12 +661,13 @@ func TestScanOnceLoadsManifestMetadata(t *testing.T) {
 	}
 }
 
-func TestGetResourceGraphAdaptsLegacyConnectionTree(t *testing.T) {
+func TestGetResourceGraphUsesNativeCommand(t *testing.T) {
 	m := &Manager{
 		plugins: map[string]PluginInfo{
-			"legacy": {
-				ID:   "legacy",
-				Path: "/tmp/legacy",
+			"native": {
+				ID:           "native",
+				Path:         "/tmp/native",
+				Capabilities: []string{"resource.graph"},
 			},
 		},
 	}
@@ -695,10 +680,10 @@ func TestGetResourceGraphAdaptsLegacyConnectionTree(t *testing.T) {
 	orig := m.runtime.local
 	m.runtime.local = &LocalPluginHostMock{
 		RunFunc: func(info PluginInfo, command string, timeout time.Duration, req []byte) ([]byte, error) {
-			if command != "connection-tree" {
+			if command != "resource-graph" {
 				return nil, fmt.Errorf("unexpected command %q", command)
 			}
-			return []byte(`{"nodes":[{"key":"db","label":"DB","node_type":"NODE_TYPE_DATABASE","children":[{"key":"table:users","label":"users","node_type":"NODE_TYPE_TABLE"}]}]}`), nil
+			return []byte(`{"nodes":[{"id":"db","name":"DB","kind":"database","path":"db","children":[{"id":"table:users","name":"users","kind":"table","path":"table:users"}]}]}`), nil
 		},
 	}
 	defer func() {
@@ -706,7 +691,7 @@ func TestGetResourceGraphAdaptsLegacyConnectionTree(t *testing.T) {
 		m.runtime = origRuntime
 	}()
 
-	graph, err := m.GetResourceGraph("legacy", nil)
+	graph, err := m.GetResourceGraph("native", nil)
 	if err != nil {
 		t.Fatalf("GetResourceGraph error: %v", err)
 	}

@@ -96,16 +96,16 @@ Binaries are placed in `bin/plugins/` (Windows builds get `.exe`) and picked up 
    ```
 
 2. Edit `plugins/<your-plugin-name>/plugin.json` to declare the manifest v1 metadata:
-   - `id`, `version`, `runtime`
+   - `id`, `type`, `version`, `runtime`
    - `capabilities`, `permissions`, `limits`
 
 3. Edit `plugins/<your-plugin-name>/main.go` — implement the four commands:
    - `info` — return plugin metadata (name, version, type)
    - `authforms` — return auth form definitions for the UI
    - `exec` — execute a query and return results
-   - `connection-tree` — return a browsable object hierarchy
+   - `resource-graph` — return a browsable resource hierarchy
 
-   The current shipping contract is still centered on `connection-tree` and query-style execution. The roadmap is moving toward `resource.graph`, resource actions, and results/streams while preserving compatibility for existing plugins.
+   The current shipping contract is centered on `resource-graph` and query-style execution. Bundled plugins are expected to ship a valid manifest and the runtime no longer falls back to legacy browse contracts.
 
 4. Build and drop the binary:
    ```bash

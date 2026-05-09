@@ -48,6 +48,59 @@ export const GetCompletionFieldsResponse = pluginpb$0.PluginV1_GetCompletionFiel
  * @typedef {pluginpb$0.PluginV1_GetCompletionFieldsResponse} GetCompletionFieldsResponse
  */
 
+export class Limits {
+    /**
+     * Creates a new Limits instance.
+     * @param {Partial<Limits>} [$$source = {}] - The source object to create the Limits.
+     */
+    constructor($$source = {}) {
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {number | undefined}
+             */
+            this["timeout_seconds"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {number | undefined}
+             */
+            this["max_output_bytes"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["working_dir"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string[] | undefined}
+             */
+            this["env_allowlist"] = undefined;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Limits instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {Limits}
+     */
+    static createFrom($$source = {}) {
+        const $$createField3_0 = $$createType0;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("env_allowlist" in $$parsedSource) {
+            $$parsedSource["env_allowlist"] = $$createField3_0($$parsedSource["env_allowlist"]);
+        }
+        return new Limits(/** @type {Partial<Limits>} */($$parsedSource));
+    }
+}
+
 export const MutateRowResponse = pluginpb$0.PluginV1_MutateRowResponse;
 
 /**
@@ -58,8 +111,350 @@ export const MutateRowResponse = pluginpb$0.PluginV1_MutateRowResponse;
  * @typedef {pluginpb$0.PluginV1_MutateRowRequest_OperationType} OperationType
  */
 
+export class PermissionDecl {
+    /**
+     * Creates a new PermissionDecl instance.
+     * @param {Partial<PermissionDecl>} [$$source = {}] - The source object to create the PermissionDecl.
+     */
+    constructor($$source = {}) {
+        if (!("name" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["name"] = "";
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["description"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {boolean | undefined}
+             */
+            this["required"] = undefined;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new PermissionDecl instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {PermissionDecl}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new PermissionDecl(/** @type {Partial<PermissionDecl>} */($$parsedSource));
+    }
+}
+
+export class ResourceAction {
+    /**
+     * Creates a new ResourceAction instance.
+     * @param {Partial<ResourceAction>} [$$source = {}] - The source object to create the ResourceAction.
+     */
+    constructor($$source = {}) {
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["id"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["kind"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["title"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["query"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {boolean | undefined}
+             */
+            this["new_tab"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {(ResourceField | null)[] | undefined}
+             */
+            this["fields"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {{ [_ in string]?: string } | undefined}
+             */
+            this["metadata"] = undefined;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ResourceAction instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {ResourceAction}
+     */
+    static createFrom($$source = {}) {
+        const $$createField5_0 = $$createType3;
+        const $$createField6_0 = $$createType4;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("fields" in $$parsedSource) {
+            $$parsedSource["fields"] = $$createField5_0($$parsedSource["fields"]);
+        }
+        if ("metadata" in $$parsedSource) {
+            $$parsedSource["metadata"] = $$createField6_0($$parsedSource["metadata"]);
+        }
+        return new ResourceAction(/** @type {Partial<ResourceAction>} */($$parsedSource));
+    }
+}
+
+export class ResourceField {
+    /**
+     * Creates a new ResourceField instance.
+     * @param {Partial<ResourceField>} [$$source = {}] - The source object to create the ResourceField.
+     */
+    constructor($$source = {}) {
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["name"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["label"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["placeholder"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {boolean | undefined}
+             */
+            this["required"] = undefined;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ResourceField instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {ResourceField}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ResourceField(/** @type {Partial<ResourceField>} */($$parsedSource));
+    }
+}
+
+export class ResourceGraphResponse {
+    /**
+     * Creates a new ResourceGraphResponse instance.
+     * @param {Partial<ResourceGraphResponse>} [$$source = {}] - The source object to create the ResourceGraphResponse.
+     */
+    constructor($$source = {}) {
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {(ResourceNode | null)[] | undefined}
+             */
+            this["nodes"] = undefined;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ResourceGraphResponse instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {ResourceGraphResponse}
+     */
+    static createFrom($$source = {}) {
+        const $$createField0_0 = $$createType7;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("nodes" in $$parsedSource) {
+            $$parsedSource["nodes"] = $$createField0_0($$parsedSource["nodes"]);
+        }
+        return new ResourceGraphResponse(/** @type {Partial<ResourceGraphResponse>} */($$parsedSource));
+    }
+}
+
+export class ResourceNode {
+    /**
+     * Creates a new ResourceNode instance.
+     * @param {Partial<ResourceNode>} [$$source = {}] - The source object to create the ResourceNode.
+     */
+    constructor($$source = {}) {
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["id"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["name"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["kind"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["path"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {(ResourceAction | null)[] | undefined}
+             */
+            this["actions"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {(ResourceNode | null)[] | undefined}
+             */
+            this["children"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {{ [_ in string]?: string } | undefined}
+             */
+            this["metadata"] = undefined;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ResourceNode instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {ResourceNode}
+     */
+    static createFrom($$source = {}) {
+        const $$createField4_0 = $$createType10;
+        const $$createField5_0 = $$createType7;
+        const $$createField6_0 = $$createType4;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("actions" in $$parsedSource) {
+            $$parsedSource["actions"] = $$createField4_0($$parsedSource["actions"]);
+        }
+        if ("children" in $$parsedSource) {
+            $$parsedSource["children"] = $$createField5_0($$parsedSource["children"]);
+        }
+        if ("metadata" in $$parsedSource) {
+            $$parsedSource["metadata"] = $$createField6_0($$parsedSource["metadata"]);
+        }
+        return new ResourceNode(/** @type {Partial<ResourceNode>} */($$parsedSource));
+    }
+}
+
+export class RuntimeSpec {
+    /**
+     * Creates a new RuntimeSpec instance.
+     * @param {Partial<RuntimeSpec>} [$$source = {}] - The source object to create the RuntimeSpec.
+     */
+    constructor($$source = {}) {
+        if (!("kind" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["kind"] = "";
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["entrypoint"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string[] | undefined}
+             */
+            this["args"] = undefined;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new RuntimeSpec instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {RuntimeSpec}
+     */
+    static createFrom($$source = {}) {
+        const $$createField2_0 = $$createType0;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("args" in $$parsedSource) {
+            $$parsedSource["args"] = $$createField2_0($$parsedSource["args"]);
+        }
+        return new RuntimeSpec(/** @type {Partial<RuntimeSpec>} */($$parsedSource));
+    }
+}
+
 export const TestConnectionResponse = pluginpb$0.PluginV1_TestConnectionResponse;
 
 /**
  * @typedef {pluginpb$0.PluginV1_TestConnectionResponse} TestConnectionResponse
  */
+
+// Private type creation functions
+const $$createType0 = $Create.Array($Create.Any);
+const $$createType1 = ResourceField.createFrom;
+const $$createType2 = $Create.Nullable($$createType1);
+const $$createType3 = $Create.Array($$createType2);
+const $$createType4 = $Create.Map($Create.Any, $Create.Any);
+const $$createType5 = ResourceNode.createFrom;
+const $$createType6 = $Create.Nullable($$createType5);
+const $$createType7 = $Create.Array($$createType6);
+const $$createType8 = ResourceAction.createFrom;
+const $$createType9 = $Create.Nullable($$createType8);
+const $$createType10 = $Create.Array($$createType9);

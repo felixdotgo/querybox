@@ -23,16 +23,16 @@ type sqlitePlugin struct {
 
 func (m *sqlitePlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRequest) (*plugin.InfoResponse, error) {
 	return &plugin.InfoResponse{
-		Type:        plugin.TypeDriver,
-		Name:        "SQLite",
-		Version:     "0.0.2",
-		Description: "SQLite database driver",
-		Url:         "https://www.sqlite.org/",
-		Author:      "QueryBox Team",
+		Type:         plugin.TypeDriver,
+		Name:         "SQLite",
+		Version:      "0.0.2",
+		Description:  "SQLite database driver",
+		Url:          "https://www.sqlite.org/",
+		Author:       "QueryBox Team",
 		Capabilities: []string{"query", "explain-query", "mutate-row", "describe-schema"},
-		Tags:        []string{"sql", "relational"},
-		License:     "MIT",
-		IconUrl:     "https://www.sqlite.org/images/logo-square.jpg",
+		Tags:         []string{"sql", "relational"},
+		License:      "MIT",
+		IconUrl:      "https://www.sqlite.org/images/logo-square.jpg",
 	}, nil
 }
 
@@ -240,9 +240,9 @@ func (m *sqlitePlugin) ConnectionTree(ctx context.Context, req *plugin.Connectio
 		NodeType: plugin.ConnectionTreeNodeTypeAction,
 		Actions: []*plugin.ConnectionTreeAction{
 			{
-				Type:  plugin.ConnectionTreeActionCreateTable,
-				Title: "Create table",
-				Query: "CREATE TABLE \"new_table\" (\n    \"id\" INTEGER PRIMARY KEY AUTOINCREMENT\n);",
+				Type:   plugin.ConnectionTreeActionCreateTable,
+				Title:  "Create table",
+				Query:  "CREATE TABLE \"new_table\" (\n    \"id\" INTEGER PRIMARY KEY AUTOINCREMENT\n);",
 				Hidden: true, // hide the action from the UI since it doesn't work out-of-the-box and requires user editing
 			},
 		},
@@ -251,95 +251,107 @@ func (m *sqlitePlugin) ConnectionTree(ctx context.Context, req *plugin.Connectio
 	return &plugin.ConnectionTreeResponse{Nodes: append([]*plugin.ConnectionTreeNode{createNode}, tableNodes...)}, nil
 }
 
+func (m *sqlitePlugin) ResourceGraph(ctx context.Context, req *plugin.ResourceGraphRequest) (*plugin.ResourceGraphResponse, error) {
+	connection := map[string]string(nil)
+	if req != nil {
+		connection = req.Connection
+	}
+	tree, err := m.ConnectionTree(ctx, &plugin.ConnectionTreeRequest{Connection: connection})
+	if err != nil {
+		return nil, err
+	}
+	return plugin.AdaptConnectionTree(tree), nil
+}
+
 // DescribeSchema returns column/index metadata for one or more tables.
 func (m *sqlitePlugin) DescribeSchema(ctx context.Context, req *plugin.DescribeSchemaRequest) (*plugin.DescribeSchemaResponse, error) {
-    c := parseCredential(req.Connection)
-    driver, dsn, err := driverDSN(c)
-    if err != nil {
-        return &plugin.DescribeSchemaResponse{}, nil
-    }
-    db, err := sql.Open(driver, dsn)
-    if err != nil {
-        return &plugin.DescribeSchemaResponse{}, nil
-    }
-    defer db.Close()
+	c := parseCredential(req.Connection)
+	driver, dsn, err := driverDSN(c)
+	if err != nil {
+		return &plugin.DescribeSchemaResponse{}, nil
+	}
+	db, err := sql.Open(driver, dsn)
+	if err != nil {
+		return &plugin.DescribeSchemaResponse{}, nil
+	}
+	defer db.Close()
 
-    var tables []string
-    if req.Table != "" {
-        tables = []string{req.Table}
-    } else {
-        rows, err := db.Query("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
-        if err == nil {
-            defer rows.Close()
-            for rows.Next() {
-                var tbl string
-                if rows.Scan(&tbl) == nil {
-                    tables = append(tables, tbl)
-                }
-            }
-        }
-    }
+	var tables []string
+	if req.Table != "" {
+		tables = []string{req.Table}
+	} else {
+		rows, err := db.Query("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var tbl string
+				if rows.Scan(&tbl) == nil {
+					tables = append(tables, tbl)
+				}
+			}
+		}
+	}
 
-    resp := &plugin.DescribeSchemaResponse{}
-    for _, tbl := range tables {
-        ts := &plugin.TableSchema{Name: tbl}
-        // columns
-        colRows, err := db.Query(fmt.Sprintf("PRAGMA table_info('%s')", tbl))
-        if err == nil {
-            defer colRows.Close()
-            for colRows.Next() {
-                var cid int
-                var name, ctype string
-                var notnull, pk int
-                var dflt sql.NullString
-                if err := colRows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
-                    continue
-                }
-                cs := &plugin.ColumnSchema{
-                    Name:       name,
-                    Type:       ctype,
-                    Nullable:   notnull == 0,
-                    PrimaryKey: pk != 0,
-                    Ordinal:    int32(cid),
-                }
-                if dflt.Valid {
-                    cs.Default = dflt.String
-                }
-                ts.Columns = append(ts.Columns, cs)
-            }
-        }
-        // indexes
-        idxRows, err := db.Query(fmt.Sprintf("PRAGMA index_list('%s')", tbl))
-        if err == nil {
-            defer idxRows.Close()
-            for idxRows.Next() {
-                var seq int
-                var name string
-                var unique int
-                var origin string
-                var partial int
-                if err := idxRows.Scan(&seq, &name, &unique, &origin, &partial); err != nil {
-                    continue
-                }
-                idx := &plugin.IndexSchema{Name: name, Unique: unique != 0, Primary: origin == "pk"}
-                // fetch columns for this index
-                infoRows, err := db.Query(fmt.Sprintf("PRAGMA index_info('%s')", name))
-                if err == nil {
-                    defer infoRows.Close()
-                    for infoRows.Next() {
-                        var seqno, cid int
-                        var colname string
-                        if infoRows.Scan(&seqno, &cid, &colname) == nil {
-                            idx.Columns = append(idx.Columns, colname)
-                        }
-                    }
-                }
-                ts.Indexes = append(ts.Indexes, idx)
-            }
-        }
-        resp.Tables = append(resp.Tables, ts)
-    }
-    return resp, nil
+	resp := &plugin.DescribeSchemaResponse{}
+	for _, tbl := range tables {
+		ts := &plugin.TableSchema{Name: tbl}
+		// columns
+		colRows, err := db.Query(fmt.Sprintf("PRAGMA table_info('%s')", tbl))
+		if err == nil {
+			defer colRows.Close()
+			for colRows.Next() {
+				var cid int
+				var name, ctype string
+				var notnull, pk int
+				var dflt sql.NullString
+				if err := colRows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+					continue
+				}
+				cs := &plugin.ColumnSchema{
+					Name:       name,
+					Type:       ctype,
+					Nullable:   notnull == 0,
+					PrimaryKey: pk != 0,
+					Ordinal:    int32(cid),
+				}
+				if dflt.Valid {
+					cs.Default = dflt.String
+				}
+				ts.Columns = append(ts.Columns, cs)
+			}
+		}
+		// indexes
+		idxRows, err := db.Query(fmt.Sprintf("PRAGMA index_list('%s')", tbl))
+		if err == nil {
+			defer idxRows.Close()
+			for idxRows.Next() {
+				var seq int
+				var name string
+				var unique int
+				var origin string
+				var partial int
+				if err := idxRows.Scan(&seq, &name, &unique, &origin, &partial); err != nil {
+					continue
+				}
+				idx := &plugin.IndexSchema{Name: name, Unique: unique != 0, Primary: origin == "pk"}
+				// fetch columns for this index
+				infoRows, err := db.Query(fmt.Sprintf("PRAGMA index_info('%s')", name))
+				if err == nil {
+					defer infoRows.Close()
+					for infoRows.Next() {
+						var seqno, cid int
+						var colname string
+						if infoRows.Scan(&seqno, &cid, &colname) == nil {
+							idx.Columns = append(idx.Columns, colname)
+						}
+					}
+				}
+				ts.Indexes = append(ts.Indexes, idx)
+			}
+		}
+		resp.Tables = append(resp.Tables, ts)
+	}
+	return resp, nil
 }
 
 // TestConnection verifies the connection is reachable without persisting any state.

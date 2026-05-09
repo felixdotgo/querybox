@@ -2,7 +2,7 @@ import type { Ref } from 'vue'
 import type { ColumnSchema, Connection, ResourceAction, ResourceNode, TableSchema, TreeNode } from '@/lib/types'
 import { reactive, ref, watch } from 'vue'
 import { GetCredential } from '@/bindings/github.com/felixdotgo/querybox/services/connectionservice'
-import { DescribeSchema, GetConnectionTree } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
+import { DescribeSchema, GetResourceGraph } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
 
 type RawTreeNode = Partial<ResourceNode> & {
   key?: string
@@ -174,7 +174,7 @@ export function useConnectionTree(connRef?: Ref<Connection | null>) {
       const params: Record<string, string> = {}
       if (cred)
         params.credential_blob = cred
-      const resp = await GetConnectionTree(conn.driver_type, params)
+      const resp = await GetResourceGraph(conn.driver_type, params)
       treeCache[id] = normalizeNodes((resp?.nodes ?? []).filter(n => n !== null) as unknown as TreeNode[])
       // load schema info in parallel; ignore errors
       try {

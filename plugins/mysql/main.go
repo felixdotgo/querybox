@@ -23,16 +23,16 @@ type mysqlPlugin struct {
 
 func (m *mysqlPlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRequest) (*plugin.InfoResponse, error) {
 	return &plugin.InfoResponse{
-		Type:        plugin.TypeDriver,
-		Name:        "MySQL",
-		Version:     "0.0.2",
-		Description: "MySQL database driver",
-		Url:         "https://www.mysql.com/",
-		Author:      "QueryBox Team",
+		Type:         plugin.TypeDriver,
+		Name:         "MySQL",
+		Version:      "0.0.2",
+		Description:  "MySQL database driver",
+		Url:          "https://www.mysql.com/",
+		Author:       "QueryBox Team",
 		Capabilities: []string{"query", "explain-query", "mutate-row", "describe-schema"},
-		Tags:        []string{"sql", "relational"},
-		License:     "MIT",
-		IconUrl:     "https://www.mysql.com/common/logos/logo-mysql-170x115.png",
+		Tags:         []string{"sql", "relational"},
+		License:      "MIT",
+		IconUrl:      "https://www.mysql.com/common/logos/logo-mysql-170x115.png",
 	}, nil
 }
 
@@ -67,85 +67,85 @@ func (m *mysqlPlugin) AuthForms(ctx context.Context, _ *plugin.AuthFormsRequest)
 // logic mirrors what Exec historically did so both execution and browsing can
 // reuse the same rules (dsn value or credential_blob JSON).
 func init() {
-    // register a TLS config using our embedded root certificates; callers
-    // can select it via tls=querybox in the DSN.
-    if pool, err := certs.RootCertPool(); err == nil {
-        mysql.RegisterTLSConfig("querybox", &tls.Config{RootCAs: pool})
-    }
+	// register a TLS config using our embedded root certificates; callers
+	// can select it via tls=querybox in the DSN.
+	if pool, err := certs.RootCertPool(); err == nil {
+		mysql.RegisterTLSConfig("querybox", &tls.Config{RootCAs: pool})
+	}
 }
 
 func buildDSN(connection map[string]string) (string, error) {
-    // Accept either a full DSN under key "dsn" (legacy) or a credential blob
-    // JSON (recommended) stored under "credential_blob" containing: {"form":"basic","values": { ... }}
-    // Additionally we allow arbitrary extra parameters (including tls) which
-    // are appended as query parameters.  This lets callers configure SSL
-    // (tls=skip-verify, tls=true, etc) or other driver options.
-    dsn, ok := connection["dsn"]
-    if !ok || dsn == "" {
-        // try credential_blob
-        if cred, err := plugin.ParseCredentialBlob(connection); err == nil {
-                // if plugin stored a dsn inside values, prefer that
-                if v, ok := cred.Values["dsn"]; ok && v != "" {
-                    dsn = v
-                } else {
-                    // build a simple DSN from common keys
-                    host := cred.Values["host"]
-                    user := cred.Values["user"]
-                    pass := cred.Values["password"]
-                    port := cred.Values["port"]
-                    dbname := cred.Values["database"]
-                    if port == "" {
-                        port = "3306"
-                    }
-                    if host != "" {
-                        dsn = fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", user, pass, host, port, dbname)
-                    }
-                }
-                // append any extra parameters as query string
-                if dsn != "" {
-                    params := url.Values{}
-                    for k, v := range cred.Values {
-                        switch k {
-                        case "host", "user", "password", "port", "database", "dsn":
-                            // already handled above
-                            continue
-                        }
-                        if v != "" {
-                            params.Add(k, v)
-                        }
-                    }
-                    // convert generic tls flags to our registered config
-                    if t := params.Get("tls"); t == "true" || t == "preferred" {
-                        params.Set("tls", "querybox")
-                    }
-                    if len(params) > 0 {
-                        // ensure we always have a reasonable connection timeout so the
-                        // plugin can't hang indefinitely (30s context is managed by
-                        // caller).  driver accepts values like "5s".
-                        if params.Get("timeout") == "" {
-                            params.Set("timeout", "5s")
-                        }
-                        sep := "?"
-                        if strings.Contains(dsn, "?") {
-                            sep = "&"
-                        }
-                        dsn = dsn + sep + params.Encode()
-                    }
-                }
-        }
-    }
-    // If the caller forwarded a specific database (e.g. from the tree-node
-    // context), override the DBName in the parsed DSN so the connection opens
-    // against the correct database regardless of the saved credential.
-    if dbOverride, ok := connection["database"]; ok && dbOverride != "" && dsn != "" {
-        if cfg, err2 := mysql.ParseDSN(dsn); err2 == nil {
-            cfg.DBName = dbOverride
-            if rebuilt := cfg.FormatDSN(); rebuilt != "" {
-                dsn = rebuilt
-            }
-        }
-    }
-    return dsn, nil
+	// Accept either a full DSN under key "dsn" (legacy) or a credential blob
+	// JSON (recommended) stored under "credential_blob" containing: {"form":"basic","values": { ... }}
+	// Additionally we allow arbitrary extra parameters (including tls) which
+	// are appended as query parameters.  This lets callers configure SSL
+	// (tls=skip-verify, tls=true, etc) or other driver options.
+	dsn, ok := connection["dsn"]
+	if !ok || dsn == "" {
+		// try credential_blob
+		if cred, err := plugin.ParseCredentialBlob(connection); err == nil {
+			// if plugin stored a dsn inside values, prefer that
+			if v, ok := cred.Values["dsn"]; ok && v != "" {
+				dsn = v
+			} else {
+				// build a simple DSN from common keys
+				host := cred.Values["host"]
+				user := cred.Values["user"]
+				pass := cred.Values["password"]
+				port := cred.Values["port"]
+				dbname := cred.Values["database"]
+				if port == "" {
+					port = "3306"
+				}
+				if host != "" {
+					dsn = fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", user, pass, host, port, dbname)
+				}
+			}
+			// append any extra parameters as query string
+			if dsn != "" {
+				params := url.Values{}
+				for k, v := range cred.Values {
+					switch k {
+					case "host", "user", "password", "port", "database", "dsn":
+						// already handled above
+						continue
+					}
+					if v != "" {
+						params.Add(k, v)
+					}
+				}
+				// convert generic tls flags to our registered config
+				if t := params.Get("tls"); t == "true" || t == "preferred" {
+					params.Set("tls", "querybox")
+				}
+				if len(params) > 0 {
+					// ensure we always have a reasonable connection timeout so the
+					// plugin can't hang indefinitely (30s context is managed by
+					// caller).  driver accepts values like "5s".
+					if params.Get("timeout") == "" {
+						params.Set("timeout", "5s")
+					}
+					sep := "?"
+					if strings.Contains(dsn, "?") {
+						sep = "&"
+					}
+					dsn = dsn + sep + params.Encode()
+				}
+			}
+		}
+	}
+	// If the caller forwarded a specific database (e.g. from the tree-node
+	// context), override the DBName in the parsed DSN so the connection opens
+	// against the correct database regardless of the saved credential.
+	if dbOverride, ok := connection["database"]; ok && dbOverride != "" && dsn != "" {
+		if cfg, err2 := mysql.ParseDSN(dsn); err2 == nil {
+			cfg.DBName = dbOverride
+			if rebuilt := cfg.FormatDSN(); rebuilt != "" {
+				dsn = rebuilt
+			}
+		}
+	}
+	return dsn, nil
 }
 
 // getDatabaseFromConn returns the database name the connection will use, or
@@ -164,102 +164,102 @@ func getDatabaseFromConn(connection map[string]string) string {
 }
 
 func (m *mysqlPlugin) DescribeSchema(ctx context.Context, req *plugin.DescribeSchemaRequest) (*plugin.DescribeSchemaResponse, error) {
-    dsn, err := buildDSN(req.Connection)
-    if err != nil {
-        return &plugin.DescribeSchemaResponse{}, nil
-    }
-    db, err := sql.Open("mysql", dsn)
-    if err != nil {
-        return &plugin.DescribeSchemaResponse{}, nil
-    }
-    defer db.Close()
+	dsn, err := buildDSN(req.Connection)
+	if err != nil {
+		return &plugin.DescribeSchemaResponse{}, nil
+	}
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		return &plugin.DescribeSchemaResponse{}, nil
+	}
+	defer db.Close()
 
-    resp := &plugin.DescribeSchemaResponse{}
+	resp := &plugin.DescribeSchemaResponse{}
 
-    // fetch tables matching optional filters
-    query := "SELECT TABLE_SCHEMA, TABLE_NAME FROM information_schema.TABLES WHERE TABLE_TYPE='BASE TABLE'"
-    args := []interface{}{}
-    if req.Database != "" {
-        query += " AND TABLE_SCHEMA = ?"
-        args = append(args, req.Database)
-    }
-    if req.Table != "" {
-        query += " AND TABLE_NAME = ?"
-        args = append(args, req.Table)
-    }
-    rows, err := db.Query(query, args...)
-    if err != nil {
-        return resp, nil
-    }
-    defer rows.Close()
+	// fetch tables matching optional filters
+	query := "SELECT TABLE_SCHEMA, TABLE_NAME FROM information_schema.TABLES WHERE TABLE_TYPE='BASE TABLE'"
+	args := []interface{}{}
+	if req.Database != "" {
+		query += " AND TABLE_SCHEMA = ?"
+		args = append(args, req.Database)
+	}
+	if req.Table != "" {
+		query += " AND TABLE_NAME = ?"
+		args = append(args, req.Table)
+	}
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		return resp, nil
+	}
+	defer rows.Close()
 
-    for rows.Next() {
-        var schema, tbl string
-        if rows.Scan(&schema, &tbl) != nil {
-            continue
-        }
-        ts := &plugin.TableSchema{Name: fmt.Sprintf("%s.%s", schema, tbl)}
-        // columns
-        colQ := `SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_KEY='PRI', ORDINAL_POSITION, COLUMN_DEFAULT
+	for rows.Next() {
+		var schema, tbl string
+		if rows.Scan(&schema, &tbl) != nil {
+			continue
+		}
+		ts := &plugin.TableSchema{Name: fmt.Sprintf("%s.%s", schema, tbl)}
+		// columns
+		colQ := `SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_KEY='PRI', ORDINAL_POSITION, COLUMN_DEFAULT
                    FROM information_schema.COLUMNS
                    WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION`
-        colRows, err := db.Query(colQ, schema, tbl)
-        if err == nil {
-            defer colRows.Close()
-            for colRows.Next() {
-                var name, ctype, isNull sql.NullString
-                var pk bool
-                var pos int32
-                var def sql.NullString
-                if err := colRows.Scan(&name, &ctype, &isNull, &pk, &pos, &def); err != nil {
-                    continue
-                }
-                cs := &plugin.ColumnSchema{
-                    Name:       name.String,
-                    Type:       ctype.String,
-                    Nullable:   strings.EqualFold(isNull.String, "YES"),
-                    PrimaryKey: pk,
-                    Ordinal:    pos,
-                }
-                if def.Valid {
-                    cs.Default = def.String
-                }
-                ts.Columns = append(ts.Columns, cs)
-            }
-        }
-        // indexes
-        idxQ := `SELECT INDEX_NAME, COLUMN_NAME, NON_UNIQUE, SEQ_IN_INDEX, INDEX_COMMENT, INDEX_TYPE
+		colRows, err := db.Query(colQ, schema, tbl)
+		if err == nil {
+			defer colRows.Close()
+			for colRows.Next() {
+				var name, ctype, isNull sql.NullString
+				var pk bool
+				var pos int32
+				var def sql.NullString
+				if err := colRows.Scan(&name, &ctype, &isNull, &pk, &pos, &def); err != nil {
+					continue
+				}
+				cs := &plugin.ColumnSchema{
+					Name:       name.String,
+					Type:       ctype.String,
+					Nullable:   strings.EqualFold(isNull.String, "YES"),
+					PrimaryKey: pk,
+					Ordinal:    pos,
+				}
+				if def.Valid {
+					cs.Default = def.String
+				}
+				ts.Columns = append(ts.Columns, cs)
+			}
+		}
+		// indexes
+		idxQ := `SELECT INDEX_NAME, COLUMN_NAME, NON_UNIQUE, SEQ_IN_INDEX, INDEX_COMMENT, INDEX_TYPE
                   FROM information_schema.STATISTICS
                   WHERE TABLE_SCHEMA=? AND TABLE_NAME=? ORDER BY INDEX_NAME, SEQ_IN_INDEX`
-        idxRows, err := db.Query(idxQ, schema, tbl)
-        if err == nil {
-            defer idxRows.Close()
-            var current *plugin.IndexSchema
-            lastName := ""
-            for idxRows.Next() {
-                var idxName, colName string
-                var nonUnique int
-                var seq int
-                var comment, idxType string
-                if idxRows.Scan(&idxName, &colName, &nonUnique, &seq, &comment, &idxType) != nil {
-                    continue
-                }
-                if idxName != lastName {
-                    current = &plugin.IndexSchema{Name: idxName, Unique: nonUnique == 0}
-                    if idxName == "PRIMARY" {
-                        current.Primary = true
-                    }
-                    ts.Indexes = append(ts.Indexes, current)
-                    lastName = idxName
-                }
-                if current != nil {
-                    current.Columns = append(current.Columns, colName)
-                }
-            }
-        }
-        resp.Tables = append(resp.Tables, ts)
-    }
-    return resp, nil
+		idxRows, err := db.Query(idxQ, schema, tbl)
+		if err == nil {
+			defer idxRows.Close()
+			var current *plugin.IndexSchema
+			lastName := ""
+			for idxRows.Next() {
+				var idxName, colName string
+				var nonUnique int
+				var seq int
+				var comment, idxType string
+				if idxRows.Scan(&idxName, &colName, &nonUnique, &seq, &comment, &idxType) != nil {
+					continue
+				}
+				if idxName != lastName {
+					current = &plugin.IndexSchema{Name: idxName, Unique: nonUnique == 0}
+					if idxName == "PRIMARY" {
+						current.Primary = true
+					}
+					ts.Indexes = append(ts.Indexes, current)
+					lastName = idxName
+				}
+				if current != nil {
+					current.Columns = append(current.Columns, colName)
+				}
+			}
+		}
+		resp.Tables = append(resp.Tables, ts)
+	}
+	return resp, nil
 }
 
 func applySortMySQL(query, column, direction string) string {
@@ -391,8 +391,8 @@ func (m *mysqlPlugin) ConnectionTree(ctx context.Context, req *plugin.Connection
 						Label:    tbl,
 						NodeType: plugin.ConnectionTreeNodeTypeTable,
 						Actions: []*plugin.ConnectionTreeAction{
-						{Type: plugin.ConnectionTreeActionSelect, Title: "Select rows", Query: fmt.Sprintf("SELECT * FROM `%s` LIMIT 100;", tbl), Hidden: true, NewTab: true},
-						{Type: plugin.ConnectionTreeActionDropTable, Title: "Drop table", Query: fmt.Sprintf("DROP TABLE `%s`;", tbl)},
+							{Type: plugin.ConnectionTreeActionSelect, Title: "Select rows", Query: fmt.Sprintf("SELECT * FROM `%s` LIMIT 100;", tbl), Hidden: true, NewTab: true},
+							{Type: plugin.ConnectionTreeActionDropTable, Title: "Drop table", Query: fmt.Sprintf("DROP TABLE `%s`;", tbl)},
 						},
 					})
 				}
@@ -423,6 +423,18 @@ func (m *mysqlPlugin) ConnectionTree(ctx context.Context, req *plugin.Connection
 	}
 
 	return &plugin.ConnectionTreeResponse{Nodes: append([]*plugin.ConnectionTreeNode{createNode}, dbNodes...)}, nil
+}
+
+func (m *mysqlPlugin) ResourceGraph(ctx context.Context, req *plugin.ResourceGraphRequest) (*plugin.ResourceGraphResponse, error) {
+	connection := map[string]string(nil)
+	if req != nil {
+		connection = req.Connection
+	}
+	tree, err := m.ConnectionTree(ctx, &plugin.ConnectionTreeRequest{Connection: connection})
+	if err != nil {
+		return nil, err
+	}
+	return plugin.AdaptConnectionTree(tree), nil
 }
 
 // TestConnection opens a MySQL connection and pings the server to verify the

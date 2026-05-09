@@ -20,7 +20,7 @@ The host-side model contains:
 - `ResourceNode` with `id`, `name`, `kind`, `path`, `actions`, `children`, and `metadata`
 - `ResourceAction` with `id`, `kind`, `title`, `query`, `new_tab`, `fields`, and `metadata`
 
-The host keeps a compatibility adapter from legacy `connection-tree` payloads into `resource.graph` so database plugins continue working during migration.
+The host now treats `resource.graph` as the only browse contract for bundled plugins. Compatibility adapters from `connection-tree` are no longer part of the runtime path.
 
 ## Consequences
 

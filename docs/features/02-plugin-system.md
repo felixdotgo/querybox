@@ -14,11 +14,10 @@ Plugins are single-shot executables under `bin/plugins/`. The host spawns one su
 
 | Command | Stdin | Stdout | Timeout | Required |
 |---------|-------|--------|---------|---------|
-| `info` | — | `{name, version, description, type, ...}` | 5s | ✓ |
+| `info` | — | `{name, version, description, type, ...}` | 5s | optional |
 | `exec` | `{connection, query, options?}` | `{result, error}` | 30s | ✓ |
 | `authforms` | — | Auth form definitions | 2s | ✓ |
-| `resource-graph` | `{connection, resource_id?, depth?}` | `{nodes: [...]}` | 30s | optional |
-| `connection-tree` | `{connection}` | `{nodes: [...]}` | 30s | optional, legacy compatibility path |
+| `resource-graph` | `{connection, resource_id?, depth?}` | `{nodes: [...]}` | 30s | ✓ for browseable plugins |
 | `test-connection` | `{connection}` | `{ok: bool, message: string}` | 15s | optional |
 | `describe-schema` | `{connection, database?, table?}` | `{tables: [{name, columns, indexes}]}` | 30s | optional |
 | `completion-fields` | `{connection, database?, collection?}` | `{fields: [{name, type?}]}` | 5s | optional |
@@ -75,6 +74,7 @@ may ship `plugin.json`; the build copies it beside the binary as
 Manifest v1 requires:
 
 - `id`
+- `type`
 - `version`
 - `runtime`
 - `capabilities`
@@ -89,8 +89,8 @@ The currently supported capability taxonomy is:
 - `connection.test`
 - `schema.inspect`
 
-If no manifest is present, QueryBox falls back to `plugin info` so legacy
-plugins continue to work.
+Bundled plugins are expected to ship a manifest. Discovery fails fast when the
+manifest is missing or invalid.
 
 Hosts ignore unknown fields; older plugins emitting a numeric `type` are also accepted.
 
@@ -108,7 +108,7 @@ Plugins that do not implement `authforms` fall back to a single DSN/credential t
 
 ## Resource Graph
 
-`plugin resource-graph` is the target browse contract. It returns a generic
+`plugin resource-graph` is the browse contract. It returns a generic
 resource tree that is not tied to database-only nouns:
 
 ```json
@@ -132,18 +132,9 @@ resource tree that is not tied to database-only nouns:
 The host/frontend normalize this graph into the existing explorer model. Node
 rendering should prefer `kind`, `actions`, and `metadata`.
 
-## Connection Tree Compatibility
-
-Built-in database plugins still speak `connection-tree`. The host adapts that
-legacy payload into `resource.graph` internally so existing drivers keep
-working while new plugins can implement `resource-graph` directly.
-
-When the user activates a node action, the frontend still routes through
-`ExecTreeAction(name, conn, actionQuery, options)`, which delegates to
-`ExecPlugin`.
-
----
-
+On the frontend, the explorer now fetches browse data through
+`PluginManager.GetResourceGraph` and normalizes the returned `ResourceNode`
+objects in `useConnectionTree.ts`.
 
 ## Mutate‑Row Capability
 
@@ -187,9 +178,9 @@ Plugins strip any existing `ORDER BY` clause before appending the new one (using
 
 | Plugin | Commands | Capabilities | Notes |
 |--------|----------|-------------|-------|
-| `mysql` | info, exec, authforms, connection-tree, test-connection, describe-schema, completion-fields | `query.execute`, `connection.test`, `schema.inspect` via manifest; `explain-query` via info metadata | Uses legacy `connection-tree`; host adapts to `resource.graph` |
-| `postgresql` | info, exec, authforms, connection-tree, test-connection, describe-schema, completion-fields | `query.execute`, `connection.test`, `schema.inspect` via manifest; `explain-query` via info metadata | Uses legacy `connection-tree`; host adapts to `resource.graph` |
-| `sqlite` | info, exec, authforms, connection-tree, test-connection, describe-schema, completion-fields | `query.execute`, `connection.test`, `schema.inspect` via manifest; `explain-query` via info metadata | Uses legacy `connection-tree`; host adapts to `resource.graph` |
+| `mysql` | info, exec, authforms, resource-graph, test-connection, describe-schema, completion-fields | `resource.graph`, `query.execute`, `connection.test`, `schema.inspect`; `explain-query` via info metadata | Browse path is native `resource-graph` |
+| `postgresql` | info, exec, authforms, resource-graph, test-connection, describe-schema, completion-fields | `resource.graph`, `query.execute`, `connection.test`, `schema.inspect`; `explain-query` via info metadata | Browse path is native `resource-graph` |
+| `sqlite` | info, exec, authforms, resource-graph, test-connection, describe-schema, completion-fields | `resource.graph`, `query.execute`, `connection.test`, `schema.inspect`; `explain-query` via info metadata | Browse path is native `resource-graph` |
 | `mongodb` | exec, authforms, connection-tree, test-connection, completion-fields | — | Two auth forms: basic (host/port/password/db/auth-db) + URI string; fields derived by sampling documents |
 | `redis` | exec, authforms | — | Two auth forms: basic (host/port/password/db) + URL string; no field metadata (key-value store) |
 | `arangodb` | exec, authforms, completion-fields | — | Multi-model (documents, graphs); basic auth form; ATTRIBUTES() comment for editor autocompletion |
@@ -208,8 +199,8 @@ user folder is populated later.
 
 `PluginRegistry` scans the configured directories **once at startup** and again
 when `Rescan()` is called. For each executable it loads
-`<binary>.manifest.json` first, validates supported capabilities/runtime/limits,
-then falls back to probing `plugin info` when the manifest is absent.
+`<binary>.manifest.json`, validates supported capabilities/runtime/limits, and
+rejects plugins whose manifest is missing or invalid.
 
 Discovery results are cached in memory for the lifetime of the process.
 Replacing a plugin binary still requires a restart or a manual `Rescan()` to
@@ -226,7 +217,7 @@ results to `PluginManager`.
 1. Create `plugins/<name>/main.go` (package `main`).
 2. Create `plugins/<name>/plugin.json` with manifest v1 fields.
 3. Import `pkg/plugin` and call `plugin.ServeCLI()` in `main()`.
-4. Implement handler functions for each command (`exec`, `authforms`, `resource-graph` or legacy `connection-tree`, etc.).
+4. Implement handler functions for each command (`exec`, `authforms`, `resource-graph`, etc.).
 5. Build: `task build:plugins` → binary lands in `bin/plugins/<name>` (`.exe` on Windows) and the manifest is copied as `<binary>.manifest.json`.
 6. Drop the built plugin into `bin/plugins/` or the user plugin directory; the host discovers it automatically at startup or on manual `Rescan()`.
 

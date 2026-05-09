@@ -4,10 +4,11 @@ Plugins are out-of-process executables placed under `bin/plugins/` and invoked o
 
 - Development: put plugin source under `plugins/<name>/` (must be `package main`) and run `task build:plugins`.
 - Runtime: host discovers executables in `./bin/plugins` (no persistent plugin processes). The host may invoke a plugin binary whenever the user requests an operation.
-- Contract (CLI): the plugin should implement two subcommands:
+- Contract (CLI): the plugin should implement these core subcommands:
   - `plugin info` → prints JSON `{name, version, description}`
   - `plugin exec` → reads JSON `{connection, query}` from stdin and writes JSON `{result, error}` to stdout
+  - `plugin resource-graph` → reads JSON `{connection, resource_id?, depth?}` from stdin and writes `{nodes:[...]}` to stdout
 
-Each plugin source folder should also ship a `plugin.json` manifest declaring runtime, capabilities, permissions, and limits. The build script copies it beside the compiled binary as `<plugin>.manifest.json`.
+Each plugin source folder should also ship a `plugin.json` manifest declaring `id`, `type`, runtime, capabilities, permissions, and limits. The build script copies it beside the compiled binary as `<plugin>.manifest.json`.
 
 See `plugins/template` for a minimal example that follows the on-demand contract.

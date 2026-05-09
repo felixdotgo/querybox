@@ -1,5 +1,6 @@
 {
   "id": "mysql",
+  "type": 1,
   "name": "MySQL",
   "description": "Built-in MySQL driver plugin for QueryBox.",
   "version": "0.0.2",
@@ -7,6 +8,7 @@
     "kind": "local"
   },
   "capabilities": [
+    "resource.graph",
     "connection.test",
     "query.execute",
     "schema.inspect"
@@ -18,8 +20,5 @@
   ],
   "limits": {
     "timeout_seconds": 30
-  },
-  "metadata": {
-    "legacy_tree_adapter": "connection-tree"
   }
 }

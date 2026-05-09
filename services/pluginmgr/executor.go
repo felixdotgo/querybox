@@ -162,45 +162,11 @@ func (m *Manager) ExecPlugin(name string, connection map[string]string, query st
 // request contains only the connection map; the plugin defines node structure
 // and actions.  A timeout guards misbehaving plugins.
 func (m *Manager) GetConnectionTree(name string, connection map[string]string) (*plugin.ConnectionTreeResponse, error) {
-	m.emitLog(services.LogLevelInfo, fmt.Sprintf("GetConnectionTree: fetching tree (driver: %s)", name))
-
-	if info, ok := m.lookupPlugin(name); ok && supportsCapability(info.Capabilities, "resource.graph") {
-		req := plugin.ResourceGraphRequest{Connection: connection}
-		b, err := json.Marshal(&req)
-		if err != nil {
-			return nil, fmt.Errorf("GetConnectionTree: marshal graph request: %w", err)
-		}
-		out, execErr := m.runPluginCommand("GetConnectionTree", name, "resource-graph", defaultPluginTimeout, b)
-		if execErr == nil {
-			graph, err := decodeResourceGraphJSON(out)
-			if err != nil {
-				return nil, fmt.Errorf("GetConnectionTree: invalid graph json: %w", err)
-			}
-			tree := adaptResourceGraph(graph)
-			m.emitLog(services.LogLevelInfo, fmt.Sprintf("GetConnectionTree: adapted %d graph node(s) from native resource.graph", len(tree.Nodes)))
-			return tree, nil
-		}
-		m.emitLog(services.LogLevelInfo, fmt.Sprintf("GetConnectionTree: legacy fallback for %s after graph error: %v", name, execErr))
-	}
-
-	req := plugin.ConnectionTreeRequest{Connection: connection}
-	b, err := json.Marshal(&req)
-	if err != nil {
-		return nil, fmt.Errorf("GetConnectionTree: marshal request: %w", err)
-	}
-
-	outB, err := m.runPluginCommand("GetConnectionTree", name, "connection-tree", defaultPluginTimeout, b)
+	graph, err := m.GetResourceGraph(name, connection)
 	if err != nil {
 		return nil, err
 	}
-
-	resp, err := decodeConnectionTreeJSON(outB)
-	if err != nil {
-		m.emitLog(services.LogLevelError, fmt.Sprintf("GetConnectionTree: invalid tree JSON from '%s': %v", name, err))
-		return nil, fmt.Errorf("GetConnectionTree: invalid tree json: %w", err)
-	}
-	m.emitLog(services.LogLevelInfo, fmt.Sprintf("GetConnectionTree: (driver: %s) returned %d node(s)", name, len(resp.Nodes)))
-	return resp, nil
+	return plugin.AdaptResourceGraph(graph), nil
 }
 
 // ExecTreeAction is a convenience wrapper for executing the query payload

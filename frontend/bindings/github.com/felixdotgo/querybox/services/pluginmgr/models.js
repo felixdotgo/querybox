@@ -6,6 +6,10 @@
 // @ts-ignore: Unused imports
 import { Create as $Create } from "@wailsio/runtime";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as plugin$0 from "../../pkg/plugin/models.js";
+
 /**
  * On Windows the helper hideWindow (implemented in platform-specific files)
  * will configure subprocesses so they do not show a console window. This
@@ -45,6 +49,13 @@ export class PluginInfo {
              * @type {string}
              */
             this["path"] = "";
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["manifest_path"] = undefined;
         }
         if (!("running" in $$source)) {
             /**
@@ -96,6 +107,27 @@ export class PluginInfo {
              * @type {string[] | undefined}
              */
             this["capabilities"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {plugin$0.PermissionDecl[] | undefined}
+             */
+            this["permissions"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {plugin$0.Limits | null | undefined}
+             */
+            this["limits"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {plugin$0.RuntimeSpec | null | undefined}
+             */
+            this["runtime"] = undefined;
         }
         if (/** @type {any} */(false)) {
             /**
@@ -156,22 +188,34 @@ export class PluginInfo {
      * @returns {PluginInfo}
      */
     static createFrom($$source = {}) {
-        const $$createField9_0 = $$createType0;
         const $$createField10_0 = $$createType0;
-        const $$createField14_0 = $$createType1;
-        const $$createField15_0 = $$createType1;
+        const $$createField11_0 = $$createType2;
+        const $$createField12_0 = $$createType4;
+        const $$createField13_0 = $$createType6;
+        const $$createField14_0 = $$createType0;
+        const $$createField18_0 = $$createType7;
+        const $$createField19_0 = $$createType7;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("capabilities" in $$parsedSource) {
-            $$parsedSource["capabilities"] = $$createField9_0($$parsedSource["capabilities"]);
+            $$parsedSource["capabilities"] = $$createField10_0($$parsedSource["capabilities"]);
+        }
+        if ("permissions" in $$parsedSource) {
+            $$parsedSource["permissions"] = $$createField11_0($$parsedSource["permissions"]);
+        }
+        if ("limits" in $$parsedSource) {
+            $$parsedSource["limits"] = $$createField12_0($$parsedSource["limits"]);
+        }
+        if ("runtime" in $$parsedSource) {
+            $$parsedSource["runtime"] = $$createField13_0($$parsedSource["runtime"]);
         }
         if ("tags" in $$parsedSource) {
-            $$parsedSource["tags"] = $$createField10_0($$parsedSource["tags"]);
+            $$parsedSource["tags"] = $$createField14_0($$parsedSource["tags"]);
         }
         if ("metadata" in $$parsedSource) {
-            $$parsedSource["metadata"] = $$createField14_0($$parsedSource["metadata"]);
+            $$parsedSource["metadata"] = $$createField18_0($$parsedSource["metadata"]);
         }
         if ("settings" in $$parsedSource) {
-            $$parsedSource["settings"] = $$createField15_0($$parsedSource["settings"]);
+            $$parsedSource["settings"] = $$createField19_0($$parsedSource["settings"]);
         }
         return new PluginInfo(/** @type {Partial<PluginInfo>} */($$parsedSource));
     }
@@ -179,4 +223,10 @@ export class PluginInfo {
 
 // Private type creation functions
 const $$createType0 = $Create.Array($Create.Any);
-const $$createType1 = $Create.Map($Create.Any, $Create.Any);
+const $$createType1 = plugin$0.PermissionDecl.createFrom;
+const $$createType2 = $Create.Array($$createType1);
+const $$createType3 = plugin$0.Limits.createFrom;
+const $$createType4 = $Create.Nullable($$createType3);
+const $$createType5 = plugin$0.RuntimeSpec.createFrom;
+const $$createType6 = $Create.Nullable($$createType5);
+const $$createType7 = $Create.Map($Create.Any, $Create.Any);

@@ -1,5 +1,6 @@
 {
   "id": "template",
+  "type": 1,
   "name": "Template Plugin",
   "description": "Template manifest for new QueryBox plugins.",
   "version": "0.0.1",
@@ -7,6 +8,7 @@
     "kind": "local"
   },
   "capabilities": [
+    "resource.graph",
     "connection.test",
     "query.execute"
   ],
