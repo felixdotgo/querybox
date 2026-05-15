@@ -11,6 +11,7 @@ import RowEditorModal from './RowEditorModal.vue'
 const props = defineProps({
   payload: { type: Object, required: true },
   schema: { type: Object, required: false },
+  database: { type: String, required: false, default: null },
   connection: { type: Object, required: false },
   capabilities: { type: Array, default: () => [] },
   query: { type: String, default: '' },
@@ -20,17 +21,10 @@ const emit = defineEmits(['mutated'])
 
 // ─── sort ───────────────────────────────────────────────────────────────────
 
-const sortDatabase = computed(() => {
-  const name = props.schema?.name
-  if (name && typeof name === 'string' && name.includes('.'))
-    return name.split('.')[0]
-  return null
-})
-
 const { sortStates, isSorting, sortedPayload, handleSorterChange, resetSort } = useResultSort({
   query: toRef(props, 'query'),
   connection: toRef(props, 'connection'),
-  database: sortDatabase,
+  database: toRef(props, 'database'),
 })
 
 watch(() => props.payload, resetSort)
@@ -274,20 +268,26 @@ function handleDelete(row) {
 }
 
 async function refreshRow(rowKey, source, filter) {
-  if (!props.connection?.driver_type) { emit('mutated'); return }
+  if (!props.connection?.driver_type) {
+    emit('mutated')
+    return
+  }
   try {
     const connMap = {}
     const cred = await GetCredential(props.connection.id)
     if (cred)
       connMap.credential_blob = cred
-    if (source?.includes('.'))
-      connMap.database = source.split('.')[0]
+    if (props.database)
+      connMap.database = props.database
     const res = await ExecPlugin(props.connection.driver_type, connMap, `SELECT * FROM ${source} WHERE ${filter} LIMIT 1`, {})
     let pl = res?.result?.Payload ?? {}
     if (pl.Sql)
       pl = pl.Sql
     const rows = Array.isArray(pl.Rows) ? pl.Rows : []
-    if (rows.length === 0) { emit('mutated'); return }
+    if (rows.length === 0) {
+      emit('mutated')
+      return
+    }
     const freshVals = rows[0].Values ?? rows[0].values ?? []
     const schemaCols = Array.isArray(props.payload.columns) ? props.payload.columns : []
     const patch = {}
@@ -299,7 +299,7 @@ async function refreshRow(rowKey, source, filter) {
 
 async function handleMutation(params) {
   const capturedRowKey = editorRowKey.value
-  await performMutation(props.connection, params, ({ operation, source, filter } = {}) => {
+  await performMutation(props.connection, params, props.database, ({ operation, source, filter } = {}) => {
     if (operation === 'delete')
       emit('mutated')
     else refreshRow(capturedRowKey, source, filter)

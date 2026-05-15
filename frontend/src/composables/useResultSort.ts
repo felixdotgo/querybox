@@ -51,15 +51,18 @@ export function useResultSort({ query, connection, database }: UseResultSortOpti
   async function executeSorted(colName: string, direction: 'asc' | 'desc') {
     const conn = connection.value
     const q = query.value
-    if (!conn || !q) return
+    if (!conn || !q)
+      return
 
     isSorting.value = true
     try {
       const connMap: Record<string, string> = {}
       const cred = await GetCredential(conn.id)
-      if (cred) connMap.credential_blob = cred
+      if (cred)
+        connMap.credential_blob = cred
       const db = database?.value
-      if (db) connMap.database = db
+      if (db)
+        connMap.database = db
 
       const result = await ExecPlugin(
         conn.driver_type,
@@ -70,8 +73,10 @@ export function useResultSort({ query, connection, database }: UseResultSortOpti
 
       // unwrap protobuf envelope — mirrors ResultViewer.vue payload computed
       let payload: any = result?.result?.Payload ?? result?.result ?? {}
-      if (payload.Sql) payload = payload.Sql
-      else if (payload.sql) payload = payload.sql
+      if (payload.Sql)
+        payload = payload.Sql
+      else if (payload.sql)
+        payload = payload.sql
 
       sortedPayload.value = payload
     }

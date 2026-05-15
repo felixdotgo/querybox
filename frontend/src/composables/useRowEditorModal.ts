@@ -1,6 +1,7 @@
-import { useNotification } from 'naive-ui'
-import { ref, type Ref } from 'vue'
+import type { Ref } from 'vue'
 import type { MutationParams } from '@/lib/types'
+import { useNotification } from 'naive-ui'
+import { ref } from 'vue'
 
 /**
  * Shared modal state and mutation helper for row editor modals used
@@ -27,9 +28,10 @@ export function useRowEditorModal(buildFilter?: (row: Record<string, unknown>) =
   }
 
   async function performMutation(
-    connection: { id: string; driver_type: string },
+    connection: { id: string, driver_type: string },
     params: MutationParams,
-    onMutated?: (info: { operation: string; source: string; filter: string }) => void,
+    database?: string | null,
+    onMutated?: (info: { operation: string, source: string, filter: string }) => void,
   ): Promise<void> {
     const { mutateRow } = await import('@/composables/useRowMutation')
     try {
@@ -39,6 +41,7 @@ export function useRowEditorModal(buildFilter?: (row: Record<string, unknown>) =
         params.source,
         params.values || {},
         params.filter,
+        database,
       )
       if (res && (res.success === false || res.error)) {
         const msg = res.error || 'Operation failed'

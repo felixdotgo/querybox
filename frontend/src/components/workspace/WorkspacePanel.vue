@@ -22,7 +22,8 @@ const notification = useNotification()
 
 function getSchemaForTab(tab) {
   const tbl = getTableNameFromTab(tab)
-  if (!tbl) return null
+  if (!tbl)
+    return null
   return getSchema(tbl, tab.context.conn)
 }
 const tabs = ref([])
@@ -71,12 +72,14 @@ function getMonacoLanguage(driver) {
 }
 
 function getTableNameFromTab(tab) {
-  if (!tab?.context?.node) return null
+  if (!tab?.context?.node)
+    return null
   return extractTableName(tab.context.conn?.id, tab.context.node.key)
 }
 
 function getDatabaseFromTab(tab) {
-  if (!tab?.context?.node) return null
+  if (!tab?.context?.node)
+    return null
   return extractDatabase(tab.context.conn?.id, tab.context.node.key)
 }
 
@@ -324,7 +327,7 @@ defineExpose({ openTab })
               </template>
               <n-tab-pane name="result" tab="Result" display-directives="show:lazy">
                 <template #default>
-                  <ResultViewer v-if="tab.result" :result="tab.result" :schema="getSchemaForTab(tab)" :connection="tab.context?.conn" :capabilities="tab.context?.capabilities ?? []" :query="tab.query" @mutated="handleRefresh(tab)" />
+                  <ResultViewer v-if="tab.result" :result="tab.result" :schema="getSchemaForTab(tab)" :database="getDatabaseFromTab(tab)" :connection="tab.context?.conn" :capabilities="tab.context?.capabilities ?? []" :query="tab.query" @mutated="handleRefresh(tab)" />
                   <pre
                     v-else-if="tab.error"
                     class="whitespace-pre-wrap p-4 text-red-600 bg-red-50 flex-1 overflow-auto font-mono text-sm"

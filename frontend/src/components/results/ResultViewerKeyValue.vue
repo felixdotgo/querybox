@@ -57,7 +57,7 @@ function openEditor(op, row) {
 }
 
 async function handleMutation(params) {
-  await performMutation(props.connection, params, () => emit('mutated'))
+  await performMutation(props.connection, params, undefined, () => emit('mutated'))
 }
 </script>
 

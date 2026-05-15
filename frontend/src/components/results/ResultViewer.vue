@@ -13,6 +13,11 @@ const props = defineProps({
     type: Object,
     required: false,
   },
+  database: {
+    type: String,
+    required: false,
+    default: null,
+  },
   // the connection object associated with this result tab; passed
   // through to viewers so they can perform mutations.
   connection: {
@@ -109,6 +114,7 @@ const viewType = computed(() => {
       v-if="viewType === 'rdbms'"
       :payload="payload"
       :schema="props.schema"
+      :database="props.database"
       :connection="props.connection"
       :capabilities="props.capabilities"
       :query="props.query"

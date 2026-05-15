@@ -53,7 +53,7 @@ const {
 } = useRowEditorModal()
 
 async function handleMutation(params) {
-  await performMutation(props.connection, params, () => emit('mutated'))
+  await performMutation(props.connection, params, undefined, () => emit('mutated'))
 }
 
 // Normalised list of document payloads — always an array
