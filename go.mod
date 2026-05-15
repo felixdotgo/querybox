@@ -8,7 +8,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.11.2
 	github.com/tursodatabase/go-libsql v0.0.0-20251219133454-43644db490ff
-	github.com/wailsapp/wails/v3 v3.0.0-alpha.72
+	github.com/wailsapp/wails/v3 v3.0.0-alpha.85
 	github.com/zalando/go-keyring v0.2.6
 	google.golang.org/grpc v1.79.1
 	google.golang.org/protobuf v1.36.11

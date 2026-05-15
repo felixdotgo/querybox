@@ -11,5 +11,7 @@ data
 
 .github
 .claude
+.agents
 CLAUDE.md
+AGENTS.md
 .serena
