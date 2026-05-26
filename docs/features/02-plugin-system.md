@@ -63,7 +63,8 @@ Plugins that return a raw string are wrapped in `kv` by the host.
 optional `simple_icon` key whose value should match a name exported by the
 [`simple-icons`](https://www.npmjs.com/package/simple-icons) npm package; when
 present the UI will render that logo for connections associated with the
-plugin. Hosts must ignore unknown metadata keys.
+plugin. Hosts must ignore unknown metadata keys. Discovery and runtime policy
+must not depend on `info`.
 
 ### manifest — runtime metadata and limits
 
@@ -75,11 +76,21 @@ Manifest v1 requires:
 
 - `id`
 - `type`
+- `name`
+- `description`
 - `version`
+- `url`
+- `author`
 - `runtime`
 - `capabilities`
 - `permissions`
 - `limits`
+- `tags`
+- `license`
+- `icon_url`
+- `contact`
+- `metadata`
+- `settings`
 
 The currently supported capability taxonomy is:
 
@@ -93,10 +104,15 @@ The currently supported capability taxonomy is:
 - `mutate-row::edit`
 - `mutate-row::delete`
 
+Do not use legacy capability names such as `query` or `describe-schema` in new
+or updated plugins.
+
 Bundled plugins are expected to ship a manifest. Discovery fails fast when the
 manifest is missing or invalid.
 
-Hosts ignore unknown fields; older plugins emitting a numeric `type` are also accepted.
+QueryBox is still in `0.x`, so plugin/runtime contract changes may be breaking.
+Prefer deleting stale compatibility paths over keeping multiple browse/capability
+contracts alive in parallel.
 
 ---
 
@@ -182,12 +198,10 @@ Plugins strip any existing `ORDER BY` clause before appending the new one (using
 
 | Plugin | Commands | Capabilities | Notes |
 |--------|----------|-------------|-------|
-| `mysql` | info, exec, authforms, resource-graph, test-connection, describe-schema, completion-fields, mutate-row | `resource.graph`, `query.execute`, `connection.test`, `schema.inspect`, `explain-query`, `mutate-row` | Browse path is native `resource-graph` |
-| `postgresql` | info, exec, authforms, resource-graph, test-connection, describe-schema, completion-fields, mutate-row | `resource.graph`, `query.execute`, `connection.test`, `schema.inspect`, `explain-query`, `mutate-row` | Browse path is native `resource-graph` |
-| `sqlite` | info, exec, authforms, resource-graph, test-connection, describe-schema, completion-fields, mutate-row | `resource.graph`, `query.execute`, `connection.test`, `schema.inspect`, `explain-query`, `mutate-row` | Browse path is native `resource-graph` |
-| `mongodb` | exec, authforms, connection-tree, test-connection, completion-fields | — | Two auth forms: basic (host/port/password/db/auth-db) + URI string; fields derived by sampling documents |
-| `redis` | exec, authforms | — | Two auth forms: basic (host/port/password/db) + URL string; no field metadata (key-value store) |
-| `arangodb` | exec, authforms, completion-fields | — | Multi-model (documents, graphs); basic auth form; ATTRIBUTES() comment for editor autocompletion |
+| `mysql` | info, exec, authforms, resource-graph, test-connection, describe-schema, completion-fields, mutate-row | `resource.graph`, `query.execute`, `connection.test`, `schema.inspect`, `explain-query`, `mutate-row` | Manifest is the discovery/source-of-truth contract |
+| `postgresql` | info, exec, authforms, resource-graph, test-connection, describe-schema, completion-fields, mutate-row | `resource.graph`, `query.execute`, `connection.test`, `schema.inspect`, `explain-query`, `mutate-row` | Manifest is the discovery/source-of-truth contract |
+| `sqlite` | info, exec, authforms, resource-graph, test-connection, describe-schema, completion-fields, mutate-row | `resource.graph`, `query.execute`, `connection.test`, `schema.inspect`, `explain-query`, `mutate-row` | Manifest is the discovery/source-of-truth contract |
+| `template` | info, exec, authforms, resource-graph, test-connection, mutate-row | `resource.graph`, `connection.test`, `query.execute` | Minimal sample plugin used as authoring reference |
 
 ---
 
@@ -216,13 +230,44 @@ results to `PluginManager`.
 
 ---
 
+## Plugin Implementation Guardrails
+
+### Capability declaration
+
+- Manifest capabilities must match real implemented behavior.
+- `resource.graph` is required for browseable plugins.
+- `query.execute` is required for `exec`.
+- `connection.test` is required for explicit connectivity checks.
+- `schema.inspect` is required for schema and completion metadata flows.
+- `explain-query` is allowed only when the plugin understands `options["explain-query"]`.
+- `mutate-row` is required for editable results; add `mutate-row::edit` and/or `mutate-row::delete` when support is narrower.
+
+### Error handling
+
+- Do not swallow connection, auth, TLS, bootstrap, or query errors.
+- `test-connection` should return `ok=false` with a concrete message for real failures.
+- `resource-graph`, `exec`, and `mutate-row` should return an error or failure payload when the underlying operation fails.
+- Empty trees or empty result sets should represent genuinely empty state, not hidden connection failure.
+
+### Memory and process safety
+
+- One request should produce one bounded result; avoid loading unbounded catalogs or datasets into memory.
+- Apply `LIMIT`, sampling, paging, or catalog scoping by default where full scans are risky.
+- Close rows, files, DB handles, and any other acquired resources.
+- Avoid long-lived goroutines, hidden background polling, or unbounded caches in plugin processes.
+- Respect manifest limits such as timeout and output size; do not print huge stdout payloads that risk host OOM.
+
+---
+
 ## Writing a Plugin
 
 1. Create `plugins/<name>/main.go` (package `main`).
 2. Create `plugins/<name>/plugin.json` with manifest v1 fields.
 3. Import `pkg/plugin` and call `plugin.ServeCLI()` in `main()`.
 4. Implement handler functions for each command (`exec`, `authforms`, `resource-graph`, etc.).
-5. Build: `task build:plugins` → binary lands in `bin/plugins/<name>` (`.exe` on Windows) and the manifest is copied as `<binary>.manifest.json`.
-6. Drop the built plugin into `bin/plugins/` or the user plugin directory; the host discovers it automatically at startup or on manual `Rescan()`.
+5. Match manifest capabilities to the commands actually implemented; do not keep legacy capability names.
+6. Make failure paths explicit and keep result size/memory use bounded.
+7. Build: `task build:plugins` → binary lands in `bin/plugins/<name>` (`.exe` on Windows) and the manifest is copied as `<binary>.manifest.json`.
+8. Drop the built plugin into `bin/plugins/` or the user plugin directory; the host discovers it automatically at startup or on manual `Rescan()`.
 
 See `plugins/template/main.go` for a minimal example with all optional fields.

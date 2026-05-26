@@ -29,7 +29,7 @@ func (m *mysqlPlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRequest
 		Description:  "MySQL database driver",
 		Url:          "https://www.mysql.com/",
 		Author:       "QueryBox Team",
-		Capabilities: []string{"query", "explain-query", "mutate-row", "describe-schema"},
+		Capabilities: []string{"resource.graph", "connection.test", "query.execute", "schema.inspect", "explain-query", "mutate-row"},
 		Tags:         []string{"sql", "relational"},
 		License:      "MIT",
 		IconUrl:      "https://www.mysql.com/common/logos/logo-mysql-170x115.png",

@@ -23,7 +23,7 @@ const props = defineProps({
 
 const emit = defineEmits(['mutated'])
 
-// Capability-gated visibility — backward-compat: "mutate-row" alone shows both buttons.
+// Capability-gated visibility for mutation actions.
 const showActions = computed(() => props.capabilities.includes('mutate-row'))
 const showEdit = computed(() => {
   if (!showActions.value)

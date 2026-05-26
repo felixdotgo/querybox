@@ -29,7 +29,7 @@ func (m *postgresqlPlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRe
 		Description:  "PostgreSQL database driver",
 		Url:          "https://www.postgresql.org/",
 		Author:       "QueryBox Team",
-		Capabilities: []string{"query", "explain-query", "mutate-row", "describe-schema"},
+		Capabilities: []string{"resource.graph", "connection.test", "query.execute", "schema.inspect", "explain-query", "mutate-row"},
 		Tags:         []string{"sql", "relational"},
 		License:      "MIT",
 		IconUrl:      "https://www.postgresql.org/media/img/about/press/elephant.png",
@@ -305,6 +305,12 @@ var openPostgresDB = func(dsn string) (*sql.DB, error) {
 	return sql.Open("postgres", dsn)
 }
 
+// pingPostgresDB lets ConnectionTree fail fast on auth/network issues while
+// remaining easy to stub in unit tests.
+var pingPostgresDB = func(db *sql.DB) error {
+	return db.Ping()
+}
+
 // getDatabaseFromConn extracts a requested database name from the
 // connection metadata.  It checks the explicit "database" field, the
 // credential_blob payload, and finally any dbname element in a supplied
@@ -544,6 +550,10 @@ func (m *postgresqlPlugin) ConnectionTree(ctx context.Context, req *plugin.Conne
 		return nil, fmt.Errorf("postgresql: connect failed: %w", err)
 	}
 	defer db.Close()
+	if err := pingPostgresDB(db); err != nil {
+		fmt.Fprintf(os.Stderr, "postgresql: ConnectionTree: ping error: %v\n", err)
+		return nil, fmt.Errorf("postgresql: connect failed: %w", err)
+	}
 
 	// determine the database we are connected to now; used for reuse below
 	var currentDB string

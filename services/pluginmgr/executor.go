@@ -158,17 +158,6 @@ func (m *Manager) ExecPlugin(name string, connection map[string]string, query st
 	return resp, nil
 }
 
-// GetConnectionTree asks the named plugin for its connection tree.  The
-// request contains only the connection map; the plugin defines node structure
-// and actions.  A timeout guards misbehaving plugins.
-func (m *Manager) GetConnectionTree(name string, connection map[string]string) (*plugin.ConnectionTreeResponse, error) {
-	graph, err := m.GetResourceGraph(name, connection)
-	if err != nil {
-		return nil, err
-	}
-	return plugin.AdaptResourceGraph(graph), nil
-}
-
 // ExecTreeAction is a convenience wrapper for executing the query payload
 // attached to a tree node action.  It simply forwards to ExecPlugin and
 // propagates any provided options map (for example "explain-query").

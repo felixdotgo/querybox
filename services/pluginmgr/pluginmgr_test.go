@@ -55,72 +55,53 @@ func TestUserPluginsDirBehavior(t *testing.T) {
 	}
 }
 
-func TestProbeInfoDecoding(t *testing.T) {
-	// prepare a fake JSON as plugin binary would emit (camelCase keys are
-	// what protojson generates).
-	raw := map[string]interface{}{
-		"type":         1,
-		"name":         "foo",
-		"version":      "1.2.3",
-		"description":  "the foo driver",
-		"url":          "https://example.org/foo",
-		"author":       "Foo Corp",
-		"capabilities": []string{"transactions"},
-		"tags":         []string{"sql"},
-		"license":      "MIT",
-		"iconUrl":      "https://example.org/icon.png",
-		"contact":      "support@example.org",
-		"metadata":     map[string]string{"key": "val", "simple_icon": "postgresql"},
-		"settings":     map[string]string{"k2": "v2"},
-	}
-	b, err := json.Marshal(raw)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var resp PluginInfo
-	if err := json.Unmarshal(b, &resp); err != nil {
-		t.Fatalf("unmarshal plugininfo: %v", err)
-	}
-
-	// mimic probeInfo() internals by building raw map then converting
-	var parsed map[string]interface{}
-	if err := json.Unmarshal(b, &parsed); err != nil {
-		t.Fatalf("inner unmarshal: %v", err)
-	}
-	res, err := probeInfoFromRaw(parsed)
-	if err != nil {
-		t.Fatalf("probeInfoFromRaw error: %v", err)
+func TestApplyManifestCopiesDisplayMetadata(t *testing.T) {
+	info := PluginInfo{}
+	manifest := &plugin.Manifest{
+		ID:          "manifested",
+		Type:        int(pluginpb.PluginV1_DRIVER),
+		Name:        "Manifested Plugin",
+		Description: "manifest-first plugin",
+		Version:     "1.2.3",
+		URL:         "https://example.org/plugin",
+		Author:      "QueryBox Team",
+		Runtime: plugin.RuntimeSpec{
+			Kind: plugin.RuntimeKindLocal,
+		},
+		Capabilities: []string{"query.execute", "connection.test"},
+		Permissions:  []plugin.PermissionDecl{{Name: "network"}},
+		Limits:       plugin.Limits{TimeoutSeconds: 12},
+		Tags:         []string{"sql", "relational"},
+		License:      "MIT",
+		IconURL:      "https://example.org/icon.png",
+		Contact:      "support@example.org",
+		Metadata: map[string]string{
+			"simple_icon": "postgresql",
+		},
+		Settings: map[string]string{
+			"color": "blue",
+		},
 	}
 
-	if res.Name != "foo" || res.URL != "https://example.org/foo" || res.Author != "Foo Corp" {
-		t.Errorf("bad basic fields: %+v", res)
+	applyManifest(&info, "/tmp/manifested.manifest.json", manifest)
+
+	if info.Name != "Manifested Plugin" || info.URL != "https://example.org/plugin" || info.Author != "QueryBox Team" {
+		t.Fatalf("expected manifest display metadata, got %#v", info)
 	}
-	if res.Type != int(pluginpb.PluginV1_DRIVER) {
-		t.Errorf("type not decoded: %d", res.Type)
+	if info.Type != int(pluginpb.PluginV1_DRIVER) {
+		t.Fatalf("expected driver type from manifest, got %d", info.Type)
 	}
-	if len(res.Capabilities) != 1 || res.Capabilities[0] != "transactions" {
-		t.Errorf("capabilities not preserved: %+v", res.Capabilities)
+	if len(info.Tags) != 2 || info.Tags[0] != "sql" {
+		t.Fatalf("expected tags from manifest, got %#v", info.Tags)
 	}
-	if len(res.Tags) != 1 || res.Tags[0] != "sql" {
-		t.Errorf("tags not preserved: %+v", res.Tags)
+	if info.License != "MIT" || info.IconURL != "https://example.org/icon.png" || info.Contact != "support@example.org" {
+		t.Fatalf("expected manifest presentation fields, got %#v", info)
 	}
-	if res.License != "MIT" {
-		t.Errorf("license not preserved: %s", res.License)
+	if info.Metadata["simple_icon"] != "postgresql" {
+		t.Fatalf("expected manifest metadata, got %#v", info.Metadata)
 	}
-	if res.IconURL != "https://example.org/icon.png" {
-		t.Errorf("icon url not preserved: %s", res.IconURL)
-	}
-	if res.Contact != "support@example.org" {
-		t.Errorf("contact not preserved: %s", res.Contact)
-	}
-	if res.Metadata == nil || res.Metadata["key"] != "val" {
-		t.Errorf("metadata missing: %+v", res.Metadata)
-	}
-	// simple_icon is a special hint used by the frontend to pick a branded
-	// database glyph.  Ensure it survives the normalization round-trip.
-	if res.Metadata["simple_icon"] != "postgresql" {
-		t.Errorf("simple_icon metadata not preserved: %+v", res.Metadata)
+	if info.Settings["color"] != "blue" {
+		t.Fatalf("expected manifest settings, got %#v", info.Settings)
 	}
 }
 
@@ -620,12 +601,6 @@ func TestScanOnceLoadsManifestMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	orig := probeInfoFunc
-	defer func() { probeInfoFunc = orig }()
-	probeInfoFunc = func(fullpath string) (PluginInfo, error) {
-		return PluginInfo{Name: "ignored", Type: int(pluginpb.PluginV1_DRIVER)}, fmt.Errorf("info disabled")
-	}
-
 	m := &Manager{
 		plugins:    make(map[string]PluginInfo),
 		appReadyCh: make(chan struct{}),
@@ -658,6 +633,55 @@ func TestScanOnceLoadsManifestMetadata(t *testing.T) {
 	}
 	if info.LastError != "" {
 		t.Fatalf("expected manifest-first discovery without error, got %q", info.LastError)
+	}
+}
+
+func TestScanOnceLoadsManifestDisplayMetadata(t *testing.T) {
+	dir, err := os.MkdirTemp("", "pmgrmanifestmerge")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	name := pluginName("manifested")
+	fullpath := filepath.Join(dir, name)
+	if err := os.WriteFile(fullpath, []byte(""), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	manifest := `{"id":"manifested","type":1,"name":"Manifested Plugin","description":"driver metadata from manifest","version":"1.2.3","url":"https://example.org/plugin","author":"QueryBox Team","runtime":{"kind":"local"},"capabilities":["query.execute","connection.test"],"permissions":[{"name":"network"}],"limits":{"timeout_seconds":12},"tags":["sql","relational"],"license":"MIT","icon_url":"https://example.org/icon.png","contact":"support@example.org","metadata":{"source":"manifest","simple_icon":"postgresql"},"settings":{"color":"blue"}}`
+	if err := os.WriteFile(fullpath+plugin.ManifestFileSuffix, []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	m := &Manager{
+		plugins:    make(map[string]PluginInfo),
+		appReadyCh: make(chan struct{}),
+		dirs:       []string{dir},
+		Dir:        dir,
+	}
+
+	m.scanOnce()
+	info := m.plugins["manifested"]
+	if info.URL != "https://example.org/plugin" || info.Author != "QueryBox Team" {
+		t.Fatalf("expected UI metadata from manifest, got %#v", info)
+	}
+	if info.Description != "driver metadata from manifest" {
+		t.Fatalf("expected description from manifest, got %q", info.Description)
+	}
+	if len(info.Capabilities) != 2 || info.Capabilities[0] != "query.execute" || info.Capabilities[1] != "connection.test" {
+		t.Fatalf("expected manifest capabilities, got %#v", info.Capabilities)
+	}
+	if info.Metadata["source"] != "manifest" {
+		t.Fatalf("expected manifest metadata, got %#v", info.Metadata)
+	}
+	if info.Metadata["simple_icon"] != "postgresql" {
+		t.Fatalf("expected manifest simple_icon metadata, got %#v", info.Metadata)
+	}
+	if info.Settings["color"] != "blue" {
+		t.Fatalf("expected settings from manifest, got %#v", info.Settings)
+	}
+	if len(info.Tags) != 2 || info.Tags[0] != "sql" {
+		t.Fatalf("expected tags from manifest, got %#v", info.Tags)
 	}
 }
 
@@ -705,66 +729,4 @@ func TestGetResourceGraphUsesNativeCommand(t *testing.T) {
 	if len(root.Children) != 1 || root.Children[0].Kind != "table" {
 		t.Fatalf("unexpected child nodes: %#v", root.Children)
 	}
-}
-
-// helper extracted from probeInfo so we can call without executing command
-func probeInfoFromRaw(raw map[string]interface{}) (PluginInfo, error) {
-	// copy logic from probeInfo, including normalization
-	// normalize camelCase keys like iconUrl -> icon_url
-	norm := make(map[string]interface{}, len(raw)+4)
-	for k, v := range raw {
-		norm[k] = v
-		switch k {
-		case "iconUrl":
-			norm["icon_url"] = v
-		}
-	}
-	raw = norm
-
-	// interpret the type field
-	typ := 0
-	if v, ok := raw["type"]; ok {
-		switch vv := v.(type) {
-		case float64:
-			typ = int(vv)
-		case string:
-			if val, ok := pluginpb.PluginV1_Type_value[vv]; ok {
-				typ = int(val)
-			}
-		}
-	}
-
-	var resp struct {
-		Name         string            `json:"name"`
-		Version      string            `json:"version"`
-		Description  string            `json:"description"`
-		URL          string            `json:"url"`
-		Author       string            `json:"author"`
-		Capabilities []string          `json:"capabilities"`
-		Tags         []string          `json:"tags"`
-		License      string            `json:"license"`
-		IconURL      string            `json:"icon_url"`
-		Contact      string            `json:"contact"`
-		Metadata     map[string]string `json:"metadata"`
-		Settings     map[string]string `json:"settings"`
-	}
-	if b2, err2 := json.Marshal(raw); err2 == nil {
-		_ = json.Unmarshal(b2, &resp)
-	}
-
-	return PluginInfo{
-		Name:         resp.Name,
-		Type:         typ,
-		Version:      resp.Version,
-		Description:  resp.Description,
-		URL:          resp.URL,
-		Author:       resp.Author,
-		Capabilities: resp.Capabilities,
-		Tags:         resp.Tags,
-		License:      resp.License,
-		IconURL:      resp.IconURL,
-		Contact:      resp.Contact,
-		Metadata:     resp.Metadata,
-		Settings:     resp.Settings,
-	}, nil
 }

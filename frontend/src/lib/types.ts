@@ -9,10 +9,30 @@ export interface Connection {
 }
 
 /** Plugin metadata discovered by the backend plugin manager. */
+export interface PluginPermission {
+  name: string
+  description?: string
+  required?: boolean
+}
+
+export interface PluginLimits {
+  timeout_seconds?: number
+  max_output_bytes?: number
+  working_dir?: string
+  env_allowlist?: string[]
+}
+
+export interface PluginRuntime {
+  kind?: string
+  entrypoint?: string
+  args?: string[]
+}
+
 export interface PluginInfo {
   id: string
   name: string
   path: string
+  manifest_path?: string
   running: boolean
   type?: number
   version?: string
@@ -20,6 +40,9 @@ export interface PluginInfo {
   url?: string
   author?: string
   capabilities?: string[]
+  permissions?: PluginPermission[]
+  limits?: PluginLimits
+  runtime?: PluginRuntime
   tags?: string[]
   license?: string
   icon_url?: string

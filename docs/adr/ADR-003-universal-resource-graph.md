@@ -26,4 +26,4 @@ The host now treats `resource.graph` as the only browse contract for bundled plu
 
 - Frontend explorer logic should prefer `kind`, `actions`, and `metadata` instead of hardcoded database nouns.
 - New plugins can implement `resource.graph` directly without inheriting legacy tree constraints.
-- Existing database plugins remain supported through host-side adaptation until they ship native graph support.
+- Built-in plugins should move to `resource.graph` as the only active browse contract; stale compatibility adapters should be removed once no longer needed.

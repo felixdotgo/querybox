@@ -14,7 +14,7 @@ Introduce a `RuntimeManager` facade that owns plugin execution and delegates the
 Phase 1 keeps only one concrete runtime target:
 
 - `RuntimeManager` selects the runtime path from plugin metadata.
-- `LocalPluginHost` executes the local binary, applies timeout limits, and remains the compatibility baseline.
+- `LocalPluginHost` executes the local binary and applies timeout limits.
 - `PluginManager` keeps the public API surface but delegates execution to the runtime layer.
 
 ## Consequences

@@ -40,7 +40,7 @@ The conceptual model for future product and protocol work is:
 connection/profile -> resource graph -> actions -> results/streams
 ```
 
-This terminology does not require an immediate breaking change. Existing connection-oriented and database-oriented flows remain supported during the transition.
+Because QueryBox is still in `0.x`, terminology and plugin/runtime contracts may change in breaking ways while the operational workspace model is being locked down. Legacy compatibility should be short-lived and deleted once the replacement contract is in place.
 
 ## Product Boundaries
 
@@ -63,5 +63,5 @@ QueryBox should avoid expanding prematurely into:
 
 - Documentation and UI copy should stop describing QueryBox as only a database client.
 - New architecture work should prefer resource-oriented and capability-oriented language over database-only nouns.
-- Existing database plugins should continue working through compatibility layers while the runtime model evolves.
+- Existing database workflows may be rewritten onto cleaner contracts without preserving long-lived compatibility layers.
 - Follow-up ADRs should define the capability model, universal resource graph, sessions, streaming, runtime management, and sandboxing.

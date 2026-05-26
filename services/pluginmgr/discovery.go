@@ -1,16 +1,11 @@
 package pluginmgr
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"time"
 
 	"github.com/felixdotgo/querybox/pkg/plugin"
-	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
 )
 
 // userPluginDirFunc is a test hook that returns the base configuration
@@ -123,79 +118,6 @@ func isExecutable(path string) bool {
 		return true
 	}
 	return mode&0111 != 0
-}
-
-// probeInfo executes `binary info` and decodes the JSON InfoResponse. If the
-// plugin doesn't implement `info` the call will error and we return that error.
-//
-// For testability we expose a variable pointing at the real implementation;
-// tests may override probeInfoFunc to avoid spawning real binaries.
-var probeInfoFunc = probeInfo
-
-func probeInfo(fullpath string) (PluginInfo, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, fullpath, "info")
-	hideWindow(cmd)
-	out, err := cmd.Output()
-	if err != nil {
-		return PluginInfo{}, fmt.Errorf("probe info failed: %w", err)
-	}
-
-	// Unmarshal known string fields directly. The "type" field needs
-	// special handling because newer plugins emit it as a string enum
-	// (via protojson) while older ones used a numeric value.
-	var resp struct {
-		Name         string            `json:"name"`
-		Version      string            `json:"version"`
-		Description  string            `json:"description"`
-		URL          string            `json:"url"`
-		Author       string            `json:"author"`
-		Capabilities []string          `json:"capabilities"`
-		Tags         []string          `json:"tags"`
-		License      string            `json:"license"`
-		IconURL      string            `json:"icon_url"`
-		Contact      string            `json:"contact"`
-		Metadata     map[string]string `json:"metadata"`
-		Settings     map[string]string `json:"settings"`
-		// Type is decoded as json.RawMessage to handle both numeric and string enum values.
-		RawType json.RawMessage `json:"type"`
-	}
-	if err := json.Unmarshal(out, &resp); err != nil {
-		return PluginInfo{}, fmt.Errorf("invalid info json: %w", err)
-	}
-
-	// interpret the type field from numeric or string enum
-	typ := 0
-	if len(resp.RawType) > 0 {
-		var numVal float64
-		if json.Unmarshal(resp.RawType, &numVal) == nil {
-			typ = int(numVal)
-		} else {
-			var strVal string
-			if json.Unmarshal(resp.RawType, &strVal) == nil {
-				if val, ok := pluginpb.PluginV1_Type_value[strVal]; ok {
-					typ = int(val)
-				}
-			}
-		}
-	}
-
-	return PluginInfo{
-		Name:         resp.Name,
-		Type:         typ,
-		Version:      resp.Version,
-		Description:  resp.Description,
-		URL:          resp.URL,
-		Author:       resp.Author,
-		Capabilities: resp.Capabilities,
-		Tags:         resp.Tags,
-		License:      resp.License,
-		IconURL:      resp.IconURL,
-		Contact:      resp.Contact,
-		Metadata:     resp.Metadata,
-		Settings:     resp.Settings,
-	}, nil
 }
 
 // Rescan clears the plugin registry and triggers a full re-probe of the

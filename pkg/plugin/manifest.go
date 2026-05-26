@@ -29,11 +29,18 @@ type Manifest struct {
 	Name         string            `json:"name,omitempty"`
 	Description  string            `json:"description,omitempty"`
 	Version      string            `json:"version"`
+	URL          string            `json:"url,omitempty"`
+	Author       string            `json:"author,omitempty"`
 	Runtime      RuntimeSpec       `json:"runtime"`
 	Capabilities []string          `json:"capabilities"`
 	Permissions  []PermissionDecl  `json:"permissions,omitempty"`
 	Limits       Limits            `json:"limits"`
+	Tags         []string          `json:"tags,omitempty"`
+	License      string            `json:"license,omitempty"`
+	IconURL      string            `json:"icon_url,omitempty"`
+	Contact      string            `json:"contact,omitempty"`
 	Metadata     map[string]string `json:"metadata,omitempty"`
+	Settings     map[string]string `json:"settings,omitempty"`
 }
 
 type RuntimeSpec struct {

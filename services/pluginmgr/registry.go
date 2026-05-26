@@ -171,6 +171,8 @@ func applyManifest(info *PluginInfo, manifestPath string, manifest *plugin.Manif
 		info.Description = manifest.Description
 	}
 	info.Version = manifest.Version
+	info.URL = manifest.URL
+	info.Author = manifest.Author
 	info.Type = manifest.Type
 	info.Capabilities = append([]string(nil), manifest.Capabilities...)
 	info.Permissions = append([]plugin.PermissionDecl(nil), manifest.Permissions...)
@@ -178,57 +180,15 @@ func applyManifest(info *PluginInfo, manifestPath string, manifest *plugin.Manif
 	info.Limits = &limitsCopy
 	runtimeCopy := manifest.Runtime
 	info.Runtime = &runtimeCopy
+	info.Tags = append([]string(nil), manifest.Tags...)
+	info.License = manifest.License
+	info.IconURL = manifest.IconURL
+	info.Contact = manifest.Contact
 	if len(manifest.Metadata) > 0 {
 		info.Metadata = cloneStringMap(manifest.Metadata)
 	}
-}
-
-func mergeInfo(info *PluginInfo, meta PluginInfo) {
-	if meta.Name != "" {
-		info.Name = meta.Name
-	}
-	if meta.Type != 0 {
-		info.Type = meta.Type
-	}
-	if meta.Version != "" && info.Version == "" {
-		info.Version = meta.Version
-	}
-	if meta.Description != "" && info.Description == "" {
-		info.Description = meta.Description
-	}
-	if meta.URL != "" {
-		info.URL = meta.URL
-	}
-	if meta.Author != "" {
-		info.Author = meta.Author
-	}
-	if len(meta.Capabilities) > 0 && len(info.Capabilities) == 0 {
-		info.Capabilities = append([]string(nil), meta.Capabilities...)
-	}
-	if len(meta.Tags) > 0 {
-		info.Tags = append([]string(nil), meta.Tags...)
-	}
-	if meta.License != "" {
-		info.License = meta.License
-	}
-	if meta.IconURL != "" {
-		info.IconURL = meta.IconURL
-	}
-	if meta.Contact != "" {
-		info.Contact = meta.Contact
-	}
-	if len(meta.Metadata) > 0 {
-		if info.Metadata == nil {
-			info.Metadata = map[string]string{}
-		}
-		for key, value := range meta.Metadata {
-			if _, exists := info.Metadata[key]; !exists {
-				info.Metadata[key] = value
-			}
-		}
-	}
-	if len(meta.Settings) > 0 {
-		info.Settings = cloneStringMap(meta.Settings)
+	if len(manifest.Settings) > 0 {
+		info.Settings = cloneStringMap(manifest.Settings)
 	}
 }
 

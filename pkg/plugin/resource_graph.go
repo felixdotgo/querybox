@@ -66,22 +66,6 @@ func AdaptConnectionTree(tree *ConnectionTreeResponse) *ResourceGraphResponse {
 	return resp
 }
 
-// AdaptResourceGraph converts a resource graph into the older tree shape.
-func AdaptResourceGraph(graph *ResourceGraphResponse) *ConnectionTreeResponse {
-	resp := &ConnectionTreeResponse{}
-	if graph == nil {
-		return resp
-	}
-	resp.Nodes = make([]*ConnectionTreeNode, 0, len(graph.Nodes))
-	for _, node := range graph.Nodes {
-		if node == nil {
-			continue
-		}
-		resp.Nodes = append(resp.Nodes, adaptResourceNode(node))
-	}
-	return resp
-}
-
 func adaptConnectionTreeNode(node *ConnectionTreeNode) *ResourceNode {
 	if node == nil {
 		return nil
@@ -111,30 +95,6 @@ func adaptConnectionTreeNode(node *ConnectionTreeNode) *ResourceNode {
 	return out
 }
 
-func adaptResourceNode(node *ResourceNode) *ConnectionTreeNode {
-	if node == nil {
-		return nil
-	}
-	out := &ConnectionTreeNode{
-		Key:      firstNonEmpty(node.Path, node.ID, node.Name),
-		Label:    firstNonEmpty(node.Name, node.ID, node.Path),
-		NodeType: legacyNodeType(node.Kind),
-	}
-	for _, action := range node.Actions {
-		if action == nil {
-			continue
-		}
-		out.Actions = append(out.Actions, adaptResourceAction(action))
-	}
-	for _, child := range node.Children {
-		if child == nil {
-			continue
-		}
-		out.Children = append(out.Children, adaptResourceNode(child))
-	}
-	return out
-}
-
 func adaptConnectionTreeAction(action *ConnectionTreeAction) *ResourceAction {
 	if action == nil {
 		return nil
@@ -146,18 +106,6 @@ func adaptConnectionTreeAction(action *ConnectionTreeAction) *ResourceAction {
 		Query:    action.Query,
 		NewTab:   action.NewTab,
 		Metadata: map[string]string{},
-	}
-}
-
-func adaptResourceAction(action *ResourceAction) *ConnectionTreeAction {
-	if action == nil {
-		return nil
-	}
-	return &ConnectionTreeAction{
-		Type:   firstNonEmpty(action.Kind, action.ID),
-		Title:  action.Title,
-		Query:  action.Query,
-		NewTab: action.NewTab,
 	}
 }
 
@@ -184,38 +132,4 @@ func nodeKind(nodeType pluginpb.PluginV1_NodeType) string {
 	default:
 		return "resource"
 	}
-}
-
-func legacyNodeType(kind string) pluginpb.PluginV1_NodeType {
-	switch kind {
-	case "database":
-		return ConnectionTreeNodeTypeDatabase
-	case "table":
-		return ConnectionTreeNodeTypeTable
-	case "column":
-		return ConnectionTreeNodeTypeColumn
-	case "schema":
-		return ConnectionTreeNodeTypeSchema
-	case "view":
-		return ConnectionTreeNodeTypeView
-	case "action":
-		return ConnectionTreeNodeTypeAction
-	case "collection":
-		return ConnectionTreeNodeTypeCollection
-	case "key":
-		return ConnectionTreeNodeTypeKey
-	case "group":
-		return ConnectionTreeNodeTypeGroup
-	default:
-		return 0
-	}
-}
-
-func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if value != "" {
-			return value
-		}
-	}
-	return ""
 }

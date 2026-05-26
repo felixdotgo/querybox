@@ -4,6 +4,8 @@
   "name": "Template Plugin",
   "description": "Template manifest for new QueryBox plugins.",
   "version": "0.0.1",
+  "url": "https://example.com/template-plugin",
+  "author": "Querybox Core Team",
   "runtime": {
     "kind": "local"
   },
@@ -12,8 +14,21 @@
     "connection.test",
     "query.execute"
   ],
+  "tags": [
+    "template",
+    "sample"
+  ],
+  "license": "MIT",
+  "icon_url": "https://example.com/icon.png",
+  "contact": "support@example.com",
   "permissions": [],
   "limits": {
     "timeout_seconds": 30
+  },
+  "metadata": {
+    "simple_icon": "postgresql"
+  },
+  "settings": {
+    "sample_mode": "true"
   }
 }

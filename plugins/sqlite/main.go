@@ -29,7 +29,7 @@ func (m *sqlitePlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoReques
 		Description:  "SQLite database driver",
 		Url:          "https://www.sqlite.org/",
 		Author:       "QueryBox Team",
-		Capabilities: []string{"query", "explain-query", "mutate-row", "describe-schema"},
+		Capabilities: []string{"resource.graph", "connection.test", "query.execute", "schema.inspect", "explain-query", "mutate-row"},
 		Tags:         []string{"sql", "relational"},
 		License:      "MIT",
 		IconUrl:      "https://www.sqlite.org/images/logo-square.jpg",

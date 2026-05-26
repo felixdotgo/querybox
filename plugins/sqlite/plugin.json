@@ -4,6 +4,8 @@
   "name": "SQLite",
   "description": "Built-in SQLite driver plugin for QueryBox.",
   "version": "0.0.2",
+  "url": "https://www.sqlite.org/",
+  "author": "QueryBox Team",
   "runtime": {
     "kind": "local"
   },
@@ -15,6 +17,12 @@
     "explain-query",
     "mutate-row"
   ],
+  "tags": [
+    "sql",
+    "relational"
+  ],
+  "license": "MIT",
+  "icon_url": "https://www.sqlite.org/images/logo-square.jpg",
   "permissions": [
     {
       "name": "filesystem"
@@ -22,5 +30,8 @@
   ],
   "limits": {
     "timeout_seconds": 30
+  },
+  "metadata": {
+    "simple_icon": "sqlite"
   }
 }

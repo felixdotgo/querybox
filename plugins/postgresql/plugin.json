@@ -4,6 +4,8 @@
   "name": "PostgreSQL",
   "description": "Built-in PostgreSQL driver plugin for QueryBox.",
   "version": "0.0.2",
+  "url": "https://www.postgresql.org/",
+  "author": "QueryBox Team",
   "runtime": {
     "kind": "local"
   },
@@ -15,6 +17,12 @@
     "explain-query",
     "mutate-row"
   ],
+  "tags": [
+    "sql",
+    "relational"
+  ],
+  "license": "MIT",
+  "icon_url": "https://www.postgresql.org/media/img/about/press/elephant.png",
   "permissions": [
     {
       "name": "network"
@@ -22,5 +30,8 @@
   ],
   "limits": {
     "timeout_seconds": 30
+  },
+  "metadata": {
+    "simple_icon": "postgresql"
   }
 }
