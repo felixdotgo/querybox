@@ -230,167 +230,6 @@ export class PluginV1_ColumnSchema {
     }
 }
 
-export class PluginV1_ConnectionTreeAction {
-    /**
-     * Creates a new PluginV1_ConnectionTreeAction instance.
-     * @param {Partial<PluginV1_ConnectionTreeAction>} [$$source = {}] - The source object to create the PluginV1_ConnectionTreeAction.
-     */
-    constructor($$source = {}) {
-        if (/** @type {any} */(false)) {
-            /**
-             * machine name (e.g. "select", "describe")
-             * @member
-             * @type {string | undefined}
-             */
-            this["type"] = undefined;
-        }
-        if (/** @type {any} */(false)) {
-            /**
-             * displayed in a context menu or double-click
-             * @member
-             * @type {string | undefined}
-             */
-            this["title"] = undefined;
-        }
-        if (/** @type {any} */(false)) {
-            /**
-             * plugin-interpreted payload (often SQL)
-             * @member
-             * @type {string | undefined}
-             */
-            this["query"] = undefined;
-        }
-        if (/** @type {any} */(false)) {
-            /**
-             * hidden suppresses the action from the context menu / action buttons.
-             * Use this for actions that should only fire on leaf-node click, not be
-             * explicitly listed as selectable options.
-             * @member
-             * @type {boolean | undefined}
-             */
-            this["hidden"] = undefined;
-        }
-        if (/** @type {any} */(false)) {
-            /**
-             * whether the core should open a new tab when this action is executed
-             * @member
-             * @type {boolean | undefined}
-             */
-            this["new_tab"] = undefined;
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new PluginV1_ConnectionTreeAction instance from a string or object.
-     * @param {any} [$$source = {}]
-     * @returns {PluginV1_ConnectionTreeAction}
-     */
-    static createFrom($$source = {}) {
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        return new PluginV1_ConnectionTreeAction(/** @type {Partial<PluginV1_ConnectionTreeAction>} */($$parsedSource));
-    }
-}
-
-export class PluginV1_ConnectionTreeNode {
-    /**
-     * Creates a new PluginV1_ConnectionTreeNode instance.
-     * @param {Partial<PluginV1_ConnectionTreeNode>} [$$source = {}] - The source object to create the PluginV1_ConnectionTreeNode.
-     */
-    constructor($$source = {}) {
-        if (/** @type {any} */(false)) {
-            /**
-             * unique within the returned tree
-             * @member
-             * @type {string | undefined}
-             */
-            this["key"] = undefined;
-        }
-        if (/** @type {any} */(false)) {
-            /**
-             * user-visible text
-             * @member
-             * @type {string | undefined}
-             */
-            this["label"] = undefined;
-        }
-        if (/** @type {any} */(false)) {
-            /**
-             * @member
-             * @type {(PluginV1_ConnectionTreeNode | null)[] | undefined}
-             */
-            this["children"] = undefined;
-        }
-        if (/** @type {any} */(false)) {
-            /**
-             * @member
-             * @type {(PluginV1_ConnectionTreeAction | null)[] | undefined}
-             */
-            this["actions"] = undefined;
-        }
-        if (/** @type {any} */(false)) {
-            /**
-             * @member
-             * @type {PluginV1_NodeType | undefined}
-             */
-            this["node_type"] = undefined;
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new PluginV1_ConnectionTreeNode instance from a string or object.
-     * @param {any} [$$source = {}]
-     * @returns {PluginV1_ConnectionTreeNode}
-     */
-    static createFrom($$source = {}) {
-        const $$createField2_0 = $$createType6;
-        const $$createField3_0 = $$createType9;
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        if ("children" in $$parsedSource) {
-            $$parsedSource["children"] = $$createField2_0($$parsedSource["children"]);
-        }
-        if ("actions" in $$parsedSource) {
-            $$parsedSource["actions"] = $$createField3_0($$parsedSource["actions"]);
-        }
-        return new PluginV1_ConnectionTreeNode(/** @type {Partial<PluginV1_ConnectionTreeNode>} */($$parsedSource));
-    }
-}
-
-export class PluginV1_ConnectionTreeResponse {
-    /**
-     * Creates a new PluginV1_ConnectionTreeResponse instance.
-     * @param {Partial<PluginV1_ConnectionTreeResponse>} [$$source = {}] - The source object to create the PluginV1_ConnectionTreeResponse.
-     */
-    constructor($$source = {}) {
-        if (/** @type {any} */(false)) {
-            /**
-             * @member
-             * @type {(PluginV1_ConnectionTreeNode | null)[] | undefined}
-             */
-            this["nodes"] = undefined;
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new PluginV1_ConnectionTreeResponse instance from a string or object.
-     * @param {any} [$$source = {}]
-     * @returns {PluginV1_ConnectionTreeResponse}
-     */
-    static createFrom($$source = {}) {
-        const $$createField0_0 = $$createType6;
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        if ("nodes" in $$parsedSource) {
-            $$parsedSource["nodes"] = $$createField0_0($$parsedSource["nodes"]);
-        }
-        return new PluginV1_ConnectionTreeResponse(/** @type {Partial<PluginV1_ConnectionTreeResponse>} */($$parsedSource));
-    }
-}
-
 /**
  * DescribeSchemaResponse returns one entry per object matching the request.
  */
@@ -417,7 +256,7 @@ export class PluginV1_DescribeSchemaResponse {
      * @returns {PluginV1_DescribeSchemaResponse}
      */
     static createFrom($$source = {}) {
-        const $$createField0_0 = $$createType12;
+        const $$createField0_0 = $$createType6;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("tables" in $$parsedSource) {
             $$parsedSource["tables"] = $$createField0_0($$parsedSource["tables"]);
@@ -464,7 +303,7 @@ export class PluginV1_ExecResponse {
      * @returns {PluginV1_ExecResponse}
      */
     static createFrom($$source = {}) {
-        const $$createField0_0 = $$createType14;
+        const $$createField0_0 = $$createType8;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("result" in $$parsedSource) {
             $$parsedSource["result"] = $$createField0_0($$parsedSource["result"]);
@@ -575,7 +414,7 @@ export class PluginV1_GetCompletionFieldsResponse {
      * @returns {PluginV1_GetCompletionFieldsResponse}
      */
     static createFrom($$source = {}) {
-        const $$createField0_0 = $$createType17;
+        const $$createField0_0 = $$createType11;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("fields" in $$parsedSource) {
             $$parsedSource["fields"] = $$createField0_0($$parsedSource["fields"]);
@@ -697,50 +536,6 @@ export class PluginV1_MutateRowResponse {
 }
 
 /**
- * NodeType is an optional hint for the frontend icon renderer and lets Go
- * code reference well-known node kinds via generated constants instead of
- * raw strings.
- * @readonly
- * @enum {number}
- */
-export const PluginV1_NodeType = {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero: 0,
-
-    /**
-     * generic / unspecified
-     */
-    PluginV1_NODE_TYPE_UNKNOWN: 0,
-    PluginV1_NODE_TYPE_DATABASE: 1,
-    PluginV1_NODE_TYPE_TABLE: 2,
-    PluginV1_NODE_TYPE_COLUMN: 3,
-    PluginV1_NODE_TYPE_SCHEMA: 4,
-    PluginV1_NODE_TYPE_VIEW: 5,
-
-    /**
-     * indicates a leaf node that represents an action, not a database object
-     */
-    PluginV1_NODE_TYPE_ACTION: 6,
-
-    /**
-     * for document stores like Mongo
-     */
-    PluginV1_NODE_TYPE_COLLECTION: 7,
-
-    /**
-     * for key/value stores like Redis
-     */
-    PluginV1_NODE_TYPE_KEY: 8,
-
-    /**
-     * folder/category grouping node (e.g. Tables, Views, Indexes)
-     */
-    PluginV1_NODE_TYPE_GROUP: 9,
-};
-
-/**
  * TableSchema represents the structure of a single table or collection.
  */
 export class PluginV1_TableSchema {
@@ -780,8 +575,8 @@ export class PluginV1_TableSchema {
      * @returns {PluginV1_TableSchema}
      */
     static createFrom($$source = {}) {
-        const $$createField1_0 = $$createType20;
-        const $$createField2_0 = $$createType23;
+        const $$createField1_0 = $$createType14;
+        const $$createField2_0 = $$createType17;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("columns" in $$parsedSource) {
             $$parsedSource["columns"] = $$createField1_0($$parsedSource["columns"]);
@@ -842,23 +637,17 @@ const $$createType0 = $Create.Array($Create.Any);
 const $$createType1 = PluginV1_AuthField.createFrom;
 const $$createType2 = $Create.Nullable($$createType1);
 const $$createType3 = $Create.Array($$createType2);
-const $$createType4 = PluginV1_ConnectionTreeNode.createFrom;
+const $$createType4 = PluginV1_TableSchema.createFrom;
 const $$createType5 = $Create.Nullable($$createType4);
 const $$createType6 = $Create.Array($$createType5);
-const $$createType7 = PluginV1_ConnectionTreeAction.createFrom;
+const $$createType7 = PluginV1_ExecResult.createFrom;
 const $$createType8 = $Create.Nullable($$createType7);
-const $$createType9 = $Create.Array($$createType8);
-const $$createType10 = PluginV1_TableSchema.createFrom;
-const $$createType11 = $Create.Nullable($$createType10);
-const $$createType12 = $Create.Array($$createType11);
-const $$createType13 = PluginV1_ExecResult.createFrom;
-const $$createType14 = $Create.Nullable($$createType13);
-const $$createType15 = PluginV1_FieldInfo.createFrom;
+const $$createType9 = PluginV1_FieldInfo.createFrom;
+const $$createType10 = $Create.Nullable($$createType9);
+const $$createType11 = $Create.Array($$createType10);
+const $$createType12 = PluginV1_ColumnSchema.createFrom;
+const $$createType13 = $Create.Nullable($$createType12);
+const $$createType14 = $Create.Array($$createType13);
+const $$createType15 = PluginV1_IndexSchema.createFrom;
 const $$createType16 = $Create.Nullable($$createType15);
 const $$createType17 = $Create.Array($$createType16);
-const $$createType18 = PluginV1_ColumnSchema.createFrom;
-const $$createType19 = $Create.Nullable($$createType18);
-const $$createType20 = $Create.Array($$createType19);
-const $$createType21 = PluginV1_IndexSchema.createFrom;
-const $$createType22 = $Create.Nullable($$createType21);
-const $$createType23 = $Create.Array($$createType22);

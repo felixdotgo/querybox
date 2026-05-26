@@ -104,20 +104,6 @@ export function GetCompletionFields(name, connection, database, collection) {
 }
 
 /**
- * GetConnectionTree asks the named plugin for its connection tree.  The
- * request contains only the connection map; the plugin defines node structure
- * and actions.  A timeout guards misbehaving plugins.
- * @param {string} name
- * @param {{ [_ in string]?: string }} connection
- * @returns {$CancellablePromise<plugin$0.ConnectionTreeResponse | null>}
- */
-export function GetConnectionTree(name, connection) {
-    return $Call.ByID(3147399459, name, connection).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType7($result);
-    }));
-}
-
-/**
  * GetPluginAuthForms probes the plugin executable for supported authentication
  * forms by invoking `plugin authforms` and decoding the JSON response. If the
  * plugin doesn't implement the command or returns no forms an empty map is
@@ -127,7 +113,7 @@ export function GetConnectionTree(name, connection) {
  */
 export function GetPluginAuthForms(name) {
     return $Call.ByID(545463133, name).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType10($result);
+        return $$createType8($result);
     }));
 }
 
@@ -138,7 +124,7 @@ export function GetPluginAuthForms(name) {
  */
 export function GetResourceGraph(name, connection) {
     return $Call.ByID(1360511137, name, connection).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType12($result);
+        return $$createType10($result);
     }));
 }
 
@@ -148,7 +134,7 @@ export function GetResourceGraph(name, connection) {
  */
 export function ListPlugins() {
     return $Call.ByID(668942975).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType14($result);
+        return $$createType12($result);
     }));
 }
 
@@ -168,7 +154,7 @@ export function ListPlugins() {
  */
 export function MutateRow(name, connection, operation, source, values, filter) {
     return $Call.ByID(3105031897, name, connection, operation, source, values, filter).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType16($result);
+        return $$createType14($result);
     }));
 }
 
@@ -229,7 +215,7 @@ export function Shutdown() {
  */
 export function TestConnection(name, connection) {
     return $Call.ByID(2822844201, name, connection).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType18($result);
+        return $$createType16($result);
     }));
 }
 
@@ -240,16 +226,14 @@ const $$createType2 = pluginpb$0.PluginV1_ExecResponse.createFrom;
 const $$createType3 = $Create.Nullable($$createType2);
 const $$createType4 = pluginpb$0.PluginV1_GetCompletionFieldsResponse.createFrom;
 const $$createType5 = $Create.Nullable($$createType4);
-const $$createType6 = pluginpb$0.PluginV1_ConnectionTreeResponse.createFrom;
+const $$createType6 = pluginpb$0.PluginV1_AuthForm.createFrom;
 const $$createType7 = $Create.Nullable($$createType6);
-const $$createType8 = pluginpb$0.PluginV1_AuthForm.createFrom;
-const $$createType9 = $Create.Nullable($$createType8);
-const $$createType10 = $Create.Map($Create.Any, $$createType9);
-const $$createType11 = plugin$0.ResourceGraphResponse.createFrom;
-const $$createType12 = $Create.Nullable($$createType11);
-const $$createType13 = $models.PluginInfo.createFrom;
-const $$createType14 = $Create.Array($$createType13);
-const $$createType15 = pluginpb$0.PluginV1_MutateRowResponse.createFrom;
+const $$createType8 = $Create.Map($Create.Any, $$createType7);
+const $$createType9 = plugin$0.ResourceGraphResponse.createFrom;
+const $$createType10 = $Create.Nullable($$createType9);
+const $$createType11 = $models.PluginInfo.createFrom;
+const $$createType12 = $Create.Array($$createType11);
+const $$createType13 = pluginpb$0.PluginV1_MutateRowResponse.createFrom;
+const $$createType14 = $Create.Nullable($$createType13);
+const $$createType15 = pluginpb$0.PluginV1_TestConnectionResponse.createFrom;
 const $$createType16 = $Create.Nullable($$createType15);
-const $$createType17 = pluginpb$0.PluginV1_TestConnectionResponse.createFrom;
-const $$createType18 = $Create.Nullable($$createType17);

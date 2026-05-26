@@ -247,7 +247,7 @@ func buildConnString(connection map[string]string) (string, error) {
 			}
 		}
 	}
-	// Apply explicit database override that may have been injected by ConnectionTree
+	// Apply explicit database override that may have been injected by ResourceGraph
 	// when scanning non-current databases.  The credential_blob paths above build the
 	// DSN from blob fields without knowledge of this override, so we apply it here
 	// once, covering both the embedded-DSN and separate-fields blob forms.
@@ -305,7 +305,7 @@ var openPostgresDB = func(dsn string) (*sql.DB, error) {
 	return sql.Open("postgres", dsn)
 }
 
-// pingPostgresDB lets ConnectionTree fail fast on auth/network issues while
+// pingPostgresDB lets ResourceGraph fail fast on auth/network issues while
 // remaining easy to stub in unit tests.
 var pingPostgresDB = func(db *sql.DB) error {
 	return db.Ping()
@@ -530,14 +530,19 @@ func (m *postgresqlPlugin) Exec(ctx context.Context, req *plugin.ExecRequest) (*
 	}, nil
 }
 
-// ConnectionTree returns a server → database → schema → table hierarchy.
+// ResourceGraph returns a server -> database -> schema -> table hierarchy.
 // It now enumerates _all_ databases on the server (subject to an explicit
 // database filter) rather than just the one to which the connection is
 // currently attached.  Behaviour falls back gracefully when listing fails.
-func (m *postgresqlPlugin) ConnectionTree(ctx context.Context, req *plugin.ConnectionTreeRequest) (*plugin.ConnectionTreeResponse, error) {
-	dsn, err := buildConnString(req.Connection)
+func (m *postgresqlPlugin) ResourceGraph(ctx context.Context, req *plugin.ResourceGraphRequest) (*plugin.ResourceGraphResponse, error) {
+	connection := map[string]string(nil)
+	if req != nil {
+		connection = req.Connection
+	}
+
+	dsn, err := buildConnString(connection)
 	if err != nil || dsn == "" {
-		fmt.Fprintf(os.Stderr, "postgresql: ConnectionTree: DSN error: %v dsn=%q\n", err, dsn)
+		fmt.Fprintf(os.Stderr, "postgresql: ResourceGraph: DSN error: %v dsn=%q\n", err, dsn)
 		if err == nil {
 			err = fmt.Errorf("empty DSN")
 		}
@@ -546,29 +551,25 @@ func (m *postgresqlPlugin) ConnectionTree(ctx context.Context, req *plugin.Conne
 
 	db, err := openPostgresDB(dsn)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "postgresql: ConnectionTree: open error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "postgresql: ResourceGraph: open error: %v\n", err)
 		return nil, fmt.Errorf("postgresql: connect failed: %w", err)
 	}
 	defer db.Close()
 	if err := pingPostgresDB(db); err != nil {
-		fmt.Fprintf(os.Stderr, "postgresql: ConnectionTree: ping error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "postgresql: ResourceGraph: ping error: %v\n", err)
 		return nil, fmt.Errorf("postgresql: connect failed: %w", err)
 	}
 
-	// determine the database we are connected to now; used for reuse below
 	var currentDB string
 	if scanErr := db.QueryRow("SELECT current_database()").Scan(&currentDB); scanErr != nil {
 		currentDB = "current"
 	}
 
-	// optional filter coming from the connection info
-	filterDB := getDatabaseFromConn(req.Connection)
+	filterDB := getDatabaseFromConn(connection)
 
-	// retrieve list of databases on the server
 	dbNames := []string{}
 	rows, err := db.Query(`SELECT datname FROM pg_database WHERE NOT datistemplate AND datallowconn`)
 	if err != nil {
-		// if we can't list, fall back to the one we know about
 		dbNames = []string{currentDB}
 	} else {
 		defer rows.Close()
@@ -583,23 +584,21 @@ func (m *postgresqlPlugin) ConnectionTree(ctx context.Context, req *plugin.Conne
 		}
 	}
 
-	// apply explicit database filter if supplied
 	if filterDB != "" {
 		found := false
-		for _, n := range dbNames {
-			if n == filterDB {
-				dbNames = []string{n}
+		for _, name := range dbNames {
+			if name == filterDB {
+				dbNames = []string{name}
 				found = true
 				break
 			}
 		}
 		if !found {
-			dbNames = []string{filterDB} // still show the requested name
+			dbNames = []string{filterDB}
 		}
 	}
 
-	// helper to build schema nodes for a given *sql.DB
-	loadSchemas := func(conn *sql.DB) []*plugin.ConnectionTreeNode {
+	loadSchemas := func(conn *sql.DB) []*plugin.ResourceNode {
 		schemaRows, err := conn.Query(`
 SELECT schema_name
 FROM information_schema.schemata
@@ -611,22 +610,20 @@ ORDER BY schema_name`)
 		}
 		defer schemaRows.Close()
 
-		var schemaNodes []*plugin.ConnectionTreeNode
+		var schemaNodes []*plugin.ResourceNode
 		for schemaRows.Next() {
 			var schemaName string
 			if err := schemaRows.Scan(&schemaName); err != nil {
 				continue
 			}
 
-			// ── Tables (regular + partitioned) (hide partition children) ─────
-			var tableNodes []*plugin.ConnectionTreeNode
+			var tableNodes []*plugin.ResourceNode
 			if rows, err := conn.Query(`
 SELECT c.relname
 FROM pg_catalog.pg_class c
 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
 WHERE n.nspname = $1
   AND c.relkind IN ('r', 'p')
-  -- exclude tables that inherit from another (i.e. partitions)
   AND NOT EXISTS (
       SELECT 1 FROM pg_catalog.pg_inherits i WHERE i.inhrelid = c.oid
   )
@@ -634,20 +631,22 @@ ORDER BY c.relname`, schemaName); err == nil {
 				for rows.Next() {
 					var tbl string
 					if err := rows.Scan(&tbl); err == nil {
-						tableNodes = append(tableNodes, &plugin.ConnectionTreeNode{
-							Key:      schemaName + "." + tbl,
-							Label:    tbl,
-							NodeType: plugin.ConnectionTreeNodeTypeTable,
-							Actions: []*plugin.ConnectionTreeAction{
+						tableNodes = append(tableNodes, &plugin.ResourceNode{
+							ID:   schemaName + "." + tbl,
+							Name: tbl,
+							Kind: "table",
+							Path: schemaName + "." + tbl,
+							Actions: []*plugin.ResourceAction{
 								{
-									Type:   plugin.ConnectionTreeActionSelect,
+									ID:     plugin.ConnectionTreeActionSelect,
+									Kind:   plugin.ConnectionTreeActionSelect,
 									Title:  "Select rows",
 									Query:  fmt.Sprintf(`SELECT * FROM "%s"."%s" LIMIT 100;`, schemaName, tbl),
-									Hidden: true,
 									NewTab: true,
 								},
 								{
-									Type:  plugin.ConnectionTreeActionDropTable,
+									ID:    plugin.ConnectionTreeActionDropTable,
+									Kind:  plugin.ConnectionTreeActionDropTable,
 									Title: "Drop table",
 									Query: fmt.Sprintf(`DROP TABLE "%s"."%s";`, schemaName, tbl),
 								},
@@ -658,233 +657,43 @@ ORDER BY c.relname`, schemaName); err == nil {
 				rows.Close()
 			}
 
-			// ── Views ────────────────────────────────────────────────────────
-			// 			var viewNodes []*plugin.ConnectionTreeNode
-			// 			if rows, err := conn.Query(`
-			// SELECT c.relname
-			// FROM pg_catalog.pg_class c
-			// JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-			// WHERE n.nspname = $1
-			//   AND c.relkind = 'v'
-			// ORDER BY c.relname`, schemaName); err == nil {
-			// 				for rows.Next() {
-			// 					var v string
-			// 					if err := rows.Scan(&v); err == nil {
-			// 						viewNodes = append(viewNodes, &plugin.ConnectionTreeNode{
-			// 							Key:      schemaName + ".v." + v,
-			// 							Label:    v,
-			// 							NodeType: plugin.ConnectionTreeNodeTypeView,
-			// 							Actions: []*plugin.ConnectionTreeAction{
-			// 								{
-			// 									Type:   plugin.ConnectionTreeActionSelect,
-			// 									Title:  "Select rows",
-			// 									Query:  fmt.Sprintf(`SELECT * FROM "%s"."%s" LIMIT 100;`, schemaName, v),
-			// 									Hidden: true,
-			// 									NewTab: true,
-			// 								},
-			// 							},
-			// 						})
-			// 					}
-			// 				}
-			// 				rows.Close()
-			// 			}
-
-			// ── Materialized Views ───────────────────────────────────────────
-			// 			var matViewNodes []*plugin.ConnectionTreeNode
-			// 			if rows, err := conn.Query(`
-			// SELECT c.relname
-			// FROM pg_catalog.pg_class c
-			// JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-			// WHERE n.nspname = $1
-			//   AND c.relkind = 'm'
-			// ORDER BY c.relname`, schemaName); err == nil {
-			// 				for rows.Next() {
-			// 					var v string
-			// 					if err := rows.Scan(&v); err == nil {
-			// 						matViewNodes = append(matViewNodes, &plugin.ConnectionTreeNode{
-			// 							Key:      schemaName + ".mv." + v,
-			// 							Label:    v,
-			// 							NodeType: plugin.ConnectionTreeNodeTypeView,
-			// 							Actions: []*plugin.ConnectionTreeAction{
-			// 								{
-			// 									Type:   plugin.ConnectionTreeActionSelect,
-			// 									Title:  "Select rows",
-			// 									Query:  fmt.Sprintf(`SELECT * FROM "%s"."%s" LIMIT 100;`, schemaName, v),
-			// 									Hidden: true,
-			// 									NewTab: true,
-			// 								},
-			// 							},
-			// 						})
-			// 					}
-			// 				}
-			// 				rows.Close()
-			// 			}
-
-			// ── Foreign Tables ───────────────────────────────────────────────
-			// 			var foreignTableNodes []*plugin.ConnectionTreeNode
-			// 			if rows, err := conn.Query(`
-			// SELECT c.relname
-			// FROM pg_catalog.pg_class c
-			// JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-			// WHERE n.nspname = $1
-			//   AND c.relkind = 'f'
-			// ORDER BY c.relname`, schemaName); err == nil {
-			// 				for rows.Next() {
-			// 					var ft string
-			// 					if err := rows.Scan(&ft); err == nil {
-			// 						foreignTableNodes = append(foreignTableNodes, &plugin.ConnectionTreeNode{
-			// 							Key:      schemaName + ".ft." + ft,
-			// 							Label:    ft,
-			// 							NodeType: plugin.ConnectionTreeNodeTypeTable,
-			// 							Actions: []*plugin.ConnectionTreeAction{
-			// 								{
-			// 									Type:   plugin.ConnectionTreeActionSelect,
-			// 									Title:  "Select rows",
-			// 									Query:  fmt.Sprintf(`SELECT * FROM "%s"."%s" LIMIT 100;`, schemaName, ft),
-			// 									Hidden: true,
-			// 									NewTab: true,
-			// 								},
-			// 							},
-			// 						})
-			// 					}
-			// 				}
-			// 				rows.Close()
-			// 			}
-
-			// ── Indexes ──────────────────────────────────────────────────────
-			// 			var indexNodes []*plugin.ConnectionTreeNode
-			// 			if rows, err := conn.Query(`
-			// SELECT indexname
-			// FROM pg_indexes
-			// WHERE schemaname = $1
-			// ORDER BY indexname`, schemaName); err == nil {
-			// 				for rows.Next() {
-			// 					var idx string
-			// 					if err := rows.Scan(&idx); err == nil {
-			// 						indexNodes = append(indexNodes, &plugin.ConnectionTreeNode{
-			// 							Key:      schemaName + ".idx." + idx,
-			// 							Label:    idx,
-			// 							NodeType: plugin.ConnectionTreeNodeTypeGroup,
-			// 						})
-			// 					}
-			// 				}
-			// 				rows.Close()
-			// 			}
-
-			// ── Functions ────────────────────────────────────────────────────
-			// 			var functionNodes []*plugin.ConnectionTreeNode
-			// 			if rows, err := conn.Query(`
-			// SELECT p.proname || '(' || pg_catalog.pg_get_function_identity_arguments(p.oid) || ')' AS signature
-			// FROM pg_catalog.pg_proc p
-			// JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
-			// WHERE n.nspname = $1
-			//   AND p.prokind = 'f'
-			// ORDER BY p.proname`, schemaName); err == nil {
-			// 				for rows.Next() {
-			// 					var sig string
-			// 					if err := rows.Scan(&sig); err == nil {
-			// 						functionNodes = append(functionNodes, &plugin.ConnectionTreeNode{
-			// 							Key:      schemaName + ".fn." + sig,
-			// 							Label:    sig,
-			// 							NodeType: plugin.ConnectionTreeNodeTypeGroup,
-			// 						})
-			// 					}
-			// 				}
-			// 				rows.Close()
-			// 			}
-
-			// ── Sequences ────────────────────────────────────────────────────
-			// 			var sequenceNodes []*plugin.ConnectionTreeNode
-			// 			if rows, err := conn.Query(`
-			// SELECT sequence_name
-			// FROM information_schema.sequences
-			// WHERE sequence_schema = $1
-			// ORDER BY sequence_name`, schemaName); err == nil {
-			// 				for rows.Next() {
-			// 					var seq string
-			// 					if err := rows.Scan(&seq); err == nil {
-			// 						sequenceNodes = append(sequenceNodes, &plugin.ConnectionTreeNode{
-			// 							Key:      schemaName + ".seq." + seq,
-			// 							Label:    seq,
-			// 							NodeType: plugin.ConnectionTreeNodeTypeGroup,
-			// 						})
-			// 					}
-			// 				}
-			// 				rows.Close()
-			// 			}
-
-			// ── Assemble category group nodes ────────────────────────────────
-			categories := []*plugin.ConnectionTreeNode{
+			categories := []*plugin.ResourceNode{
 				{
-					Key:      schemaName + ".Tables",
-					Label:    "Tables",
-					NodeType: plugin.ConnectionTreeNodeTypeGroup,
+					ID:       schemaName + ".Tables",
+					Name:     "Tables",
+					Kind:     "group",
+					Path:     schemaName + ".Tables",
 					Children: tableNodes,
-					Actions: []*plugin.ConnectionTreeAction{
+					Actions: []*plugin.ResourceAction{
 						{
-							Type:  plugin.ConnectionTreeActionCreateTable,
+							ID:    plugin.ConnectionTreeActionCreateTable,
+							Kind:  plugin.ConnectionTreeActionCreateTable,
 							Title: "Create table",
 							Query: fmt.Sprintf("CREATE TABLE \"%s\".\"new_table\" (\n    id SERIAL PRIMARY KEY\n);", schemaName),
 						},
 					},
 				},
-				// {
-				// 	Key:      schemaName + ".Views",
-				// 	Label:    "Views",
-				// 	NodeType: plugin.ConnectionTreeNodeTypeGroup,
-				// 	Children: viewNodes,
-				// },
-				// {
-				// 	Key:      schemaName + ".Materialized Views",
-				// 	Label:    "Materialized Views",
-				// 	NodeType: plugin.ConnectionTreeNodeTypeGroup,
-				// 	Children: matViewNodes,
-				// },
-				// {
-				// 	Key:      schemaName + ".Foreign Tables",
-				// 	Label:    "Foreign Tables",
-				// 	NodeType: plugin.ConnectionTreeNodeTypeGroup,
-				// 	Children: foreignTableNodes,
-				// },
-				// {
-				// 	Key:      schemaName + ".Indexes",
-				// 	Label:    "Indexes",
-				// 	NodeType: plugin.ConnectionTreeNodeTypeGroup,
-				// 	Children: indexNodes,
-				// },
-				// {
-				// 	Key:      schemaName + ".Functions",
-				// 	Label:    "Functions",
-				// 	NodeType: plugin.ConnectionTreeNodeTypeGroup,
-				// 	Children: functionNodes,
-				// },
-				// {
-				// 	Key:      schemaName + ".Sequences",
-				// 	Label:    "Sequences",
-				// 	NodeType: plugin.ConnectionTreeNodeTypeGroup,
-				// 	Children: sequenceNodes,
-				// },
 			}
 
-			schemaNode := &plugin.ConnectionTreeNode{
-				Key:      schemaName,
-				Label:    schemaName,
-				NodeType: plugin.ConnectionTreeNodeTypeSchema,
+			schemaNodes = append(schemaNodes, &plugin.ResourceNode{
+				ID:       schemaName,
+				Name:     schemaName,
+				Kind:     "schema",
+				Path:     schemaName,
 				Children: categories,
-			}
-			schemaNodes = append(schemaNodes, schemaNode)
+			})
 		}
 		return schemaNodes
 	}
 
-	var dbNodes []*plugin.ConnectionTreeNode
+	var dbNodes []*plugin.ResourceNode
 	for _, dbname := range dbNames {
-		var schemas []*plugin.ConnectionTreeNode
+		var schemas []*plugin.ResourceNode
 		if dbname == currentDB {
 			schemas = loadSchemas(db)
 		} else {
 			connMap := make(map[string]string)
-			for k, v := range req.Connection {
+			for k, v := range connection {
 				connMap[k] = v
 			}
 			connMap["database"] = dbname
@@ -895,49 +704,39 @@ ORDER BY c.relname`, schemaName); err == nil {
 				}
 			}
 		}
-		node := &plugin.ConnectionTreeNode{
-			Key:      dbname,
-			Label:    dbname,
-			NodeType: plugin.ConnectionTreeNodeTypeDatabase,
+		dbNodes = append(dbNodes, &plugin.ResourceNode{
+			ID:       dbname,
+			Name:     dbname,
+			Kind:     "database",
+			Path:     dbname,
 			Children: schemas,
-			Actions: []*plugin.ConnectionTreeAction{
+			Actions: []*plugin.ResourceAction{
 				{
-					Type:  plugin.ConnectionTreeActionDropDatabase,
+					ID:    plugin.ConnectionTreeActionDropDatabase,
+					Kind:  plugin.ConnectionTreeActionDropDatabase,
 					Title: "Drop database",
 					Query: fmt.Sprintf(`DROP DATABASE "%s";`, dbname),
 				},
 			},
-		}
-		dbNodes = append(dbNodes, node)
+		})
 	}
 
-	createNode := &plugin.ConnectionTreeNode{
-		Key:      "__create_database__",
-		Label:    "New database",
-		NodeType: plugin.ConnectionTreeNodeTypeAction,
-		Actions: []*plugin.ConnectionTreeAction{
+	createNode := &plugin.ResourceNode{
+		ID:   "__create_database__",
+		Name: "New database",
+		Kind: "action",
+		Path: "__create_database__",
+		Actions: []*plugin.ResourceAction{
 			{
-				Type:   plugin.ConnectionTreeActionCreateDatabase,
-				Title:  "Create database",
-				Query:  `CREATE DATABASE "new_database";`,
-				Hidden: true,
+				ID:    plugin.ConnectionTreeActionCreateDatabase,
+				Kind:  plugin.ConnectionTreeActionCreateDatabase,
+				Title: "Create database",
+				Query: `CREATE DATABASE "new_database";`,
 			},
 		},
 	}
 
-	return &plugin.ConnectionTreeResponse{Nodes: append([]*plugin.ConnectionTreeNode{createNode}, dbNodes...)}, nil
-}
-
-func (m *postgresqlPlugin) ResourceGraph(ctx context.Context, req *plugin.ResourceGraphRequest) (*plugin.ResourceGraphResponse, error) {
-	connection := map[string]string(nil)
-	if req != nil {
-		connection = req.Connection
-	}
-	tree, err := m.ConnectionTree(ctx, &plugin.ConnectionTreeRequest{Connection: connection})
-	if err != nil {
-		return nil, err
-	}
-	return plugin.AdaptConnectionTree(tree), nil
+	return &plugin.ResourceGraphResponse{Nodes: append([]*plugin.ResourceNode{createNode}, dbNodes...)}, nil
 }
 
 // formatPingError wraps a ping failure with supplemental hints when the

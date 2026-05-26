@@ -235,7 +235,7 @@ func TestFormatPingError(t *testing.T) {
 	}
 }
 
-func TestConnectionTreeReturnsConnectFailedOnPingError(t *testing.T) {
+func TestResourceGraphReturnsConnectFailedOnPingError(t *testing.T) {
 	origOpen := openPostgresDB
 	origPing := pingPostgresDB
 	defer func() {
@@ -255,7 +255,7 @@ func TestConnectionTreeReturnsConnectFailedOnPingError(t *testing.T) {
 	}
 
 	p := &postgresqlPlugin{}
-	_, err = p.ConnectionTree(context.Background(), &pluginpb.PluginV1_ConnectionTreeRequest{
+	_, err = p.ResourceGraph(context.Background(), &plugin.ResourceGraphRequest{
 		Connection: map[string]string{"dsn": "postgres://foo"},
 	})
 	if err == nil {
@@ -420,7 +420,7 @@ func TestGetDatabaseFromConn(t *testing.T) {
 	}
 }
 
-func TestConnectionTreeListsDatabases(t *testing.T) {
+func TestResourceGraphListsDatabases(t *testing.T) {
 	orig := openPostgresDB
 	defer func() { openPostgresDB = orig }()
 
@@ -450,7 +450,7 @@ func TestConnectionTreeListsDatabases(t *testing.T) {
 		t.Logf("debug dsn2 calculated as %q", dsn2)
 	}
 
-	resp, err := p.ConnectionTree(ctx, &pluginpb.PluginV1_ConnectionTreeRequest{Connection: map[string]string{"dsn": "postgres://foo"}})
+	resp, err := p.ResourceGraph(ctx, &plugin.ResourceGraphRequest{Connection: map[string]string{"dsn": "postgres://foo"}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -465,11 +465,11 @@ func TestConnectionTreeListsDatabases(t *testing.T) {
 	if len(resp.Nodes) != 3 {
 		t.Fatalf("expected 3 nodes (create + db1 + db2), got %d", len(resp.Nodes))
 	}
-	if resp.Nodes[1].Label != "db1" {
-		t.Errorf("first db label wrong: %s", resp.Nodes[1].Label)
+	if resp.Nodes[1].Name != "db1" {
+		t.Errorf("first db label wrong: %s", resp.Nodes[1].Name)
 	}
-	if resp.Nodes[2].Label != "db2" {
-		t.Errorf("second db label wrong: %s", resp.Nodes[2].Label)
+	if resp.Nodes[2].Name != "db2" {
+		t.Errorf("second db label wrong: %s", resp.Nodes[2].Name)
 	}
 
 	t.Logf("debug seenDSNs: %v", seenDSNs)
@@ -482,10 +482,10 @@ func TestConnectionTreeListsDatabases(t *testing.T) {
 		t.Errorf("db1.public should have 1 category group, got %d", len(db1Schema.Children))
 	}
 	tablesGroup := db1Schema.Children[0]
-	if tablesGroup.Label != "Tables" {
-		t.Errorf("first category should be Tables, got %s", tablesGroup.Label)
+	if tablesGroup.Name != "Tables" {
+		t.Errorf("first category should be Tables, got %s", tablesGroup.Name)
 	}
-	if len(tablesGroup.Children) != 1 || tablesGroup.Children[0].Label != "users" {
+	if len(tablesGroup.Children) != 1 || tablesGroup.Children[0].Name != "users" {
 		t.Errorf("db1 Tables group should contain 'users'")
 	}
 
@@ -501,7 +501,7 @@ func TestConnectionTreeListsDatabases(t *testing.T) {
 	}
 }
 
-func TestConnectionTreeFilterDatabase(t *testing.T) {
+func TestResourceGraphFilterDatabase(t *testing.T) {
 	orig := openPostgresDB
 	defer func() { openPostgresDB = orig }()
 
@@ -525,7 +525,7 @@ func TestConnectionTreeFilterDatabase(t *testing.T) {
 	mock.ExpectQuery("SELECT schema_name").WillReturnRows(sqlmock.NewRows([]string{"schema_name"}).AddRow("public"))
 	mock.ExpectQuery("(?s)relkind IN.*pg_inherits").WithArgs("public").WillReturnRows(sqlmock.NewRows([]string{"relname"}).AddRow("things"))
 
-	resp, err := p.ConnectionTree(ctx, &pluginpb.PluginV1_ConnectionTreeRequest{Connection: map[string]string{"dsn": "postgres://foo", "database": "db2"}})
+	resp, err := p.ResourceGraph(ctx, &plugin.ResourceGraphRequest{Connection: map[string]string{"dsn": "postgres://foo", "database": "db2"}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -540,8 +540,8 @@ func TestConnectionTreeFilterDatabase(t *testing.T) {
 	if len(resp.Nodes) != 2 {
 		t.Fatalf("expected 2 nodes (create + db2), got %d", len(resp.Nodes))
 	}
-	if resp.Nodes[1].Label != "db2" {
-		t.Errorf("expected only db2 node, got %s", resp.Nodes[1].Label)
+	if resp.Nodes[1].Name != "db2" {
+		t.Errorf("expected only db2 node, got %s", resp.Nodes[1].Name)
 	}
 	if len(resp.Nodes[1].Children) != 1 {
 		t.Errorf("db2 should have 1 schema")
@@ -552,10 +552,10 @@ func TestConnectionTreeFilterDatabase(t *testing.T) {
 		t.Errorf("db2.public should have 1 category group, got %d", len(db2Schema.Children))
 	}
 	tablesGroup := db2Schema.Children[0]
-	if tablesGroup.Label != "Tables" {
-		t.Errorf("first category should be Tables, got %s", tablesGroup.Label)
+	if tablesGroup.Name != "Tables" {
+		t.Errorf("first category should be Tables, got %s", tablesGroup.Name)
 	}
-	if len(tablesGroup.Children) != 1 || tablesGroup.Children[0].Label != "things" {
+	if len(tablesGroup.Children) != 1 || tablesGroup.Children[0].Name != "things" {
 		t.Errorf("db2 Tables group should contain 'things'")
 	}
 
@@ -564,7 +564,7 @@ func TestConnectionTreeFilterDatabase(t *testing.T) {
 	}
 }
 
-func TestConnectionTreeSchemaGroups(t *testing.T) {
+func TestResourceGraphSchemaGroups(t *testing.T) {
 	// verify override with unusual database name does not get mangled
 	if dsn, err := buildConnString(map[string]string{"dsn": "postgres://foo", "database": "phonedb:public:public"}); err == nil {
 		if !strings.Contains(dsn, "phonedb:public:public") {
@@ -590,7 +590,7 @@ func TestConnectionTreeSchemaGroups(t *testing.T) {
 	// tables only (other object types are not currently fetched)
 	mock.ExpectQuery("(?s)relkind IN.*pg_inherits").WithArgs("app").WillReturnRows(sqlmock.NewRows([]string{"relname"}).AddRow("orders").AddRow("users"))
 
-	resp, err := p.ConnectionTree(ctx, &pluginpb.PluginV1_ConnectionTreeRequest{Connection: map[string]string{"dsn": "postgres://foo"}})
+	resp, err := p.ResourceGraph(ctx, &plugin.ResourceGraphRequest{Connection: map[string]string{"dsn": "postgres://foo"}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -600,20 +600,20 @@ func TestConnectionTreeSchemaGroups(t *testing.T) {
 		t.Fatalf("expected 2 top-level nodes, got %d", len(resp.Nodes))
 	}
 	dbNode := resp.Nodes[1]
-	if dbNode.Label != "mydb" {
-		t.Fatalf("expected mydb, got %s", dbNode.Label)
+	if dbNode.Name != "mydb" {
+		t.Fatalf("expected mydb, got %s", dbNode.Name)
 	}
 	if len(dbNode.Children) != 1 {
 		t.Fatalf("expected 1 schema, got %d", len(dbNode.Children))
 	}
 	schemaNode := dbNode.Children[0]
-	if schemaNode.Label != "app" {
-		t.Errorf("expected schema 'app', got %s", schemaNode.Label)
+	if schemaNode.Name != "app" {
+		t.Errorf("expected schema 'app', got %s", schemaNode.Name)
 	}
 
 	// schema node should have no direct create-table action (moved to Tables group)
 	for _, a := range schemaNode.Actions {
-		if a.Type == plugin.ConnectionTreeActionCreateTable {
+		if a.Kind == plugin.ConnectionTreeActionCreateTable {
 			t.Errorf("create-table action should be on Tables group, not schema node")
 		}
 	}
@@ -627,7 +627,7 @@ func TestConnectionTreeSchemaGroups(t *testing.T) {
 	// Tables group should have create-table action
 	hasCreateTable := false
 	for _, a := range tablesGroup.Actions {
-		if a.Type == plugin.ConnectionTreeActionCreateTable {
+		if a.Kind == plugin.ConnectionTreeActionCreateTable {
 			hasCreateTable = true
 		}
 	}

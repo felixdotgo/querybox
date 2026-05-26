@@ -16,12 +16,6 @@ export const AuthForm = pluginpb$0.PluginV1_AuthForm;
  * @typedef {pluginpb$0.PluginV1_AuthForm} AuthForm
  */
 
-export const ConnectionTreeResponse = pluginpb$0.PluginV1_ConnectionTreeResponse;
-
-/**
- * @typedef {pluginpb$0.PluginV1_ConnectionTreeResponse} ConnectionTreeResponse
- */
-
 export const DescribeSchemaResponse = pluginpb$0.PluginV1_DescribeSchemaResponse;
 
 /**

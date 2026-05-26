@@ -48,6 +48,8 @@ The host may invoke these commands:
 
 All request/response payloads are defined by `contracts/plugin/v1/plugin.proto` and wired through `pkg/plugin.ServeCLI()`.
 
+Bundled plugins and the template plugin should implement `resource-graph` directly. Treat `connection-tree` only as a short-lived compatibility surface for external legacy plugins while QueryBox is still in `0.x`.
+
 ## Capability Taxonomy
 
 Use only the current capability names:

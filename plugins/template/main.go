@@ -70,23 +70,6 @@ func (t *templatePlugin) AuthForms(ctx context.Context, _ *plugin.AuthFormsReque
 	return &plugin.AuthFormsResponse{Forms: map[string]*plugin.AuthForm{"basic": &basic}}, nil
 }
 
-// ConnectionTree returns a trivial tree for demonstration purposes.  In a
-// real plugin the structure would be derived from the connection (e.g. list of
-// databases/tables).
-func (t *templatePlugin) ConnectionTree(ctx context.Context, req *plugin.ConnectionTreeRequest) (*plugin.ConnectionTreeResponse, error) {
-	return &plugin.ConnectionTreeResponse{
-		Nodes: []*plugin.ConnectionTreeNode{
-			{
-				Key:   "dummy",
-				Label: "Dummy node",
-				Actions: []*plugin.ConnectionTreeAction{
-					{Type: plugin.ConnectionTreeActionSelect, Title: "Echo query", Query: "SELECT 1"},
-				},
-			},
-		},
-	}, nil
-}
-
 func (t *templatePlugin) ResourceGraph(ctx context.Context, req *plugin.ResourceGraphRequest) (*plugin.ResourceGraphResponse, error) {
 	return &plugin.ResourceGraphResponse{
 		Nodes: []*plugin.ResourceNode{
@@ -97,22 +80,6 @@ func (t *templatePlugin) ResourceGraph(ctx context.Context, req *plugin.Resource
 				Path: "dummy",
 				Actions: []*plugin.ResourceAction{
 					{ID: "select", Kind: "select", Title: "Echo query", Query: "SELECT 1"},
-				},
-			},
-		},
-	}, nil
-}
-
-// ConnectionTreeAction simply echoes back the action's query for demo purposes.
-// In a real plugin this would execute the query and return results or perform some other side effect.
-func (t *templatePlugin) ConnectionTreeAction(req *plugin.ConnectionTreeAction) (*plugin.ExecResponse, error) {
-	// simply echo back the action's query for demo purposes
-	data := map[string]string{"action_query": req.Query}
-	return &plugin.ExecResponse{
-		Result: &plugin.ExecResult{
-			Payload: &pluginpb.PluginV1_ExecResult_Kv{
-				Kv: &plugin.KeyValueResult{
-					Data: data,
 				},
 			},
 		},

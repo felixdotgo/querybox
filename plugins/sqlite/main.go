@@ -194,9 +194,13 @@ func (m *sqlitePlugin) Exec(ctx context.Context, req *plugin.ExecRequest) (*plug
 	}, nil
 }
 
-// ConnectionTree returns a list of tables in the SQLite database.
-func (m *sqlitePlugin) ConnectionTree(ctx context.Context, req *plugin.ConnectionTreeRequest) (*plugin.ConnectionTreeResponse, error) {
-	c := parseCredential(req.Connection)
+// ResourceGraph returns a list of tables in the SQLite database.
+func (m *sqlitePlugin) ResourceGraph(ctx context.Context, req *plugin.ResourceGraphRequest) (*plugin.ResourceGraphResponse, error) {
+	connection := map[string]string(nil)
+	if req != nil {
+		connection = req.Connection
+	}
+	c := parseCredential(connection)
 
 	driver, dsn, err := driverDSN(c)
 	if err != nil {
@@ -215,52 +219,40 @@ func (m *sqlitePlugin) ConnectionTree(ctx context.Context, req *plugin.Connectio
 	}
 	defer rows.Close()
 
-	var tableNodes []*plugin.ConnectionTreeNode
+	var tableNodes []*plugin.ResourceNode
 	for rows.Next() {
 		var tbl string
 		if err := rows.Scan(&tbl); err != nil {
 			continue
 		}
-		tableNodes = append(tableNodes, &plugin.ConnectionTreeNode{
-			Key:      tbl,
-			Label:    tbl,
-			NodeType: plugin.ConnectionTreeNodeTypeTable,
-			Actions: []*plugin.ConnectionTreeAction{
-				{Type: plugin.ConnectionTreeActionSelect, Title: "Select rows", Query: fmt.Sprintf(`SELECT * FROM "%s"`, tbl), Hidden: true, NewTab: true},
-				{Type: plugin.ConnectionTreeActionDropTable, Title: "Drop table", Query: fmt.Sprintf(`DROP TABLE "%s";`, tbl)},
+		tableNodes = append(tableNodes, &plugin.ResourceNode{
+			ID:   tbl,
+			Name: tbl,
+			Kind: "table",
+			Path: tbl,
+			Actions: []*plugin.ResourceAction{
+				{ID: plugin.ConnectionTreeActionSelect, Kind: plugin.ConnectionTreeActionSelect, Title: "Select rows", Query: fmt.Sprintf(`SELECT * FROM "%s"`, tbl), NewTab: true},
+				{ID: plugin.ConnectionTreeActionDropTable, Kind: plugin.ConnectionTreeActionDropTable, Title: "Drop table", Query: fmt.Sprintf(`DROP TABLE "%s";`, tbl)},
 			},
 		})
 	}
 
-	// Prepend a leaf node for the create-table action so the user can
-	// create a new table without a redundant wrapper server node.
-	createNode := &plugin.ConnectionTreeNode{
-		Key:      "__create_table__",
-		Label:    "New table",
-		NodeType: plugin.ConnectionTreeNodeTypeAction,
-		Actions: []*plugin.ConnectionTreeAction{
+	createNode := &plugin.ResourceNode{
+		ID:   "__create_table__",
+		Name: "New table",
+		Kind: "action",
+		Path: "__create_table__",
+		Actions: []*plugin.ResourceAction{
 			{
-				Type:   plugin.ConnectionTreeActionCreateTable,
-				Title:  "Create table",
-				Query:  "CREATE TABLE \"new_table\" (\n    \"id\" INTEGER PRIMARY KEY AUTOINCREMENT\n);",
-				Hidden: true, // hide the action from the UI since it doesn't work out-of-the-box and requires user editing
+				ID:    plugin.ConnectionTreeActionCreateTable,
+				Kind:  plugin.ConnectionTreeActionCreateTable,
+				Title: "Create table",
+				Query: "CREATE TABLE \"new_table\" (\n    \"id\" INTEGER PRIMARY KEY AUTOINCREMENT\n);",
 			},
 		},
 	}
 
-	return &plugin.ConnectionTreeResponse{Nodes: append([]*plugin.ConnectionTreeNode{createNode}, tableNodes...)}, nil
-}
-
-func (m *sqlitePlugin) ResourceGraph(ctx context.Context, req *plugin.ResourceGraphRequest) (*plugin.ResourceGraphResponse, error) {
-	connection := map[string]string(nil)
-	if req != nil {
-		connection = req.Connection
-	}
-	tree, err := m.ConnectionTree(ctx, &plugin.ConnectionTreeRequest{Connection: connection})
-	if err != nil {
-		return nil, err
-	}
-	return plugin.AdaptConnectionTree(tree), nil
+	return &plugin.ResourceGraphResponse{Nodes: append([]*plugin.ResourceNode{createNode}, tableNodes...)}, nil
 }
 
 // DescribeSchema returns column/index metadata for one or more tables.

@@ -4,7 +4,6 @@
 
 export {
     AuthForm,
-    ConnectionTreeResponse,
     DescribeSchemaResponse,
     ExecResponse,
     GetCompletionFieldsResponse,

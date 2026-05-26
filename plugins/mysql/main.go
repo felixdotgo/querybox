@@ -149,8 +149,8 @@ func buildDSN(connection map[string]string) (string, error) {
 }
 
 // getDatabaseFromConn returns the database name the connection will use, or
-// an empty string if none was provided explicitly.  This is used by
-// ConnectionTree to decide whether to restrict the returned node list.
+// an empty string if none was provided explicitly. This lets ResourceGraph
+// decide whether to restrict the returned node list.
 func getDatabaseFromConn(connection map[string]string) string {
 	dsn, _ := buildDSN(connection)
 	if dsn == "" {
@@ -340,14 +340,17 @@ func (m *mysqlPlugin) Exec(ctx context.Context, req *plugin.ExecRequest) (*plugi
 	}, nil
 }
 
-// ConnectionTree returns a server root node, a list of databases, and their
-// tables for browsing.  Each level exposes DDL actions so the user can create
-// or drop databases and tables directly from the connection tree.  If the
-// connection is invalid or the underlying query fails, an error is returned
-// so callers (and the UI) can surface the failure instead of seeing an
-// indistinguishable empty tree.
-func (m *mysqlPlugin) ConnectionTree(ctx context.Context, req *plugin.ConnectionTreeRequest) (*plugin.ConnectionTreeResponse, error) {
-	dsn, err := buildDSN(req.Connection)
+// ResourceGraph returns databases and tables for browsing. Each level exposes
+// DDL actions so the user can create or drop databases and tables directly
+// from the explorer. If the connection is invalid or the underlying query
+// fails, an error is returned so callers can surface the failure instead of
+// seeing an indistinguishable empty tree.
+func (m *mysqlPlugin) ResourceGraph(ctx context.Context, req *plugin.ResourceGraphRequest) (*plugin.ResourceGraphResponse, error) {
+	connection := map[string]string(nil)
+	if req != nil {
+		connection = req.Connection
+	}
+	dsn, err := buildDSN(connection)
 	if err != nil || dsn == "" {
 		if err == nil {
 			err = fmt.Errorf("empty DSN")
@@ -361,7 +364,7 @@ func (m *mysqlPlugin) ConnectionTree(ctx context.Context, req *plugin.Connection
 	defer db.Close()
 
 	// if the user supplied a database explicitly we only show that one
-	filterDB := getDatabaseFromConn(req.Connection)
+	filterDB := getDatabaseFromConn(connection)
 
 	rows, err := db.Query("SHOW DATABASES")
 	if err != nil {
@@ -369,7 +372,7 @@ func (m *mysqlPlugin) ConnectionTree(ctx context.Context, req *plugin.Connection
 	}
 	defer rows.Close()
 
-	var dbNodes []*plugin.ConnectionTreeNode
+	var dbNodes []*plugin.ResourceNode
 	for rows.Next() {
 		var dbname string
 		if err := rows.Scan(&dbname); err != nil {
@@ -380,61 +383,50 @@ func (m *mysqlPlugin) ConnectionTree(ctx context.Context, req *plugin.Connection
 		}
 		// For each database expose a child list of tables.  Clicking a table
 		// pre-fills a SELECT query; the DDL actions allow create/drop.
-		tables := []*plugin.ConnectionTreeNode{}
+		tables := []*plugin.ResourceNode{}
 		tblRows, err := db.Query(fmt.Sprintf("SHOW TABLES FROM `%s`", dbname))
 		if err == nil {
 			for tblRows.Next() {
 				var tbl string
 				if tblRows.Scan(&tbl) == nil {
-					tables = append(tables, &plugin.ConnectionTreeNode{
-						Key:      dbname + "." + tbl,
-						Label:    tbl,
-						NodeType: plugin.ConnectionTreeNodeTypeTable,
-						Actions: []*plugin.ConnectionTreeAction{
-							{Type: plugin.ConnectionTreeActionSelect, Title: "Select rows", Query: fmt.Sprintf("SELECT * FROM `%s` LIMIT 100;", tbl), Hidden: true, NewTab: true},
-							{Type: plugin.ConnectionTreeActionDropTable, Title: "Drop table", Query: fmt.Sprintf("DROP TABLE `%s`;", tbl)},
+					tables = append(tables, &plugin.ResourceNode{
+						ID:   dbname + "." + tbl,
+						Name: tbl,
+						Kind: "table",
+						Path: dbname + "." + tbl,
+						Actions: []*plugin.ResourceAction{
+							{ID: plugin.ConnectionTreeActionSelect, Kind: plugin.ConnectionTreeActionSelect, Title: "Select rows", Query: fmt.Sprintf("SELECT * FROM `%s` LIMIT 100;", tbl), NewTab: true},
+							{ID: plugin.ConnectionTreeActionDropTable, Kind: plugin.ConnectionTreeActionDropTable, Title: "Drop table", Query: fmt.Sprintf("DROP TABLE `%s`;", tbl)},
 						},
 					})
 				}
 			}
 			tblRows.Close()
 		}
-		dbNodes = append(dbNodes, &plugin.ConnectionTreeNode{
-			Key:      dbname,
-			Label:    dbname,
-			NodeType: plugin.ConnectionTreeNodeTypeDatabase,
+		dbNodes = append(dbNodes, &plugin.ResourceNode{
+			ID:       dbname,
+			Name:     dbname,
+			Kind:     "database",
+			Path:     dbname,
 			Children: tables,
-			Actions: []*plugin.ConnectionTreeAction{
-				{Type: plugin.ConnectionTreeActionCreateTable, Title: "Create table", Query: "CREATE TABLE `new_table` (\n  `id` INT NOT NULL AUTO_INCREMENT,\n  PRIMARY KEY (`id`)\n);"},
-				{Type: plugin.ConnectionTreeActionDropDatabase, Title: "Drop database", Query: fmt.Sprintf("DROP DATABASE `%s`;", dbname)},
+			Actions: []*plugin.ResourceAction{
+				{ID: plugin.ConnectionTreeActionCreateTable, Kind: plugin.ConnectionTreeActionCreateTable, Title: "Create table", Query: "CREATE TABLE `new_table` (\n  `id` INT NOT NULL AUTO_INCREMENT,\n  PRIMARY KEY (`id`)\n);"},
+				{ID: plugin.ConnectionTreeActionDropDatabase, Kind: plugin.ConnectionTreeActionDropDatabase, Title: "Drop database", Query: fmt.Sprintf("DROP DATABASE `%s`;", dbname)},
 			},
 		})
 	}
 
-	// Prepend a leaf node for the create-database action so the user can
-	// create a new database without a redundant wrapper server node.
-	createNode := &plugin.ConnectionTreeNode{
-		Key:      "__create_database__",
-		Label:    "New database",
-		NodeType: plugin.ConnectionTreeNodeTypeAction,
-		Actions: []*plugin.ConnectionTreeAction{
-			{Type: plugin.ConnectionTreeActionCreateDatabase, Title: "Create database", Query: "CREATE DATABASE `new_database`;", Hidden: true},
+	createNode := &plugin.ResourceNode{
+		ID:   "__create_database__",
+		Name: "New database",
+		Kind: "action",
+		Path: "__create_database__",
+		Actions: []*plugin.ResourceAction{
+			{ID: plugin.ConnectionTreeActionCreateDatabase, Kind: plugin.ConnectionTreeActionCreateDatabase, Title: "Create database", Query: "CREATE DATABASE `new_database`;"},
 		},
 	}
 
-	return &plugin.ConnectionTreeResponse{Nodes: append([]*plugin.ConnectionTreeNode{createNode}, dbNodes...)}, nil
-}
-
-func (m *mysqlPlugin) ResourceGraph(ctx context.Context, req *plugin.ResourceGraphRequest) (*plugin.ResourceGraphResponse, error) {
-	connection := map[string]string(nil)
-	if req != nil {
-		connection = req.Connection
-	}
-	tree, err := m.ConnectionTree(ctx, &plugin.ConnectionTreeRequest{Connection: connection})
-	if err != nil {
-		return nil, err
-	}
-	return plugin.AdaptConnectionTree(tree), nil
+	return &plugin.ResourceGraphResponse{Nodes: append([]*plugin.ResourceNode{createNode}, dbNodes...)}, nil
 }
 
 // TestConnection opens a MySQL connection and pings the server to verify the
