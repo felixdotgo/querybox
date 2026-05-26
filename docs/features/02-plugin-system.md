@@ -200,6 +200,7 @@ Plugins strip any existing `ORDER BY` clause before appending the new one (using
 |--------|----------|-------------|-------|
 | `mysql` | info, exec, authforms, resource-graph, test-connection, describe-schema, completion-fields, mutate-row | `resource.graph`, `query.execute`, `connection.test`, `schema.inspect`, `explain-query`, `mutate-row` | Manifest is the discovery/source-of-truth contract |
 | `postgresql` | info, exec, authforms, resource-graph, test-connection, describe-schema, completion-fields, mutate-row | `resource.graph`, `query.execute`, `connection.test`, `schema.inspect`, `explain-query`, `mutate-row` | Manifest is the discovery/source-of-truth contract |
+| `redis` | info, exec, authforms, resource-graph, test-connection | `resource.graph`, `query.execute`, `connection.test` | Phase 2 Redis MVP: bounded SCAN-based key inspector over the selected logical DB |
 | `sqlite` | info, exec, authforms, resource-graph, test-connection, describe-schema, completion-fields, mutate-row | `resource.graph`, `query.execute`, `connection.test`, `schema.inspect`, `explain-query`, `mutate-row` | Manifest is the discovery/source-of-truth contract |
 | `template` | info, exec, authforms, resource-graph, test-connection, mutate-row | `resource.graph`, `connection.test`, `query.execute` | Minimal sample plugin used as authoring reference |
 

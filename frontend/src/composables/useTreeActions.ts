@@ -7,8 +7,8 @@ import {
   GetCredential,
 } from '@/bindings/github.com/felixdotgo/querybox/services/connectionservice'
 import {
-  ExecPlugin,
   ExecTreeAction,
+  TestConnection,
 } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
 import { extractDatabase } from '@/lib/nodeKey'
 
@@ -19,7 +19,7 @@ const INSTANT_SELECT_TYPES = new Set(['table', 'collection', 'key', 'view', 'for
 const PROMPT_ACTION_TYPES = new Set(['create-database', 'create-table'])
 
 /** Action types that require a destructive confirmation dialog. */
-const DESTRUCTIVE_ACTION_TYPES = new Set(['drop-database', 'drop-table', 'drop-collection'])
+const DESTRUCTIVE_ACTION_TYPES = new Set(['drop-database', 'drop-table', 'drop-collection', 'delete-key'])
 
 function actionTypeOf(action: TreeAction | null | undefined): string {
   return String(action?.type ?? action?.kind ?? action?.id ?? '')
@@ -92,9 +92,9 @@ export function useTreeActions({
       const params: Record<string, string> = {}
       if (cred)
         params.credential_blob = cred
-      const res = await ExecPlugin(conn.driver_type, params, 'SELECT 1', {})
-      if (res && (res as { error?: string }).error) {
-        throw new Error((res as { error?: string }).error)
+      const res = await TestConnection(conn.driver_type, params)
+      if (!res?.ok) {
+        throw new Error(res?.message || 'Connection test failed')
       }
     }
     catch (err: unknown) {

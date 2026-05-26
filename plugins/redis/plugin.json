@@ -1,0 +1,35 @@
+{
+  "id": "redis",
+  "type": 1,
+  "name": "Redis",
+  "description": "Built-in Redis key inspector plugin for QueryBox.",
+  "version": "0.0.1",
+  "url": "https://redis.io/",
+  "author": "QueryBox Team",
+  "runtime": {
+    "kind": "local"
+  },
+  "capabilities": [
+    "resource.graph",
+    "connection.test",
+    "query.execute"
+  ],
+  "tags": [
+    "nosql",
+    "key-value",
+    "cache"
+  ],
+  "license": "MIT",
+  "icon_url": "https://redis.io/images/redis-white.png",
+  "permissions": [
+    {
+      "name": "network"
+    }
+  ],
+  "limits": {
+    "timeout_seconds": 15
+  },
+  "metadata": {
+    "simple_icon": "redis"
+  }
+}
