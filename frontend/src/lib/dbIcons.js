@@ -51,8 +51,11 @@ export function getDriverIcon(driverType) {
  * @returns {string} icon key suitable for passing to `DbIcon`/`getDriverIcon`
  */
 export function getIconNameForDriver(driverType, plugin) {
+  if (!driverType || typeof driverType !== 'string')
+    return ''
+
   if (plugin && plugin.metadata && typeof plugin.metadata.simple_icon === 'string' && plugin.metadata.simple_icon.trim() !== '') {
     return plugin.metadata.simple_icon.toLowerCase()
   }
-  return driverType ? driverType.toLowerCase() : ''
+  return driverType.toLowerCase()
 }

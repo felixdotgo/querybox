@@ -3,7 +3,7 @@
   "type": 1,
   "name": "Redis",
   "description": "Built-in Redis key inspector plugin for QueryBox.",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "url": "https://redis.io/",
   "author": "QueryBox Team",
   "runtime": {

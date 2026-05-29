@@ -62,7 +62,7 @@ func (m *redisPlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRequest
 	return &plugin.InfoResponse{
 		Type:         plugin.TypeDriver,
 		Name:         "Redis",
-		Version:      "0.0.1",
+		Version:      "0.1.0",
 		Description:  "Redis key inspector plugin",
 		Url:          "https://redis.io/",
 		Author:       "QueryBox Team",

@@ -3,7 +3,7 @@
   "type": 1,
   "name": "PostgreSQL",
   "description": "Built-in PostgreSQL driver plugin for QueryBox.",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "url": "https://www.postgresql.org/",
   "author": "QueryBox Team",
   "runtime": {
