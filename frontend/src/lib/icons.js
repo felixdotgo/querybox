@@ -136,7 +136,7 @@ export const nodeTypeIconMap = {
 export const nodeTypeFallbackIcon = Documents
 
 /**
- * Maps ConnectionTreeAction type strings (constants defined in pkg/plugin/plugin.go)
+ * Maps resource action kind strings (constants defined in pkg/plugin/resource_graph.go)
  * to their icon component.  Falls back to actionTypeFallbackIcon when unknown.
  * @type {Record<string, object>}
  */

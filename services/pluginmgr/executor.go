@@ -36,7 +36,7 @@ func (m *Manager) RunCommand(name, command string, timeout time.Duration, req []
 // request and unmarshaling the response.
 //
 // The `caller` parameter is a label used in log/error messages (e.g.
-// "ExecPlugin", "GetConnectionTree") so that each call site produces
+// "ExecPlugin", "GetResourceGraph") so that each call site produces
 // recognisable diagnostics.
 //
 // Serialization contract: requests are serialized with encoding/json because

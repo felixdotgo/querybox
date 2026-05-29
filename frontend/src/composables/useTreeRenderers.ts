@@ -3,7 +3,7 @@ import type { Connection, PluginInfo } from '@/lib/types'
 import { NButton, NIcon, NSpin } from 'naive-ui'
 import { h } from 'vue'
 import ConnectionEntryLabel from '@/components/connections/ConnectionEntryLabel.vue'
-import ConnectionTreeItemLabel from '@/components/connections/ConnectionTreeItemLabel.vue'
+import ResourceGraphItemLabel from '@/components/connections/ResourceGraphItemLabel.vue'
 import DbIcon from '@/components/DbIcon.vue'
 import { getIconNameForDriver } from '@/lib/dbIcons'
 import { nodeTypeFallbackIcon, nodeTypeIconMap } from '@/lib/icons'
@@ -76,7 +76,7 @@ export function useTreeRenderers(opts: TreeRenderOptions) {
 
     // non-connection nodes with actions
     if (!conn && option.actions && option.actions.length > 0) {
-      return h(ConnectionTreeItemLabel, {
+      return h(ResourceGraphItemLabel, {
         label: option.label,
         actions: option.actions,
         onAction(action: any) {

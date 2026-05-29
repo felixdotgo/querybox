@@ -24,10 +24,6 @@ service PluginService {
   // to the plugin when creating a connection.
   rpc AuthForms(PluginV1.AuthFormsRequest) returns (PluginV1.AuthFormsResponse);
 
-  // ConnectionTree returns a driver-defined hierarchy of nodes and actions for
-  // a given connection.  The frontend uses this to render a browsable tree.
-  rpc ConnectionTree(PluginV1.ConnectionTreeRequest) returns (PluginV1.ConnectionTreeResponse);
-
   // DescribeSchema returns metadata about objects (tables, collections,
   // etc.) present in the connection.  The request may optionally specify
   // a database and/or object name to filter the result set.  Plugins that
@@ -239,51 +235,6 @@ message PluginV1 {
   message AuthFormsResponse {
     // map key is the form `key` (e.g. "basic").
     map<string, AuthForm> forms = 1;
-  }
-
-  // ConnectionTreeRequest is sent when the frontend wants to browse a
-  // connection.  The contents are purely driver-defined.
-  message ConnectionTreeRequest {
-    map<string,string> connection = 1;
-  }
-
-  message ConnectionTreeResponse {
-    repeated ConnectionTreeNode nodes = 1;
-  }
-
-  // NodeType is an optional hint for the frontend icon renderer and lets Go
-  // code reference well-known node kinds via generated constants instead of
-  // raw strings.
-  enum NodeType {
-    NODE_TYPE_UNKNOWN    = 0; // generic / unspecified
-    NODE_TYPE_DATABASE   = 1;
-    NODE_TYPE_TABLE      = 2;
-    NODE_TYPE_COLUMN     = 3;
-    NODE_TYPE_SCHEMA     = 4;
-    NODE_TYPE_VIEW       = 5;
-    NODE_TYPE_ACTION     = 6; // indicates a leaf node that represents an action, not a database object
-    NODE_TYPE_COLLECTION = 7; // for document stores like Mongo
-    NODE_TYPE_KEY        = 8; // for key/value stores like Redis
-    NODE_TYPE_GROUP      = 9; // folder/category grouping node (e.g. Tables, Views, Indexes)
-  }
-
-  message ConnectionTreeNode {
-    string key       = 1;              // unique within the returned tree
-    string label     = 2;              // user-visible text
-    repeated ConnectionTreeNode children = 3;
-    repeated ConnectionTreeAction actions = 4;
-    NodeType node_type = 5;
-  }
-
-  message ConnectionTreeAction {
-    string type   = 1; // machine name (e.g. "select", "describe")
-    string title  = 2; // displayed in a context menu or double-click
-    string query  = 3; // plugin-interpreted payload (often SQL)
-    // hidden suppresses the action from the context menu / action buttons.
-    // Use this for actions that should only fire on leaf-node click, not be
-    // explicitly listed as selectable options.
-    bool   hidden = 4;
-    bool new_tab = 5; // whether the core should open a new tab when this action is executed
   }
 
   // TestConnectionRequest carries the same credential map as ExecRequest so

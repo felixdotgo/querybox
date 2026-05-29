@@ -12,16 +12,17 @@ type RawTreeNode = Partial<ResourceNode> & {
   children?: Array<RawTreeNode | null> | null
 }
 
-// global reactive cache mapping connection id -> nodes array
-const treeCache: Record<string, TreeNode[]> = reactive({})
+// global reactive cache mapping connection id -> resource graph nodes
+const resourceGraphCache: Record<string, TreeNode[]> = reactive({})
 
 // schemaCache maps connection id -> tableName -> Schema object returned by plugin
 // TODO: persist these entries on disk (via the connection service or similar)
 // so that table information can survive restarts and be available offline.
 const schemaCache: Record<string, Record<string, TableSchema>> = reactive({})
 
-// map proto enum numbers to lowercase names; used both here and by the
-// ConnectionsPanel component.  Exported so tests can verify tagging logic.
+// Legacy numeric node types are still normalized defensively in case stale
+// cached payloads exist during development, but active plugins should emit
+// string `kind` values through `resource-graph`.
 export const NODE_TYPE_ENUM_MAP: Record<number, string> = {
   1: 'database',
   2: 'table',
@@ -140,18 +141,18 @@ function normalizeNodes(nodes: TreeNode[]): TreeNode[] {
 }
 
 /**
- * Composable providing access to cached connection trees and helpers
+ * Composable providing access to cached resource graphs and helpers
  * for client-side completion/lookups. When a `conn` object is supplied via
- * the optional ref, the tree will be loaded automatically.  Otherwise the
+ * the optional ref, the graph will be loaded automatically. Otherwise the
  * caller may manually invoke `load(conn)`.
  */
-export function useConnectionTree(connRef?: Ref<Connection | null>) {
+export function useResourceGraph(connRef?: Ref<Connection | null>) {
   const nodes = ref<TreeNode[]>([])
 
   // update whenever cache entry is modified or the connection changes
   const updateLocal = () => {
     const id = connRef?.value?.id
-    nodes.value = id ? treeCache[id] || [] : []
+    nodes.value = id ? resourceGraphCache[id] || [] : []
   }
 
   if (connRef) {
@@ -167,7 +168,7 @@ export function useConnectionTree(connRef?: Ref<Connection | null>) {
     if (!conn || !conn.id)
       return
     const id = conn.id
-    if (treeCache[id])
+    if (resourceGraphCache[id])
       return // already fetched
     try {
       const cred = await GetCredential(id)
@@ -175,7 +176,7 @@ export function useConnectionTree(connRef?: Ref<Connection | null>) {
       if (cred)
         params.credential_blob = cred
       const resp = await GetResourceGraph(conn.driver_type, params)
-      treeCache[id] = normalizeNodes((resp?.nodes ?? []).filter(n => n !== null) as unknown as TreeNode[])
+      resourceGraphCache[id] = normalizeNodes((resp?.nodes ?? []).filter(n => n !== null) as unknown as TreeNode[])
       // load schema info in parallel; ignore errors
       try {
         // @ts-expect-error: may be generated later
@@ -204,12 +205,12 @@ export function useConnectionTree(connRef?: Ref<Connection | null>) {
         schemaCache[id] = tableMap
       }
       catch (err) {
-        console.error('useConnectionTree.load schema error', id, err)
+        console.error('useResourceGraph.load schema error', id, err)
         schemaCache[id] = {}
       }
     }
     catch (err) {
-      console.error('useConnectionTree load', id, err)
+      console.error('useResourceGraph load', id, err)
       throw err
     }
     finally {
@@ -366,7 +367,7 @@ export function useConnectionTree(connRef?: Ref<Connection | null>) {
       }
     }
     catch (err) {
-      console.error('useConnectionTree.fetchSchema error', id, table, err)
+      console.error('useResourceGraph.fetchSchema error', id, table, err)
     }
   }
 
@@ -385,6 +386,6 @@ export function useConnectionTree(connRef?: Ref<Connection | null>) {
     getAllSchemas,
     fetchSchema,
     schemaCache,
-    cache: treeCache,
+    cache: resourceGraphCache,
   }
 }

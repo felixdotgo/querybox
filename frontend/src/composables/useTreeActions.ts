@@ -38,7 +38,7 @@ interface UseTreeActionsOptions {
   connecting: Ref<Record<string, boolean>>
   selectedConnection: Ref<Connection | null>
   pluginCaps: ComputedRef<Record<string, string[]>>
-  loadConnectionTree: (conn: Connection) => Promise<void>
+  loadResourceGraph: (conn: Connection) => Promise<void>
   emit: (event: string, ...args: unknown[]) => void
 }
 
@@ -51,7 +51,7 @@ export function useTreeActions({
   connecting,
   selectedConnection,
   pluginCaps,
-  loadConnectionTree,
+  loadResourceGraph,
   emit,
 }: UseTreeActionsOptions) {
   const dialog = useDialog()
@@ -71,7 +71,7 @@ export function useTreeActions({
     connecting.value[conn.id] = true
     loadingNodes.value[conn.id] = true
     try {
-      await loadConnectionTree(conn)
+      await loadResourceGraph(conn)
       if (!expandedKeys.value.includes(conn.id)) {
         expandedKeys.value = [...expandedKeys.value, conn.id]
       }

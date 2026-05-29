@@ -10,8 +10,8 @@ const props = defineProps({
     required: true,
   },
   /**
-   * Array of ConnectionTreeAction objects ({ type, title, query, hidden }) as
-   * returned by the plugin's ConnectionTree response.
+   * Array of resource action objects ({ type, title, query, hidden }) as
+   * returned by the plugin's resource graph response.
    */
   actions: {
     type: Array,

@@ -4,7 +4,7 @@ import { ListPlugins } from '@/bindings/github.com/felixdotgo/querybox/services/
 
 // shared reactive state; once initialized it stays in memory so every
 // caller gets the same live list and loading state.  This mirrors the
-// pattern used by useConnectionTree in the repo.
+// pattern used by useResourceGraph in the repo.
 const plugins = ref<any[]>([])
 const loading = ref(false)
 const error = ref('')

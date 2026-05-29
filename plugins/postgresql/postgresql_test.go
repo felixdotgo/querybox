@@ -174,7 +174,7 @@ func TestBuildConnStringDSNDatabaseOverride(t *testing.T) {
 }
 
 func TestBuildConnStringBlobDatabaseOverride(t *testing.T) {
-	// ConnectionTree injects connection["database"] = dbname when opening
+	// Resource graph browsing injects connection["database"] = dbname when opening
 	// each non-current database.  buildConnString must honour this override
 	// even when the credentials are carried in credential_blob (the common
 	// path for QueryBox connections).
@@ -613,7 +613,7 @@ func TestResourceGraphSchemaGroups(t *testing.T) {
 
 	// schema node should have no direct create-table action (moved to Tables group)
 	for _, a := range schemaNode.Actions {
-		if a.Kind == plugin.ConnectionTreeActionCreateTable {
+		if a.Kind == plugin.ResourceActionCreateTable {
 			t.Errorf("create-table action should be on Tables group, not schema node")
 		}
 	}
@@ -627,7 +627,7 @@ func TestResourceGraphSchemaGroups(t *testing.T) {
 	// Tables group should have create-table action
 	hasCreateTable := false
 	for _, a := range tablesGroup.Actions {
-		if a.Kind == plugin.ConnectionTreeActionCreateTable {
+		if a.Kind == plugin.ResourceActionCreateTable {
 			hasCreateTable = true
 		}
 	}

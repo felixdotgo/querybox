@@ -231,8 +231,8 @@ func (m *sqlitePlugin) ResourceGraph(ctx context.Context, req *plugin.ResourceGr
 			Kind: "table",
 			Path: tbl,
 			Actions: []*plugin.ResourceAction{
-				{ID: plugin.ConnectionTreeActionSelect, Kind: plugin.ConnectionTreeActionSelect, Title: "Select rows", Query: fmt.Sprintf(`SELECT * FROM "%s"`, tbl), NewTab: true},
-				{ID: plugin.ConnectionTreeActionDropTable, Kind: plugin.ConnectionTreeActionDropTable, Title: "Drop table", Query: fmt.Sprintf(`DROP TABLE "%s";`, tbl)},
+				{ID: plugin.ResourceActionSelect, Kind: plugin.ResourceActionSelect, Title: "Select rows", Query: fmt.Sprintf(`SELECT * FROM "%s"`, tbl), NewTab: true},
+				{ID: plugin.ResourceActionDropTable, Kind: plugin.ResourceActionDropTable, Title: "Drop table", Query: fmt.Sprintf(`DROP TABLE "%s";`, tbl)},
 			},
 		})
 	}
@@ -244,8 +244,8 @@ func (m *sqlitePlugin) ResourceGraph(ctx context.Context, req *plugin.ResourceGr
 		Path: "__create_table__",
 		Actions: []*plugin.ResourceAction{
 			{
-				ID:    plugin.ConnectionTreeActionCreateTable,
-				Kind:  plugin.ConnectionTreeActionCreateTable,
+				ID:    plugin.ResourceActionCreateTable,
+				Kind:  plugin.ResourceActionCreateTable,
 				Title: "Create table",
 				Query: "CREATE TABLE \"new_table\" (\n    \"id\" INTEGER PRIMARY KEY AUTOINCREMENT\n);",
 			},

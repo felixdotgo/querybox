@@ -85,16 +85,6 @@ type AuthForm = pluginpb.PluginV1_AuthForm
 type AuthFormsRequest = pluginpb.PluginV1_AuthFormsRequest
 type AuthFormsResponse = pluginpb.PluginV1_AuthFormsResponse
 
-// Connection‑tree aliases
-// these correspond to the `ConnectionTree` RPC introduced for browsing a
-// connection.  Each driver may return its own structure; the core simply
-// renders the nodes and forwards any action queries back to the plugin.
-
-type ConnectionTreeRequest = pluginpb.PluginV1_ConnectionTreeRequest
-type ConnectionTreeResponse = pluginpb.PluginV1_ConnectionTreeResponse
-type ConnectionTreeNode = pluginpb.PluginV1_ConnectionTreeNode
-type ConnectionTreeAction = pluginpb.PluginV1_ConnectionTreeAction
-
 // Schema descriptions – returned by the DescribeSchema RPC.
 type DescribeSchemaRequest = pluginpb.PluginV1_DescribeSchemaRequest
 type DescribeSchemaResponse = pluginpb.PluginV1_DescribeSchemaResponse
@@ -119,29 +109,6 @@ const (
 	AuthFieldSelect   = pluginpb.PluginV1_AuthField_SELECT
 	AuthFieldCheckbox = pluginpb.PluginV1_AuthField_CHECKBOX
 	AuthFieldFilePath = pluginpb.PluginV1_AuthField_FILE_PATH
-
-	// common action types for ConnectionTree nodes.  Plugins should use
-	// these constants rather than hardcoding strings to avoid typos and to
-	// document the set of recognised actions.
-	ConnectionTreeActionSelect   = "select"
-	ConnectionTreeActionDescribe = "describe"
-
-	// DDL action types – rendered as context-menu items on database/table nodes.
-	ConnectionTreeActionCreateDatabase = "create-database"
-	ConnectionTreeActionDropDatabase   = "drop-database"
-	ConnectionTreeActionCreateTable    = "create-table"
-	ConnectionTreeActionDropTable      = "drop-table"
-
-	// Common node types for ConnectionTree.  The core uses these to determine
-	ConnectionTreeNodeTypeDatabase   = pluginpb.PluginV1_NODE_TYPE_DATABASE
-	ConnectionTreeNodeTypeTable      = pluginpb.PluginV1_NODE_TYPE_TABLE
-	ConnectionTreeNodeTypeColumn     = pluginpb.PluginV1_NODE_TYPE_COLUMN
-	ConnectionTreeNodeTypeSchema     = pluginpb.PluginV1_NODE_TYPE_SCHEMA
-	ConnectionTreeNodeTypeView       = pluginpb.PluginV1_NODE_TYPE_VIEW
-	ConnectionTreeNodeTypeAction     = pluginpb.PluginV1_NODE_TYPE_ACTION
-	ConnectionTreeNodeTypeCollection = pluginpb.PluginV1_NODE_TYPE_COLLECTION
-	ConnectionTreeNodeTypeKey        = pluginpb.PluginV1_NODE_TYPE_KEY
-	ConnectionTreeNodeTypeGroup      = pluginpb.PluginV1_NODE_TYPE_GROUP // category grouping folder
 )
 
 // Historically this package exported a custom `Plugin` interface, but the

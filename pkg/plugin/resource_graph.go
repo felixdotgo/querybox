@@ -2,6 +2,25 @@ package plugin
 
 import "context"
 
+const (
+	ResourceActionSelect         = "select"
+	ResourceActionDescribe       = "describe"
+	ResourceActionCreateDatabase = "create-database"
+	ResourceActionDropDatabase   = "drop-database"
+	ResourceActionCreateTable    = "create-table"
+	ResourceActionDropTable      = "drop-table"
+
+	ResourceKindDatabase   = "database"
+	ResourceKindTable      = "table"
+	ResourceKindColumn     = "column"
+	ResourceKindSchema     = "schema"
+	ResourceKindView       = "view"
+	ResourceKindAction     = "action"
+	ResourceKindCollection = "collection"
+	ResourceKindKey        = "key"
+	ResourceKindGroup      = "group"
+)
+
 type ResourceGraphRequest struct {
 	Connection map[string]string `json:"connection,omitempty"`
 	ResourceID string            `json:"resource_id,omitempty"`

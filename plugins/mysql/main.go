@@ -395,8 +395,8 @@ func (m *mysqlPlugin) ResourceGraph(ctx context.Context, req *plugin.ResourceGra
 						Kind: "table",
 						Path: dbname + "." + tbl,
 						Actions: []*plugin.ResourceAction{
-							{ID: plugin.ConnectionTreeActionSelect, Kind: plugin.ConnectionTreeActionSelect, Title: "Select rows", Query: fmt.Sprintf("SELECT * FROM `%s` LIMIT 100;", tbl), NewTab: true},
-							{ID: plugin.ConnectionTreeActionDropTable, Kind: plugin.ConnectionTreeActionDropTable, Title: "Drop table", Query: fmt.Sprintf("DROP TABLE `%s`;", tbl)},
+							{ID: plugin.ResourceActionSelect, Kind: plugin.ResourceActionSelect, Title: "Select rows", Query: fmt.Sprintf("SELECT * FROM `%s` LIMIT 100;", tbl), NewTab: true},
+							{ID: plugin.ResourceActionDropTable, Kind: plugin.ResourceActionDropTable, Title: "Drop table", Query: fmt.Sprintf("DROP TABLE `%s`;", tbl)},
 						},
 					})
 				}
@@ -410,8 +410,8 @@ func (m *mysqlPlugin) ResourceGraph(ctx context.Context, req *plugin.ResourceGra
 			Path:     dbname,
 			Children: tables,
 			Actions: []*plugin.ResourceAction{
-				{ID: plugin.ConnectionTreeActionCreateTable, Kind: plugin.ConnectionTreeActionCreateTable, Title: "Create table", Query: "CREATE TABLE `new_table` (\n  `id` INT NOT NULL AUTO_INCREMENT,\n  PRIMARY KEY (`id`)\n);"},
-				{ID: plugin.ConnectionTreeActionDropDatabase, Kind: plugin.ConnectionTreeActionDropDatabase, Title: "Drop database", Query: fmt.Sprintf("DROP DATABASE `%s`;", dbname)},
+				{ID: plugin.ResourceActionCreateTable, Kind: plugin.ResourceActionCreateTable, Title: "Create table", Query: "CREATE TABLE `new_table` (\n  `id` INT NOT NULL AUTO_INCREMENT,\n  PRIMARY KEY (`id`)\n);"},
+				{ID: plugin.ResourceActionDropDatabase, Kind: plugin.ResourceActionDropDatabase, Title: "Drop database", Query: fmt.Sprintf("DROP DATABASE `%s`;", dbname)},
 			},
 		})
 	}
@@ -422,7 +422,7 @@ func (m *mysqlPlugin) ResourceGraph(ctx context.Context, req *plugin.ResourceGra
 		Kind: "action",
 		Path: "__create_database__",
 		Actions: []*plugin.ResourceAction{
-			{ID: plugin.ConnectionTreeActionCreateDatabase, Kind: plugin.ConnectionTreeActionCreateDatabase, Title: "Create database", Query: "CREATE DATABASE `new_database`;"},
+			{ID: plugin.ResourceActionCreateDatabase, Kind: plugin.ResourceActionCreateDatabase, Title: "Create database", Query: "CREATE DATABASE `new_database`;"},
 		},
 	}
 

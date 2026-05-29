@@ -142,7 +142,7 @@ func setSSLMode(dsn, mode string) string {
 // format is NOT used because it is invalid for the postgres DSN format.
 //
 // Historically we ignored the "database" field when a raw DSN was present.
-// that meant that ConnectionTree created new connections for each database but
+// That meant resource-graph browsing created new connections for each database but
 // the DSN still pointed at the original database.  The symptom was that all
 // databases in the tree showed the same schemas/tables.  This helper now
 // overrides the DSN if a database override is supplied.
@@ -638,15 +638,15 @@ ORDER BY c.relname`, schemaName); err == nil {
 							Path: schemaName + "." + tbl,
 							Actions: []*plugin.ResourceAction{
 								{
-									ID:     plugin.ConnectionTreeActionSelect,
-									Kind:   plugin.ConnectionTreeActionSelect,
+									ID:     plugin.ResourceActionSelect,
+									Kind:   plugin.ResourceActionSelect,
 									Title:  "Select rows",
 									Query:  fmt.Sprintf(`SELECT * FROM "%s"."%s" LIMIT 100;`, schemaName, tbl),
 									NewTab: true,
 								},
 								{
-									ID:    plugin.ConnectionTreeActionDropTable,
-									Kind:  plugin.ConnectionTreeActionDropTable,
+									ID:    plugin.ResourceActionDropTable,
+									Kind:  plugin.ResourceActionDropTable,
 									Title: "Drop table",
 									Query: fmt.Sprintf(`DROP TABLE "%s"."%s";`, schemaName, tbl),
 								},
@@ -666,8 +666,8 @@ ORDER BY c.relname`, schemaName); err == nil {
 					Children: tableNodes,
 					Actions: []*plugin.ResourceAction{
 						{
-							ID:    plugin.ConnectionTreeActionCreateTable,
-							Kind:  plugin.ConnectionTreeActionCreateTable,
+							ID:    plugin.ResourceActionCreateTable,
+							Kind:  plugin.ResourceActionCreateTable,
 							Title: "Create table",
 							Query: fmt.Sprintf("CREATE TABLE \"%s\".\"new_table\" (\n    id SERIAL PRIMARY KEY\n);", schemaName),
 						},
@@ -712,8 +712,8 @@ ORDER BY c.relname`, schemaName); err == nil {
 			Children: schemas,
 			Actions: []*plugin.ResourceAction{
 				{
-					ID:    plugin.ConnectionTreeActionDropDatabase,
-					Kind:  plugin.ConnectionTreeActionDropDatabase,
+					ID:    plugin.ResourceActionDropDatabase,
+					Kind:  plugin.ResourceActionDropDatabase,
 					Title: "Drop database",
 					Query: fmt.Sprintf(`DROP DATABASE "%s";`, dbname),
 				},
@@ -728,8 +728,8 @@ ORDER BY c.relname`, schemaName); err == nil {
 		Path: "__create_database__",
 		Actions: []*plugin.ResourceAction{
 			{
-				ID:    plugin.ConnectionTreeActionCreateDatabase,
-				Kind:  plugin.ConnectionTreeActionCreateDatabase,
+				ID:    plugin.ResourceActionCreateDatabase,
+				Kind:  plugin.ResourceActionCreateDatabase,
 				Title: "Create database",
 				Query: `CREATE DATABASE "new_database";`,
 			},

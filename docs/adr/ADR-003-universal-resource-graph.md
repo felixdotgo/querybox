@@ -20,10 +20,10 @@ The host-side model contains:
 - `ResourceNode` with `id`, `name`, `kind`, `path`, `actions`, `children`, and `metadata`
 - `ResourceAction` with `id`, `kind`, `title`, `query`, `new_tab`, `fields`, and `metadata`
 
-The host now treats `resource.graph` as the only browse contract for bundled plugins. Compatibility adapters from `connection-tree` are no longer part of the runtime path.
+The host now treats `resource.graph` as the only browse contract for bundled plugins and shared plugin authoring.
 
 ## Consequences
 
 - Frontend explorer logic should prefer `kind`, `actions`, and `metadata` instead of hardcoded database nouns.
 - New plugins can implement `resource.graph` directly without inheriting legacy tree constraints.
-- Bundled plugins now emit `resource.graph` directly. Remaining `connection-tree` compatibility is limited to shared CLI/proto surfaces for external legacy plugins and should not be reintroduced into active browse paths.
+- Bundled plugins now emit `resource.graph` directly, and the shared SDK/proto surface no longer exports `connection-tree`.

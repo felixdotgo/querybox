@@ -52,7 +52,7 @@ export interface PluginInfo {
   lastError?: string
 }
 
-/** A single action exposed by a connection tree node. */
+/** A single action exposed by a resource graph node. */
 export interface ResourceAction {
   id?: string
   kind?: string
@@ -64,7 +64,7 @@ export interface ResourceAction {
   fields?: ResourceActionField[]
 }
 
-/** An input field definition for tree actions that require user input. */
+/** An input field definition for resource actions that require user input. */
 export interface ResourceActionField {
   name: string
   label?: string
@@ -72,7 +72,7 @@ export interface ResourceActionField {
   required?: boolean
 }
 
-/** A node in the hierarchical connection tree returned by plugins. */
+/** A node in the hierarchical resource graph returned by plugins. */
 export interface ResourceNode {
   id?: string
   name?: string

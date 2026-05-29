@@ -2,7 +2,7 @@ import type { Ref } from 'vue'
 import { computed, ref } from 'vue'
 import { GetCredential } from '@/bindings/github.com/felixdotgo/querybox/services/connectionservice'
 import { GetCompletionFields } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
-import { useConnectionTree } from '@/composables/useConnectionTree'
+import { useResourceGraph } from '@/composables/useResourceGraph'
 
 // Module-level cache: connId:collection -> FieldInfo[] so results survive
 // tab switches and aren't refetched for every editor keystroke.
@@ -11,7 +11,7 @@ const completionFieldsCache = new Map<string, Array<{ name: string, type: string
 /**
  * Per-tab completion data composable.
  *
- * Wraps `useConnectionTree` and adds:
+ * Wraps `useResourceGraph` and adds:
  *  - `getCompletionFields(collection)` for schemaless DBs
  *  - `primaryTable` — inferred from the active tab's selected node
  *  - smart-ranked suggestion helpers
@@ -19,7 +19,7 @@ const completionFieldsCache = new Map<string, Array<{ name: string, type: string
  * @param {import('vue').Ref} tabRef - reactive reference to the current tab object
  */
 export function useTabCompletion(tabRef: Ref<any>) {
-  const { nodes, load, getTableNames, getColumns, getColumnDetails, getSchema, getAllSchemas } = useConnectionTree()
+  const { nodes, load, getTableNames, getColumns, getColumnDetails, getSchema, getAllSchemas } = useResourceGraph()
 
   // Lazily-fetched sampled fields, keyed by collection name
   const completionFieldsLoading = ref(false)
@@ -156,7 +156,7 @@ export function useTabCompletion(tabRef: Ref<any>) {
   }
 
   return {
-    // Re-exports from useConnectionTree
+    // Re-exports from useResourceGraph
     nodes,
     load,
     getTableNames,

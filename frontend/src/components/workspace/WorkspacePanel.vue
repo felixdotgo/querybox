@@ -2,7 +2,7 @@
 import { NButton, NIcon, useNotification } from 'naive-ui'
 import { onMounted, ref, toRef, watch } from 'vue'
 import { ResultViewer } from '@/components/results'
-import { useConnectionTree } from '@/composables/useConnectionTree'
+import { useResourceGraph } from '@/composables/useResourceGraph'
 import { Analytics, Play } from '@/lib/icons'
 import { extractDatabase, extractTableName } from '@/lib/nodeKey'
 import QueryEditor from './QueryEditor.vue'
@@ -17,7 +17,7 @@ const emit = defineEmits(['tab-closed', 'active-connection-changed', 'refresh-ta
 
 // allow lookup of cached schemas; provide selectedConnection ref so
 // schema-related helpers know which connection to query.
-const { getSchema, fetchSchema } = useConnectionTree(toRef(props, 'selectedConnection'))
+const { getSchema, fetchSchema } = useResourceGraph(toRef(props, 'selectedConnection'))
 const notification = useNotification()
 
 function getSchemaForTab(tab) {

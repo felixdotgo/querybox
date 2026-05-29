@@ -154,7 +154,7 @@ rendering should prefer `kind`, `actions`, and `metadata`.
 
 On the frontend, the explorer now fetches browse data through
 `PluginManager.GetResourceGraph` and normalizes the returned `ResourceNode`
-objects in `useConnectionTree.ts`.
+objects in `useResourceGraph.ts`.
 
 ## Mutate‑Row Capability
 

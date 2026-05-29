@@ -4,14 +4,14 @@ import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   ShowConnectionsWindow,
+  ShowEditConnectionWindow,
 } from '@/bindings/github.com/felixdotgo/querybox/services/app'
-import { tagWithConnId, useConnectionTree } from '@/composables/useConnectionTree'
 import { useConnectionEvents } from '@/composables/useConnectionEvents'
-import { useTreeRenderers } from '@/composables/useTreeRenderers'
-import { useTreeActions } from '@/composables/useTreeActions'
 import { usePlugins } from '@/composables/usePlugins'
+import { tagWithConnId, useResourceGraph } from '@/composables/useResourceGraph'
+import { useTreeActions } from '@/composables/useTreeActions'
+import { useTreeRenderers } from '@/composables/useTreeRenderers'
 import { AddCircle, Search } from '@/lib/icons'
-import { ShowEditConnectionWindow } from '@/bindings/github.com/felixdotgo/querybox/services/app'
 import ActionFormModal from './ActionFormModal.vue'
 
 const props = defineProps({
@@ -62,7 +62,7 @@ const pluginMap = computed(() => {
 const loadingNodes = ref({})
 const connecting = ref({})
 const filter = ref('')
-const { cache: connectionTrees, load: loadConnectionTree, schemaCache } = useConnectionTree()
+const { cache: connectionTrees, load: loadResourceGraph, schemaCache } = useResourceGraph()
 const selectedConnection = ref(null)
 const expandedKeys = ref([])
 
@@ -97,7 +97,7 @@ const {
   connecting,
   selectedConnection,
   pluginCaps,
-  loadConnectionTree,
+  loadResourceGraph,
   emit,
 })
 

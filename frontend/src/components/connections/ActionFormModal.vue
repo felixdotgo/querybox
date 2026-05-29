@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
-  /** ConnectionTreeAction object: { type, title, query } */
+  /** Resource action object: { type, title, query } */
   action: { type: Object, default: null },
 })
 

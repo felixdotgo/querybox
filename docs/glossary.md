@@ -20,7 +20,7 @@
 | **RuntimeManager** | Execution facade that chooses how a plugin runs. Phase 1 ships only `LocalPluginHost`, but the abstraction is intended to support future remote or sandboxed runtimes. |
 | **Plugin SDK** | `pkg/plugin` — minimal Go package providing `ServeCLI` helper and protobuf type aliases for plugin authors. |
 | **Protobuf Contract** | Canonical API at `contracts/plugin/v1/plugin.proto` (generated Go package: `rpc/contracts/plugin/v1`, package `pluginpb`). |
-| **Resource Graph** | The runtime-neutral browse model returned by `resource-graph`. It generalizes the database-specific `connection-tree` into plugin-defined resources, relationships, actions, and metadata. |
+| **Resource Graph** | The runtime-neutral browse model returned by `resource-graph`. It replaces the earlier database-specific tree contract with plugin-defined resources, relationships, actions, and metadata. |
 | **Resource Action** | A user-triggered operation attached to a resource or workspace context, such as inspect, query, open, export, or stream. |
 | **Results / Streams** | Output surfaces for actions. Bounded responses render as results; unbounded or long-lived outputs render as streams. |
 | **Rescan** | Immediate synchronous plugin discovery triggered manually via `PluginManager.Rescan()` or the Rescan button in the Plugins window. Discovery also runs asynchronously once at application startup. Plugin binary changes require a restart or manual Rescan to take effect. |
