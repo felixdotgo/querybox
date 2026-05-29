@@ -1,11 +1,12 @@
 <script setup>
-import { NButton, NIcon, NSpin, NTag } from 'naive-ui'
+import { NButton, NIcon, NInput, NInputNumber, NSpin, NSwitch, NTag } from 'naive-ui'
 import { computed, onBeforeUnmount, onMounted, ref, toRef, watch } from 'vue'
 import { GetCredential } from '@/bindings/github.com/felixdotgo/querybox/services/connectionservice'
 import { ExecPlugin } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
 import { useResultSort } from '@/composables/useResultSort'
 import { useRowEditorModal } from '@/composables/useRowEditorModal'
 import { getDataTypeColor, Key, Pencil, Pin, Trash } from '@/lib/icons'
+import { buildEditorFieldsFromSchema, coerceEditorValue, getEditorField, isJsonEditorField } from '@/lib/rowEditor'
 import RowEditorModal from './RowEditorModal.vue'
 
 const props = defineProps({
@@ -19,8 +20,6 @@ const props = defineProps({
 
 const emit = defineEmits(['mutated'])
 
-// ─── sort ───────────────────────────────────────────────────────────────────
-
 const { sortStates, isSorting, sortedPayload, handleSorterChange, resetSort } = useResultSort({
   query: toRef(props, 'query'),
   connection: toRef(props, 'connection'),
@@ -28,8 +27,6 @@ const { sortStates, isSorting, sortedPayload, handleSorterChange, resetSort } = 
 })
 
 watch(() => props.payload, resetSort)
-
-// ─── capabilities ────────────────────────────────────────────────────────────
 
 const showActions = computed(() => props.capabilities.includes('mutate-row'))
 const showEdit = computed(() => {
@@ -45,11 +42,8 @@ const showDelete = computed(() => {
   return !hasSub || props.capabilities.includes('mutate-row::delete')
 })
 
-// ─── column definitions ──────────────────────────────────────────────────────
-
 const COL_MIN_WIDTH = 120
 const COL_CHAR_WIDTH = 9
-// Extra space in header cell: pin button (20) + sort indicator (14) + padding (16) + buffer (8)
 const COL_HEADER_BASE_EXTRA = 58
 
 const pinnedColumns = ref([])
@@ -82,7 +76,6 @@ const tableColumns = computed(() => {
         isPK = true
     }
 
-    // Width must accommodate: name text + type badge + PK icon + sort indicator + pin + padding
     const typeExtra = typeString ? Math.max(50, typeString.length * 7 + 20) : 0
     const pkExtra = isPK ? 16 : 0
     const headerExtra = COL_HEADER_BASE_EXTRA + typeExtra + pkExtra
@@ -109,14 +102,9 @@ const totalWidth = computed(() =>
   tableColumns.value.reduce((s, c) => s + c.width, 0),
 )
 
-// Single grid-template string used by header + every data row via a CSS
-// custom property on a shared parent. Computed once per column change, so
-// rows do not produce new style objects during scroll.
 const gridTemplate = computed(() =>
   tableColumns.value.map(c => `${c.width}px`).join(' '),
 )
-
-// ─── row data ────────────────────────────────────────────────────────────────
 
 const rowOverrides = ref(new Map())
 
@@ -151,8 +139,6 @@ const tableData = computed(() => {
   })
 })
 
-// ─── virtual scroll ──────────────────────────────────────────────────────────
-
 const ROW_HEIGHT = 33
 const BUFFER_ROWS = 5
 
@@ -169,11 +155,8 @@ const endIndex = computed(() =>
 const renderedRows = computed(() => tableData.value.slice(startIndex.value, endIndex.value))
 const totalHeight = computed(() => tableData.value.length * ROW_HEIGHT)
 const offsetY = computed(() => startIndex.value * ROW_HEIGHT)
-// Visual offset for the fixed Actions panel (not inside the scroll container)
 const actionsOffsetY = computed(() => offsetY.value - scrollTop.value)
 
-// rAF-coalesce scroll updates so reactive recompute runs at most once per frame.
-// Without this, fast wheel events trigger dozens of recomputes per frame.
 let scrollRaf = 0
 function onScroll() {
   if (scrollRaf)
@@ -201,15 +184,11 @@ onBeforeUnmount(() => {
     cancelAnimationFrame(scrollRaf)
 })
 
-// ─── column sort ─────────────────────────────────────────────────────────────
-
 function handleColumnSort(col) {
   const current = col.sortOrder
   const order = current === false ? 'ascend' : current === 'ascend' ? 'descend' : false
   handleSorterChange({ columnKey: col.key, order, sorter: () => 0 })
 }
-
-// ─── row mutations ────────────────────────────────────────────────────────────
 
 function escapeSqlValue(val) {
   if (val === null || val === undefined)
@@ -252,19 +231,91 @@ function namedRow(row) {
   return rest
 }
 
-const { showEditor, editorOperation, editorRow, editorFilter, editorSource, openEditor, closeEditor, performMutation } = useRowEditorModal()
+const schemaColumns = computed(() => Array.isArray(props.schema?.columns) ? props.schema.columns : [])
+
+function buildRowFields(row) {
+  return buildEditorFieldsFromSchema(row, schemaColumns.value)
+}
+
+function getFieldForCell(row, key) {
+  return getEditorField(buildRowFields(namedRow(row)), key)
+}
+
+function normalizeDraft(rowValues) {
+  const draft = { ...rowValues }
+  buildRowFields(rowValues).forEach((field) => {
+    draft[field.key] = coerceEditorValue(field, draft[field.key])
+  })
+  return draft
+}
+
+function formatCellValue(value) {
+  if (value === null || value === undefined)
+    return ''
+  if (typeof value === 'object')
+    return JSON.stringify(value)
+  return String(value)
+}
+
+const { showEditor, editorOperation, editorRow, editorFilter, editorSource, editorFields, editorFocusField, openEditor, closeEditor, performMutation } = useRowEditorModal()
 const editorRowKey = ref(null)
+const editingRowKey = ref(null)
+const inlineDraftValues = ref({})
+const inlineOriginalFilter = ref('')
+
+function resetInlineEdit() {
+  editingRowKey.value = null
+  inlineDraftValues.value = {}
+  inlineOriginalFilter.value = ''
+}
+
+function beginInlineEdit(row) {
+  const named = namedRow(row)
+  editingRowKey.value = row.key
+  inlineDraftValues.value = normalizeDraft(named)
+  inlineOriginalFilter.value = pkFilterFor(named)
+}
+
+function openTypedEditor(row, focusField = '') {
+  const named = editingRowKey.value === row.key && Object.keys(inlineDraftValues.value).length > 0
+    ? { ...inlineDraftValues.value }
+    : normalizeDraft(namedRow(row))
+  editorRowKey.value = row.key
+  openEditor('update', named, sourceFrom(), pkFilterFor(namedRow(row)), buildRowFields(named), focusField)
+}
 
 function handleEdit(row) {
-  const named = namedRow(row)
-  editorRowKey.value = row.key
-  openEditor('update', named, sourceFrom(), pkFilterFor(named))
+  openTypedEditor(row)
 }
 
 function handleDelete(row) {
   const named = namedRow(row)
   editorRowKey.value = row.key
-  openEditor('delete', named, sourceFrom(), pkFilterFor(named))
+  openEditor('delete', named, sourceFrom(), pkFilterFor(named), buildRowFields(named))
+}
+
+function handleCellDoubleClick(row, columnKey) {
+  if (!showEdit.value)
+    return
+  const field = getFieldForCell(row, columnKey)
+  if (isJsonEditorField(field)) {
+    openTypedEditor(row, columnKey)
+    return
+  }
+  beginInlineEdit(row)
+}
+
+function saveInlineEdit() {
+  if (editingRowKey.value === null)
+    return
+  const capturedRowKey = editingRowKey.value
+  const params = {
+    operation: 'update',
+    source: sourceFrom(),
+    values: { ...inlineDraftValues.value },
+    filter: inlineOriginalFilter.value,
+  }
+  handleMutation(params, capturedRowKey)
 }
 
 async function refreshRow(rowKey, source, filter) {
@@ -294,22 +345,28 @@ async function refreshRow(rowKey, source, filter) {
     freshVals.forEach((v, i) => { patch[schemaCols[i]?.name ?? `col${i}`] = v })
     rowOverrides.value = new Map(rowOverrides.value).set(rowKey, patch)
   }
-  catch { emit('mutated') }
+  catch {
+    emit('mutated')
+  }
 }
 
-async function handleMutation(params) {
-  const capturedRowKey = editorRowKey.value
+async function handleMutation(params, forcedRowKey = null) {
+  const capturedRowKey = forcedRowKey ?? editorRowKey.value
   await performMutation(props.connection, params, props.database, ({ operation, source, filter } = {}) => {
+    resetInlineEdit()
     if (operation === 'delete')
       emit('mutated')
     else refreshRow(capturedRowKey, source, filter)
   })
 }
+
+function isEditingRow(row) {
+  return editingRowKey.value === row.key
+}
 </script>
 
 <template>
   <div class="relative flex h-full w-full overflow-hidden">
-    <!-- Sorting overlay -->
     <div
       v-if="isSorting"
       class="absolute inset-0 z-20 flex items-center justify-center gap-2 bg-white/70"
@@ -318,14 +375,12 @@ async function handleMutation(params) {
       <span class="text-sm text-gray-500">Sorting...</span>
     </div>
 
-    <!-- Scrollable data area -->
     <div
       ref="bodyRef"
       class="min-h-0 flex-1 overflow-auto pb-10"
       @scroll.passive="onScroll"
     >
       <div :style="{ 'minWidth': `${totalWidth}px`, '--grid-cols': gridTemplate, '--row-h': `${ROW_HEIGHT}px` }">
-        <!-- Sticky header -->
         <div class="header-row sticky top-0 z-10 border-b border-gray-200 bg-slate-50 text-xs font-semibold text-gray-600">
           <div
             v-for="col in tableColumns"
@@ -363,13 +418,11 @@ async function handleMutation(params) {
           </div>
         </div>
 
-        <!-- Virtual scroll body -->
         <div :style="{ height: `${totalHeight}px`, position: 'relative' }">
           <div :style="{ transform: `translateY(${offsetY}px)` }">
             <div
               v-for="row in renderedRows"
               :key="row.key"
-              v-memo="[row, tableColumns]"
               class="data-row border-b border-gray-100 hover:bg-blue-50/40"
               :class="row.key % 2 === 1 ? 'bg-gray-50/60' : 'bg-white'"
             >
@@ -377,9 +430,34 @@ async function handleMutation(params) {
                 v-for="col in tableColumns"
                 :key="col.key"
                 class="flex items-center overflow-hidden border-r border-gray-100 px-2 text-xs"
-                :title="String(row[col.key] ?? '')"
+                :title="formatCellValue(row[col.key])"
+                @dblclick.stop="handleCellDoubleClick(row, col.key)"
               >
-                <span class="truncate">{{ row[col.key] ?? '' }}</span>
+                <NInputNumber
+                  v-if="isEditingRow(row) && getFieldForCell(row, col.key)?.kind === 'number'"
+                  v-model:value="inlineDraftValues[col.key]"
+                  class="w-full"
+                  size="small"
+                  :step="getFieldForCell(row, col.key)?.numericMode === 'integer' ? 1 : 0.1"
+                  :precision="getFieldForCell(row, col.key)?.numericMode === 'integer' ? 0 : undefined"
+                />
+                <NSwitch
+                  v-else-if="isEditingRow(row) && getFieldForCell(row, col.key)?.kind === 'boolean'"
+                  v-model:value="inlineDraftValues[col.key]"
+                  size="small"
+                />
+                <div v-else-if="isEditingRow(row) && getFieldForCell(row, col.key)?.kind === 'json'" class="flex w-full items-center justify-between gap-2">
+                  <span class="truncate text-gray-500">JSON value</span>
+                  <NButton size="tiny" secondary @click.stop="openTypedEditor(row, col.key)">
+                    Edit JSON
+                  </NButton>
+                </div>
+                <NInput
+                  v-else-if="isEditingRow(row)"
+                  v-model:value="inlineDraftValues[col.key]"
+                  size="small"
+                />
+                <span v-else class="truncate">{{ formatCellValue(row[col.key]) }}</span>
               </div>
             </div>
           </div>
@@ -387,52 +465,58 @@ async function handleMutation(params) {
       </div>
     </div>
 
-    <!-- Fixed Actions panel (pinned to the right, outside scroll area) -->
     <div
       v-if="showActions"
-      class="flex w-[100px] shrink-0 flex-col border-l border-gray-200"
+      class="flex w-[132px] shrink-0 flex-col border-l border-gray-200"
     >
-      <!-- Header — height must match data header h-8 (32px) -->
       <div class="flex h-8 shrink-0 items-center justify-center border-b border-gray-200 bg-slate-50 text-xs font-semibold text-gray-600">
         Actions
       </div>
-      <!-- Body — clips overflow, rows positioned by visual offset (offsetY - scrollTop) -->
       <div class="relative flex-1 overflow-hidden">
         <div :style="{ transform: `translateY(${actionsOffsetY}px)` }">
           <div
             v-for="row in renderedRows"
             :key="row.key"
-            v-memo="[row, showEdit, showDelete]"
             class="flex items-center justify-center gap-1 border-b border-gray-100"
             :class="row.key % 2 === 1 ? 'bg-gray-50/60' : 'bg-white'"
             :style="{ height: `${ROW_HEIGHT}px` }"
           >
-            <NButton
-              v-if="showEdit"
-              tertiary
-              size="small"
-              title="Edit row"
-              @click="handleEdit(row)"
-            >
-              <template #icon>
-                <NIcon :size="14">
-                  <Pencil />
-                </NIcon>
-              </template>
-            </NButton>
-            <NButton
-              v-if="showDelete"
-              tertiary
-              size="small"
-              title="Delete row"
-              @click="handleDelete(row)"
-            >
-              <template #icon>
-                <NIcon :size="14">
-                  <Trash />
-                </NIcon>
-              </template>
-            </NButton>
+            <template v-if="isEditingRow(row)">
+              <NButton tertiary size="small" type="primary" @click="saveInlineEdit">
+                Save
+              </NButton>
+              <NButton tertiary size="small" @click="resetInlineEdit">
+                Cancel
+              </NButton>
+            </template>
+            <template v-else>
+              <NButton
+                v-if="showEdit"
+                tertiary
+                size="small"
+                title="Edit row"
+                @click="handleEdit(row)"
+              >
+                <template #icon>
+                  <NIcon :size="14">
+                    <Pencil />
+                  </NIcon>
+                </template>
+              </NButton>
+              <NButton
+                v-if="showDelete"
+                tertiary
+                size="small"
+                title="Delete row"
+                @click="handleDelete(row)"
+              >
+                <template #icon>
+                  <NIcon :size="14">
+                    <Trash />
+                  </NIcon>
+                </template>
+              </NButton>
+            </template>
           </div>
         </div>
       </div>
@@ -442,6 +526,8 @@ async function handleMutation(params) {
       v-model:show="showEditor"
       :operation="editorOperation"
       :row="editorRow"
+      :fields="editorFields"
+      :focus-field="editorFocusField"
       :filter="editorFilter"
       :source="editorSource"
       @submit="handleMutation"

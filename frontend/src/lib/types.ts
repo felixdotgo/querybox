@@ -231,8 +231,21 @@ export interface SavedCredential {
 export interface MutationParams {
   operation: string
   source: string
-  values?: Record<string, string>
+  values?: Record<string, unknown>
   filter: string
+}
+
+export type EditorFieldKind = 'text' | 'textarea' | 'number' | 'boolean' | 'json'
+
+export interface EditorFieldDescriptor {
+  key: string
+  label?: string
+  kind: EditorFieldKind
+  nullable?: boolean
+  rawType?: string
+  numericMode?: 'integer' | 'decimal'
+  serializeJsonAsString?: boolean
+  value: unknown
 }
 
 /** Backend event names — mirrors services/events.go constants. */

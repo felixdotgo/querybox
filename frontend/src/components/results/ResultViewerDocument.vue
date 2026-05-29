@@ -3,6 +3,7 @@ import { NButton, NIcon } from 'naive-ui'
 import { computed } from 'vue'
 import { useRowEditorModal } from '@/composables/useRowEditorModal'
 import { Pencil, Trash } from '@/lib/icons'
+import { buildEditorFieldsFromValue } from '@/lib/rowEditor'
 import JsonNode from './JsonNode.vue'
 import RowEditorModal from './RowEditorModal.vue'
 
@@ -47,6 +48,8 @@ const {
   editorRow: editorDoc,
   editorFilter,
   editorSource,
+  editorFields,
+  editorFocusField,
   openEditor,
   closeEditor,
   performMutation,
@@ -79,14 +82,14 @@ const docs = computed(() => {
         class="doc-row"
       >
         <div v-if="showEdit || showDelete" class="flex justify-end gap-2 mb-1">
-          <NButton v-if="showEdit" size="small" tertiary title="Edit document" @click.stop.prevent="openEditor('update', doc)">
+          <NButton v-if="showEdit" size="small" tertiary title="Edit document" @click.stop.prevent="openEditor('update', doc, '', '', buildEditorFieldsFromValue(doc))">
             <template #icon>
               <NIcon :size="16">
                 <Pencil />
               </NIcon>
             </template>
           </NButton>
-          <NButton v-if="showDelete" size="small" tertiary title="Delete document" @click.stop.prevent="openEditor('delete', doc)">
+          <NButton v-if="showDelete" size="small" tertiary title="Delete document" @click.stop.prevent="openEditor('delete', doc, '', '', buildEditorFieldsFromValue(doc))">
             <template #icon>
               <NIcon :size="16">
                 <Trash />
@@ -104,6 +107,8 @@ const docs = computed(() => {
       v-model:show="showEditor"
       :operation="editorOperation"
       :row="editorDoc"
+      :fields="editorFields"
+      :focus-field="editorFocusField"
       :filter="editorFilter"
       :source="editorSource"
       @submit="handleMutation"

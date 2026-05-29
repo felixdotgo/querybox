@@ -1,5 +1,5 @@
 import type { Ref } from 'vue'
-import type { MutationParams } from '@/lib/types'
+import type { EditorFieldDescriptor, MutationParams } from '@/lib/types'
 import { useNotification } from 'naive-ui'
 import { ref } from 'vue'
 
@@ -14,12 +14,23 @@ export function useRowEditorModal(buildFilter?: (row: Record<string, unknown>) =
   const editorRow: Ref<Record<string, unknown> | null> = ref(null)
   const editorFilter: Ref<string> = ref('')
   const editorSource: Ref<string> = ref('')
+  const editorFields: Ref<EditorFieldDescriptor[]> = ref([])
+  const editorFocusField: Ref<string> = ref('')
 
-  function openEditor(op: string, row: Record<string, unknown>, source = '', filter: string | null = null): void {
+  function openEditor(
+    op: string,
+    row: Record<string, unknown>,
+    source = '',
+    filter: string | null = null,
+    fields: EditorFieldDescriptor[] = [],
+    focusField = '',
+  ): void {
     editorOperation.value = op
     editorRow.value = row
     editorFilter.value = filter !== null ? filter : (buildFilter ? buildFilter(row) : '')
     editorSource.value = source
+    editorFields.value = fields
+    editorFocusField.value = focusField
     showEditor.value = true
   }
 
@@ -66,6 +77,8 @@ export function useRowEditorModal(buildFilter?: (row: Record<string, unknown>) =
     editorRow,
     editorFilter,
     editorSource,
+    editorFields,
+    editorFocusField,
     openEditor,
     closeEditor,
     performMutation,

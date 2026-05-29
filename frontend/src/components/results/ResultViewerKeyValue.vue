@@ -3,6 +3,7 @@ import { NButton, NIcon } from 'naive-ui'
 import { computed, defineEmits } from 'vue'
 import { useRowEditorModal } from '@/composables/useRowEditorModal'
 import { Pencil, Trash } from '@/lib/icons'
+import { buildEditorFieldsFromValue } from '@/lib/rowEditor'
 import RowEditorModal from './RowEditorModal.vue'
 
 const props = defineProps({
@@ -47,13 +48,15 @@ const {
   editorRow,
   editorFilter,
   editorSource,
+  editorFields,
+  editorFocusField,
   openEditor: _openEditor,
   closeEditor,
   performMutation,
 } = useRowEditorModal()
 
 function openEditor(op, row) {
-  _openEditor(op, { ...row })
+  _openEditor(op, { ...row }, '', '', buildEditorFieldsFromValue(row))
 }
 
 async function handleMutation(params) {
@@ -91,6 +94,8 @@ async function handleMutation(params) {
     v-model:show="showEditor"
     :operation="editorOperation"
     :row="editorRow"
+    :fields="editorFields"
+    :focus-field="editorFocusField"
     :filter="editorFilter"
     :source="editorSource"
     @submit="handleMutation"
