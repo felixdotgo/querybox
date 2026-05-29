@@ -10,11 +10,11 @@
         <key>CFBundleIdentifier</key>
             <string>com.querybox.querybox</string>
         <key>CFBundleVersion</key>
-            <string>0.1.0</string>
+            <string>0.1.1</string>
         <key>CFBundleGetInfoString</key>
             <string>QueryBox is a powerful tool for performing queries on various databases.</string>
         <key>CFBundleShortVersionString</key>
-            <string>0.1.0</string>
+            <string>0.1.1</string>
         <key>CFBundleIconFile</key>
             <string>icons</string>
         <key>CFBundleIconName</key>

@@ -22,5 +22,6 @@ You only need these when editing `contracts/plugin/v1/plugin.proto` or generated
 ## Platform notes
 
 - QueryBox is developed as a local-first desktop app; Linux, macOS, and Windows packaging are supported through the `build/` tree.
+- Linux app builds follow the current Wails v3 default stack: install `gcc`, `libgtk-4-dev`, and `libwebkitgtk-6.0-dev` on Ubuntu/Debian build hosts. GTK3/WebKit2GTK 4.1 is only for legacy `-tags gtk3` builds.
 - Plugin binaries are compiled for the host OS by default and bundled under `bin/plugins/`.
 - OS keyring support affects the primary credential storage tier. When keyring support is unavailable, QueryBox falls back to local SQLite storage for secrets.

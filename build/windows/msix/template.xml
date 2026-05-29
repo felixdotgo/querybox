@@ -17,7 +17,7 @@
         PackageDisplayName="QueryBox"
         PublisherName="CN=QueryBox Inc."
         PublisherDisplayName="QueryBox Inc."
-        Version="0.1.0.0"
+        Version="0.1.1.0"
         PackageDescription="QueryBox is a powerful tool for performing queries on various databases.">
         <Capabilities>
             <Capability Name="runFullTrust" />
