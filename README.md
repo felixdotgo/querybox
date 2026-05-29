@@ -114,7 +114,7 @@ Binaries are placed in `bin/plugins/` (Windows builds get `.exe`) and picked up 
 
 5. The running app will discover the new plugin automatically (no restart needed).
 
-See [docs/features/02-plugin-system.md](docs/features/02-plugin-system.md) for the full plugin contract and examples.
+See [docs/features/plugin-system.md](docs/features/plugin-system.md) for the full plugin contract and examples.
 
 ## Project Structure
 
@@ -130,7 +130,7 @@ See [docs/features/02-plugin-system.md](docs/features/02-plugin-system.md) for t
 ├── contracts/plugin/v1/        # Protobuf definitions
 ├── rpc/contracts/plugin/v1/    # Generated Go code (pluginpb)
 ├── frontend/                   # Vue 3 frontend
-├── docs/                       # Design, ADR, and architecture documentation
+├── docs/                       # Canonical product, development, and architecture documentation
 │   └── adr/                    # Architecture decision records
 ├── scripts/                    # Build helper scripts
 └── build/                      # Platform-specific build configuration
@@ -138,11 +138,11 @@ See [docs/features/02-plugin-system.md](docs/features/02-plugin-system.md) for t
 
 ## Documentation
 
-See [docs/README.md](docs/README.md) for the full reading order. Quick links:
+See [docs/index.md](docs/index.md) for the full documentation map. Quick links:
 
-- [ADR-001: QueryBox as Operational Runtime](docs/adr/ADR-001-querybox-as-operational-runtime.md)
-- [Plugin system](docs/features/02-plugin-system.md)
-- [Query editor auto‑completion](docs/features/06-query-editor-autocomplete.md)
+- [System overview](docs/architecture/system-overview.md)
+- [Plugin system](docs/features/plugin-system.md)
+- [Query editor auto‑completion](docs/features/query-editor-autocomplete.md)
 
 ## Third-Party Licenses
 

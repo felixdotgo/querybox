@@ -10,7 +10,7 @@
 //   2. Add the appropriate import above and include it in `driverIconMap`, keyed
 //      by the string that appears in the connection's `driver_type` field.
 //   3. If the simple-icons name differs from your driver string you can alias it.
-//   4. Optionally update docs (see docs/features/01-connection-management.md).
+//   4. Optionally update docs (see docs/features/connection-management.md).
 //
 // The frontend component `DbIcon.vue` consumes this map and automatically
 // falls back to the generic `Server` icon if the driver is unknown.

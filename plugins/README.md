@@ -115,4 +115,4 @@ Do not introduce or keep legacy names such as:
 7. Build with `task build:plugins`.
 8. Verify the build output contains both the binary and `<binary>.manifest.json`.
 
-See `plugins/template/main.go` for a minimal starting point, but follow this README and `docs/features/02-plugin-system.md` as the current contract.
+See `plugins/template/main.go` for a minimal starting point, but follow this README and `docs/features/plugin-system.md` as the current contract.

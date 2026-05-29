@@ -31,7 +31,7 @@ func (t *templatePlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRequ
 		// for example, supplying
 		//     "simple_icon": "postgresql"
 		// allows the UI to render the matching logo from the `simple-icons`
-		// package when displaying connections.  See docs/features/01-connection-management.md.
+		// package when displaying connections. See docs/features/connection-management.md.
 		Metadata: map[string]string{
 			"exampleKey": "exampleValue",
 			// optional hint for frontend to choose a branded icon; value should
