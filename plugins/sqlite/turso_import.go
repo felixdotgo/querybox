@@ -1,9 +1,6 @@
-//go:build !windows
-// +build !windows
+//go:build linux || (darwin && arm64)
 
 package main
 
-// import libsql driver on non-windows platforms so the "libsql"
-// driver name is registered.  the package doesn't build on
-// windows, hence the build constraint.
+// Import libsql only on platforms where go-libsql ships a native archive.
 import _ "github.com/tursodatabase/go-libsql"

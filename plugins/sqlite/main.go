@@ -25,7 +25,7 @@ func (m *sqlitePlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoReques
 	return &plugin.InfoResponse{
 		Type:         plugin.TypeDriver,
 		Name:         "SQLite",
-		Version:      "0.1.0",
+		Version:      "0.1.1",
 		Description:  "SQLite database driver",
 		Url:          "https://www.sqlite.org/",
 		Author:       "QueryBox Team",
@@ -55,8 +55,8 @@ func (m *sqlitePlugin) AuthForms(ctx context.Context, _ *plugin.AuthFormsRequest
 			{Type: plugin.AuthFieldPassword, Name: "token", Label: "Auth Token", Required: true, Placeholder: "your-turso-auth-token"},
 		},
 	}
-	// if OS is windows, not return turso-cloud form, because libsql driver does not support windows yet.
-	if strings.Contains(strings.ToLower(runtime.GOOS), "windows") {
+	// Only expose Turso where the bundled libsql native archive exists.
+	if !tursoCloudSupported() {
 		return &plugin.AuthFormsResponse{Forms: map[string]*plugin.AuthForm{"basic": &basic}}, nil
 	}
 	return &plugin.AuthFormsResponse{Forms: map[string]*plugin.AuthForm{"basic": &basic, "turso-cloud": &turso}}, nil
@@ -84,6 +84,9 @@ func tursoURL(c plugin.CredentialBlob) string {
 // driverDSN resolves the SQL driver name and DSN from the credential form.
 func driverDSN(c plugin.CredentialBlob) (driver, dsn string, err error) {
 	if c.Form == "turso-cloud" {
+		if !tursoCloudSupported() {
+			return "", "", fmt.Errorf("turso-cloud is not supported on %s/%s", runtime.GOOS, runtime.GOARCH)
+		}
 		dsn = tursoURL(c)
 		if dsn == "" {
 			return "", "", fmt.Errorf("missing database_url in connection")
