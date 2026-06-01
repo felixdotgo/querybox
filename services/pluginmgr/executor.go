@@ -170,10 +170,26 @@ func (m *Manager) ExecTreeAction(name string, connection map[string]string, acti
 // core does not interpret them.  The operation type (insert/update/delete)
 // is described by the OperationType enum.  A 30-second timeout guards
 // against misbehaving plugins.
-func (m *Manager) MutateRow(name string, connection map[string]string, operation plugin.OperationType, source string, values map[string]string, filter string) (*plugin.MutateRowResponse, error) {
+func (m *Manager) MutateRow(name string, connection map[string]string, operation plugin.OperationType, source string, values map[string]interface{}, filter string, filterValues map[string]interface{}) (*plugin.MutateRowResponse, error) {
 	m.emitLog(services.LogLevelInfo, fmt.Sprintf("MutateRow: (driver: %s) op=%v source=%q filter=%q", name, operation, source, filter))
 
-	req := mutateRowRequest{Connection: connection, Operation: operation, Source: source, Values: values, Filter: filter}
+	typedValues, err := plugin.NewValueMap(values)
+	if err != nil {
+		return nil, fmt.Errorf("MutateRow: values: %w", err)
+	}
+	typedFilterValues, err := plugin.NewValueMap(filterValues)
+	if err != nil {
+		return nil, fmt.Errorf("MutateRow: filter values: %w", err)
+	}
+
+	req := mutateRowRequest{
+		Connection:   connection,
+		Operation:    operation,
+		Source:       source,
+		Values:       typedValues,
+		Filter:       filter,
+		FilterValues: typedFilterValues,
+	}
 	b, err := json.Marshal(&req)
 	if err != nil {
 		return nil, fmt.Errorf("MutateRow: marshal request: %w", err)

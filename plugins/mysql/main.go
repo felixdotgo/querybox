@@ -14,6 +14,7 @@ import (
 	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
 
 	"github.com/go-sql-driver/mysql"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 // mysqlPlugin implements the protobuf PluginServiceServer interface for a simple MySQL executor.
@@ -530,6 +531,37 @@ func quoteSource(source string) string {
 	return fmt.Sprintf("`%s`", escapeBacktick(source))
 }
 
+func quoteColumn(column string) string {
+	return fmt.Sprintf("`%s`", escapeBacktick(column))
+}
+
+func buildWhereMySQL(filterValues map[string]*structpb.Value, fallback string) (string, []interface{}, error) {
+	if len(filterValues) == 0 {
+		return fallback, nil, nil
+	}
+	keys := make([]string, 0, len(filterValues))
+	for key := range filterValues {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	args := make([]interface{}, 0, len(keys))
+	for _, key := range keys {
+		value := filterValues[key]
+		if plugin.IsNullValue(value) {
+			parts = append(parts, fmt.Sprintf("%s IS NULL", quoteColumn(key)))
+			continue
+		}
+		arg, err := plugin.SQLArgFromValue(value)
+		if err != nil {
+			return "", nil, err
+		}
+		parts = append(parts, fmt.Sprintf("%s=?", quoteColumn(key)))
+		args = append(args, arg)
+	}
+	return strings.Join(parts, " AND "), args, nil
+}
+
 // MutateRow executes an UPDATE or DELETE against the MySQL database identified
 // by req.Connection.  req.Source must be the unquoted table name and
 // req.Filter must be a non-empty SQL WHERE expression; both are supplied by
@@ -541,8 +573,8 @@ func (m *mysqlPlugin) MutateRow(ctx context.Context, req *plugin.MutateRowReques
 	if req.Source == "" {
 		return &plugin.MutateRowResponse{Success: false, Error: "source (table name) is required"}, nil
 	}
-	if req.Filter == "" {
-		return &plugin.MutateRowResponse{Success: false, Error: "filter (WHERE clause) is required"}, nil
+	if req.Filter == "" && len(req.FilterValues) == 0 {
+		return &plugin.MutateRowResponse{Success: false, Error: "filter (WHERE clause) or filter_values is required"}, nil
 	}
 
 	dsn, err := buildDSN(req.Connection)
@@ -572,6 +604,10 @@ func (m *mysqlPlugin) MutateRow(ctx context.Context, req *plugin.MutateRowReques
 
 	var query string
 	var args []interface{}
+	whereClause, whereArgs, err := buildWhereMySQL(req.FilterValues, req.Filter)
+	if err != nil {
+		return &plugin.MutateRowResponse{Success: false, Error: err.Error()}, nil
+	}
 
 	switch req.Operation {
 	case pluginpb.PluginV1_MutateRowRequest_UPDATE:
@@ -586,13 +622,19 @@ func (m *mysqlPlugin) MutateRow(ctx context.Context, req *plugin.MutateRowReques
 		sort.Strings(keys)
 		setParts := make([]string, 0, len(keys))
 		for _, k := range keys {
-			setParts = append(setParts, fmt.Sprintf("`%s`=?", escapeBacktick(k)))
-			args = append(args, req.Values[k])
+			arg, err := plugin.SQLArgFromValue(req.Values[k])
+			if err != nil {
+				return &plugin.MutateRowResponse{Success: false, Error: err.Error()}, nil
+			}
+			setParts = append(setParts, fmt.Sprintf("%s=?", quoteColumn(k)))
+			args = append(args, arg)
 		}
+		args = append(args, whereArgs...)
 		query = fmt.Sprintf("UPDATE %s SET %s WHERE %s",
-			quoteSource(req.Source), strings.Join(setParts, ", "), req.Filter)
+			quoteSource(req.Source), strings.Join(setParts, ", "), whereClause)
 	case pluginpb.PluginV1_MutateRowRequest_DELETE:
-		query = fmt.Sprintf("DELETE FROM %s WHERE %s", quoteSource(req.Source), req.Filter)
+		args = append(args, whereArgs...)
+		query = fmt.Sprintf("DELETE FROM %s WHERE %s", quoteSource(req.Source), whereClause)
 	default:
 		return &plugin.MutateRowResponse{Success: false, Error: "operation not supported"}, nil
 	}

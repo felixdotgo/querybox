@@ -148,12 +148,13 @@ export function ListPlugins() {
  * @param {{ [_ in string]?: string }} connection
  * @param {plugin$0.OperationType} operation
  * @param {string} source
- * @param {{ [_ in string]?: string }} values
+ * @param {{ [_ in string]?: any }} values
  * @param {string} filter
+ * @param {{ [_ in string]?: any }} filterValues
  * @returns {$CancellablePromise<plugin$0.MutateRowResponse | null>}
  */
-export function MutateRow(name, connection, operation, source, values, filter) {
-    return $Call.ByID(3105031897, name, connection, operation, source, values, filter).then(/** @type {($result: any) => any} */(($result) => {
+export function MutateRow(name, connection, operation, source, values, filter, filterValues) {
+    return $Call.ByID(3105031897, name, connection, operation, source, values, filter, filterValues).then(/** @type {($result: any) => any} */(($result) => {
         return $$createType14($result);
     }));
 }

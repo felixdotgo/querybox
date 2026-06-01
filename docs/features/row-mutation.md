@@ -8,6 +8,8 @@ Row mutation lets a plugin-backed result surface edit and delete operations for 
 
 - The UI shows edit and delete affordances only when the plugin advertises `mutate-row`.
 - The backend forwards mutation requests to the plugin over the `mutate-row` command.
+- Mutation `values` use `google.protobuf.Value` so inline edit can preserve null, boolean, number, string, and JSON container values.
+- UI-generated row identity filters should use typed `filter_values`; plugins may use the raw `filter` string as a fallback when `filter_values` is empty.
 - Successful mutation flows refresh the visible result.
 
 ## Key components
@@ -26,4 +28,4 @@ Row mutation lets a plugin-backed result surface edit and delete operations for 
 ## Limits and roadmap
 
 - Mutation semantics are still plugin-defined and intentionally lightweight.
-- Better key inference and richer inline editing remain future enhancements.
+- Richer multi-row mutation workflows remain future enhancements.

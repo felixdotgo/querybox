@@ -233,6 +233,7 @@ export interface MutationParams {
   source: string
   values?: Record<string, unknown>
   filter: string
+  filterValues?: Record<string, unknown>
 }
 
 export type EditorFieldKind = 'text' | 'textarea' | 'number' | 'boolean' | 'json'

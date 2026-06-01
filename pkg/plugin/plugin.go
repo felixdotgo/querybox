@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 	"unicode/utf8"
 
 	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
@@ -35,6 +36,8 @@ func FormatSQLValue(v interface{}) string {
 		return ""
 	}
 	switch t := v.(type) {
+	case time.Time:
+		return t.Format(time.RFC3339Nano)
 	case []byte:
 		// Drivers commonly return []byte for text columns. Convert to
 		// string when the bytes represent valid UTF-8; otherwise encode as a

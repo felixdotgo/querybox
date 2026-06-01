@@ -13,7 +13,15 @@ import { MutateRow } from '@/bindings/github.com/felixdotgo/querybox/services/pl
  *
  * Returns the plugin's MutateRowResponse promise.
  */
-export async function mutateRow(conn: { id: string, driver_type: string }, operation: number, source: string, values: Record<string, string> = {}, filter: string = '', database?: string | null) {
+export async function mutateRow(
+  conn: { id: string, driver_type: string },
+  operation: number,
+  source: string,
+  values: Record<string, unknown> = {},
+  filter: string = '',
+  filterValues: Record<string, unknown> = {},
+  database?: string | null,
+) {
   if (!conn || !conn.id || !conn.driver_type) {
     throw new Error('invalid connection for mutateRow')
   }
@@ -28,5 +36,5 @@ export async function mutateRow(conn: { id: string, driver_type: string }, opera
     params.database = database
 
   // the binding expects the connection map followed by the other parameters
-  return await MutateRow(conn.driver_type, params, operation, source, values, filter)
+  return await MutateRow(conn.driver_type, params, operation, source, values, filter, filterValues)
 }

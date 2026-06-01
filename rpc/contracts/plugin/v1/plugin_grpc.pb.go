@@ -67,10 +67,12 @@ type PluginServiceClient interface {
 	// MutateRow performs an insert/update/delete operation on a single row.
 	// The plugin defines the semantics of the `source` (e.g. table name)
 	// and `filter` (e.g. WHERE clause) parameters, and the core simply forwards
-	// them from the UI.  The `values` map contains column→value pairs for
-	// insert/update operations.  The plugin returns success=true if the mutation
-	// succeeded, or false with an optional error message if it failed.  This
-	// RPC is OPTIONAL – plugins that do not implement it should return
+	// them from the UI.  The `values` map contains typed column→value pairs for
+	// insert/update operations.  `filter_values` contains typed column→value
+	// pairs for UI-generated row identity filters; plugins may use `filter` as a
+	// raw fallback when this map is empty.  The plugin returns success=true if
+	// the mutation succeeded, or false with an optional error message if it
+	// failed.  This RPC is OPTIONAL – plugins that do not implement it should return
 	// success=false and an appropriate error message.
 	MutateRow(ctx context.Context, in *PluginV1_MutateRowRequest, opts ...grpc.CallOption) (*PluginV1_MutateRowResponse, error)
 }
@@ -192,10 +194,12 @@ type PluginServiceServer interface {
 	// MutateRow performs an insert/update/delete operation on a single row.
 	// The plugin defines the semantics of the `source` (e.g. table name)
 	// and `filter` (e.g. WHERE clause) parameters, and the core simply forwards
-	// them from the UI.  The `values` map contains column→value pairs for
-	// insert/update operations.  The plugin returns success=true if the mutation
-	// succeeded, or false with an optional error message if it failed.  This
-	// RPC is OPTIONAL – plugins that do not implement it should return
+	// them from the UI.  The `values` map contains typed column→value pairs for
+	// insert/update operations.  `filter_values` contains typed column→value
+	// pairs for UI-generated row identity filters; plugins may use `filter` as a
+	// raw fallback when this map is empty.  The plugin returns success=true if
+	// the mutation succeeded, or false with an optional error message if it
+	// failed.  This RPC is OPTIONAL – plugins that do not implement it should return
 	// success=false and an appropriate error message.
 	MutateRow(context.Context, *PluginV1_MutateRowRequest) (*PluginV1_MutateRowResponse, error)
 	mustEmbedUnimplementedPluginServiceServer()
