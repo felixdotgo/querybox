@@ -1,16 +1,16 @@
 {
   "plugins": {
     "mysql": {
-      "version": "0.1.0"
+      "version": "0.1.2"
     },
     "postgresql": {
-      "version": "0.1.0"
+      "version": "0.1.2"
     },
     "sqlite": {
-      "version": "0.1.1"
+      "version": "0.1.2"
     },
     "redis": {
-      "version": "0.1.0"
+      "version": "0.1.2"
     }
   }
 }

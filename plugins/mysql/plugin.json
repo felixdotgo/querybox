@@ -3,7 +3,7 @@
   "type": 1,
   "name": "MySQL",
   "description": "Built-in MySQL driver plugin for QueryBox.",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "url": "https://www.mysql.com/",
   "author": "QueryBox Team",
   "runtime": {
@@ -21,6 +21,7 @@
     "sql",
     "relational"
   ],
+  
   "license": "MIT",
   "icon_url": "https://www.mysql.com/common/logos/logo-mysql-170x115.png",
   "permissions": [
