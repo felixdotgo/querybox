@@ -1703,8 +1703,9 @@ type PluginV1_MutateRowRequest struct {
 	Connection    map[string]string                       `protobuf:"bytes,1,rep,name=connection,proto3" json:"connection,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	Operation     PluginV1_MutateRowRequest_OperationType `protobuf:"varint,2,opt,name=operation,proto3,enum=plugin.v1.PluginV1_MutateRowRequest_OperationType" json:"operation,omitempty"`
 	Source        string                                  `protobuf:"bytes,3,opt,name=source,proto3" json:"source,omitempty"`
-	Values        map[string]string                       `protobuf:"bytes,4,rep,name=values,proto3" json:"values,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // column→value for insert/update
-	Filter        string                                  `protobuf:"bytes,5,opt,name=filter,proto3" json:"filter,omitempty"`                                                                           // optional filter expression for update/delete
+	Values        map[string]*structpb.Value              `protobuf:"bytes,4,rep,name=values,proto3" json:"values,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`                                 // column→value for insert/update
+	Filter        string                                  `protobuf:"bytes,5,opt,name=filter,proto3" json:"filter,omitempty"`                                                                                                           // optional filter expression for update/delete
+	FilterValues  map[string]*structpb.Value              `protobuf:"bytes,6,rep,name=filter_values,json=filterValues,proto3" json:"filter_values,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // column→original value for generated WHERE filters
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1760,7 +1761,7 @@ func (x *PluginV1_MutateRowRequest) GetSource() string {
 	return ""
 }
 
-func (x *PluginV1_MutateRowRequest) GetValues() map[string]string {
+func (x *PluginV1_MutateRowRequest) GetValues() map[string]*structpb.Value {
 	if x != nil {
 		return x.Values
 	}
@@ -1772,6 +1773,13 @@ func (x *PluginV1_MutateRowRequest) GetFilter() string {
 		return x.Filter
 	}
 	return ""
+}
+
+func (x *PluginV1_MutateRowRequest) GetFilterValues() map[string]*structpb.Value {
+	if x != nil {
+		return x.FilterValues
+	}
+	return nil
 }
 
 // MutateRowResponse indicates whether the mutation operation succeeded.
@@ -1831,7 +1839,7 @@ var File_contracts_plugin_v1_plugin_proto protoreflect.FileDescriptor
 
 const file_contracts_plugin_v1_plugin_proto_rawDesc = "" +
 	"\n" +
-	" contracts/plugin/v1/plugin.proto\x12\tplugin.v1\x1a\x1cgoogle/protobuf/struct.proto\"\xa9!\n" +
+	" contracts/plugin/v1/plugin.proto\x12\tplugin.v1\x1a\x1cgoogle/protobuf/struct.proto\"\xf7\"\n" +
 	"\bPluginV1\x1a\r\n" +
 	"\vInfoRequest\x1a\xcf\x04\n" +
 	"\fInfoResponse\x12,\n" +
@@ -1973,7 +1981,7 @@ const file_contracts_plugin_v1_plugin_proto_rawDesc = "" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x1aT\n" +
 	"\x1bGetCompletionFieldsResponse\x125\n" +
-	"\x06fields\x18\x01 \x03(\v2\x1d.plugin.v1.PluginV1.FieldInfoR\x06fields\x1a\xf3\x03\n" +
+	"\x06fields\x18\x01 \x03(\v2\x1d.plugin.v1.PluginV1.FieldInfoR\x06fields\x1a\xc1\x05\n" +
 	"\x10MutateRowRequest\x12T\n" +
 	"\n" +
 	"connection\x18\x01 \x03(\v24.plugin.v1.PluginV1.MutateRowRequest.ConnectionEntryR\n" +
@@ -1981,13 +1989,17 @@ const file_contracts_plugin_v1_plugin_proto_rawDesc = "" +
 	"\toperation\x18\x02 \x01(\x0e22.plugin.v1.PluginV1.MutateRowRequest.OperationTypeR\toperation\x12\x16\n" +
 	"\x06source\x18\x03 \x01(\tR\x06source\x12H\n" +
 	"\x06values\x18\x04 \x03(\v20.plugin.v1.PluginV1.MutateRowRequest.ValuesEntryR\x06values\x12\x16\n" +
-	"\x06filter\x18\x05 \x01(\tR\x06filter\x1a=\n" +
+	"\x06filter\x18\x05 \x01(\tR\x06filter\x12[\n" +
+	"\rfilter_values\x18\x06 \x03(\v26.plugin.v1.PluginV1.MutateRowRequest.FilterValuesEntryR\ffilterValues\x1a=\n" +
 	"\x0fConnectionEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a9\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1aQ\n" +
 	"\vValuesEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"C\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12,\n" +
+	"\x05value\x18\x02 \x01(\v2\x16.google.protobuf.ValueR\x05value:\x028\x01\x1aW\n" +
+	"\x11FilterValuesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12,\n" +
+	"\x05value\x18\x02 \x01(\v2\x16.google.protobuf.ValueR\x05value:\x028\x01\"C\n" +
 	"\rOperationType\x12\x0e\n" +
 	"\n" +
 	"OP_UNKNOWN\x10\x00\x12\n" +
@@ -2026,7 +2038,7 @@ func file_contracts_plugin_v1_plugin_proto_rawDescGZIP() []byte {
 }
 
 var file_contracts_plugin_v1_plugin_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_contracts_plugin_v1_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 38)
+var file_contracts_plugin_v1_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 39)
 var file_contracts_plugin_v1_plugin_proto_goTypes = []any{
 	(PluginV1_Type)(0),                           // 0: plugin.v1.PluginV1.Type
 	(PluginV1_AuthField_FieldType)(0),            // 1: plugin.v1.PluginV1.AuthField.FieldType
@@ -2069,7 +2081,9 @@ var file_contracts_plugin_v1_plugin_proto_goTypes = []any{
 	nil,                                          // 38: plugin.v1.PluginV1.GetCompletionFieldsRequest.ConnectionEntry
 	nil,                                          // 39: plugin.v1.PluginV1.MutateRowRequest.ConnectionEntry
 	nil,                                          // 40: plugin.v1.PluginV1.MutateRowRequest.ValuesEntry
-	(*structpb.Struct)(nil),                      // 41: google.protobuf.Struct
+	nil,                                          // 41: plugin.v1.PluginV1.MutateRowRequest.FilterValuesEntry
+	(*structpb.Struct)(nil),                      // 42: google.protobuf.Struct
+	(*structpb.Value)(nil),                       // 43: google.protobuf.Value
 }
 var file_contracts_plugin_v1_plugin_proto_depIdxs = []int32{
 	0,  // 0: plugin.v1.PluginV1.InfoResponse.type:type_name -> plugin.v1.PluginV1.Type
@@ -2087,7 +2101,7 @@ var file_contracts_plugin_v1_plugin_proto_depIdxs = []int32{
 	13, // 12: plugin.v1.PluginV1.DescribeSchemaResponse.tables:type_name -> plugin.v1.PluginV1.TableSchema
 	14, // 13: plugin.v1.PluginV1.TableSchema.columns:type_name -> plugin.v1.PluginV1.ColumnSchema
 	15, // 14: plugin.v1.PluginV1.TableSchema.indexes:type_name -> plugin.v1.PluginV1.IndexSchema
-	41, // 15: plugin.v1.PluginV1.DocumentResult.documents:type_name -> google.protobuf.Struct
+	42, // 15: plugin.v1.PluginV1.DocumentResult.documents:type_name -> google.protobuf.Struct
 	35, // 16: plugin.v1.PluginV1.KeyValueResult.data:type_name -> plugin.v1.PluginV1.KeyValueResult.DataEntry
 	1,  // 17: plugin.v1.PluginV1.AuthField.type:type_name -> plugin.v1.PluginV1.AuthField.FieldType
 	19, // 18: plugin.v1.PluginV1.AuthForm.fields:type_name -> plugin.v1.PluginV1.AuthField
@@ -2098,26 +2112,29 @@ var file_contracts_plugin_v1_plugin_proto_depIdxs = []int32{
 	39, // 23: plugin.v1.PluginV1.MutateRowRequest.connection:type_name -> plugin.v1.PluginV1.MutateRowRequest.ConnectionEntry
 	2,  // 24: plugin.v1.PluginV1.MutateRowRequest.operation:type_name -> plugin.v1.PluginV1.MutateRowRequest.OperationType
 	40, // 25: plugin.v1.PluginV1.MutateRowRequest.values:type_name -> plugin.v1.PluginV1.MutateRowRequest.ValuesEntry
-	20, // 26: plugin.v1.PluginV1.AuthFormsResponse.FormsEntry.value:type_name -> plugin.v1.PluginV1.AuthForm
-	4,  // 27: plugin.v1.PluginService.Info:input_type -> plugin.v1.PluginV1.InfoRequest
-	6,  // 28: plugin.v1.PluginService.Exec:input_type -> plugin.v1.PluginV1.ExecRequest
-	21, // 29: plugin.v1.PluginService.AuthForms:input_type -> plugin.v1.PluginV1.AuthFormsRequest
-	11, // 30: plugin.v1.PluginService.DescribeSchema:input_type -> plugin.v1.PluginV1.DescribeSchemaRequest
-	23, // 31: plugin.v1.PluginService.TestConnection:input_type -> plugin.v1.PluginV1.TestConnectionRequest
-	25, // 32: plugin.v1.PluginService.GetCompletionFields:input_type -> plugin.v1.PluginV1.GetCompletionFieldsRequest
-	28, // 33: plugin.v1.PluginService.MutateRow:input_type -> plugin.v1.PluginV1.MutateRowRequest
-	5,  // 34: plugin.v1.PluginService.Info:output_type -> plugin.v1.PluginV1.InfoResponse
-	7,  // 35: plugin.v1.PluginService.Exec:output_type -> plugin.v1.PluginV1.ExecResponse
-	22, // 36: plugin.v1.PluginService.AuthForms:output_type -> plugin.v1.PluginV1.AuthFormsResponse
-	12, // 37: plugin.v1.PluginService.DescribeSchema:output_type -> plugin.v1.PluginV1.DescribeSchemaResponse
-	24, // 38: plugin.v1.PluginService.TestConnection:output_type -> plugin.v1.PluginV1.TestConnectionResponse
-	27, // 39: plugin.v1.PluginService.GetCompletionFields:output_type -> plugin.v1.PluginV1.GetCompletionFieldsResponse
-	29, // 40: plugin.v1.PluginService.MutateRow:output_type -> plugin.v1.PluginV1.MutateRowResponse
-	34, // [34:41] is the sub-list for method output_type
-	27, // [27:34] is the sub-list for method input_type
-	27, // [27:27] is the sub-list for extension type_name
-	27, // [27:27] is the sub-list for extension extendee
-	0,  // [0:27] is the sub-list for field type_name
+	41, // 26: plugin.v1.PluginV1.MutateRowRequest.filter_values:type_name -> plugin.v1.PluginV1.MutateRowRequest.FilterValuesEntry
+	20, // 27: plugin.v1.PluginV1.AuthFormsResponse.FormsEntry.value:type_name -> plugin.v1.PluginV1.AuthForm
+	43, // 28: plugin.v1.PluginV1.MutateRowRequest.ValuesEntry.value:type_name -> google.protobuf.Value
+	43, // 29: plugin.v1.PluginV1.MutateRowRequest.FilterValuesEntry.value:type_name -> google.protobuf.Value
+	4,  // 30: plugin.v1.PluginService.Info:input_type -> plugin.v1.PluginV1.InfoRequest
+	6,  // 31: plugin.v1.PluginService.Exec:input_type -> plugin.v1.PluginV1.ExecRequest
+	21, // 32: plugin.v1.PluginService.AuthForms:input_type -> plugin.v1.PluginV1.AuthFormsRequest
+	11, // 33: plugin.v1.PluginService.DescribeSchema:input_type -> plugin.v1.PluginV1.DescribeSchemaRequest
+	23, // 34: plugin.v1.PluginService.TestConnection:input_type -> plugin.v1.PluginV1.TestConnectionRequest
+	25, // 35: plugin.v1.PluginService.GetCompletionFields:input_type -> plugin.v1.PluginV1.GetCompletionFieldsRequest
+	28, // 36: plugin.v1.PluginService.MutateRow:input_type -> plugin.v1.PluginV1.MutateRowRequest
+	5,  // 37: plugin.v1.PluginService.Info:output_type -> plugin.v1.PluginV1.InfoResponse
+	7,  // 38: plugin.v1.PluginService.Exec:output_type -> plugin.v1.PluginV1.ExecResponse
+	22, // 39: plugin.v1.PluginService.AuthForms:output_type -> plugin.v1.PluginV1.AuthFormsResponse
+	12, // 40: plugin.v1.PluginService.DescribeSchema:output_type -> plugin.v1.PluginV1.DescribeSchemaResponse
+	24, // 41: plugin.v1.PluginService.TestConnection:output_type -> plugin.v1.PluginV1.TestConnectionResponse
+	27, // 42: plugin.v1.PluginService.GetCompletionFields:output_type -> plugin.v1.PluginV1.GetCompletionFieldsResponse
+	29, // 43: plugin.v1.PluginService.MutateRow:output_type -> plugin.v1.PluginV1.MutateRowResponse
+	37, // [37:44] is the sub-list for method output_type
+	30, // [30:37] is the sub-list for method input_type
+	30, // [30:30] is the sub-list for extension type_name
+	30, // [30:30] is the sub-list for extension extendee
+	0,  // [0:30] is the sub-list for field type_name
 }
 
 func init() { file_contracts_plugin_v1_plugin_proto_init() }
@@ -2136,7 +2153,7 @@ func file_contracts_plugin_v1_plugin_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_contracts_plugin_v1_plugin_proto_rawDesc), len(file_contracts_plugin_v1_plugin_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   38,
+			NumMessages:   39,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

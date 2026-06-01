@@ -131,12 +131,21 @@ func TestExecRequestMarshalling(t *testing.T) {
 // TestMutateRowRequestMarshalling ensures the internal mutateRowRequest
 // serialises the operation enum and other fields correctly.
 func TestMutateRowRequestMarshalling(t *testing.T) {
+	values, err := plugin.NewValueMap(map[string]interface{}{"ok": true, "x": "y"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	filterValues, err := plugin.NewValueMap(map[string]interface{}{"id": float64(1)})
+	if err != nil {
+		t.Fatal(err)
+	}
 	r := mutateRowRequest{
-		Connection: map[string]string{"a": "b"},
-		Operation:  pluginpb.PluginV1_MutateRowRequest_INSERT,
-		Source:     "t1",
-		Values:     map[string]string{"x": "y"},
-		Filter:     "id=1",
+		Connection:   map[string]string{"a": "b"},
+		Operation:    pluginpb.PluginV1_MutateRowRequest_INSERT,
+		Source:       "t1",
+		Values:       values,
+		Filter:       "id=1",
+		FilterValues: filterValues,
 	}
 	b, err := json.Marshal(&r)
 	if err != nil {
@@ -153,11 +162,21 @@ func TestMutateRowRequestMarshalling(t *testing.T) {
 	if m["filter"] != "id=1" {
 		t.Errorf("filter wrong: %#v", m["filter"])
 	}
+	if values, ok := m["values"].(map[string]interface{}); !ok {
+		t.Fatalf("values field missing or wrong type: %#v", m)
+	} else if values["x"] != "y" || values["ok"] != true {
+		t.Errorf("unexpected values content: %#v", values)
+	}
+	if filterValues, ok := m["filter_values"].(map[string]interface{}); !ok {
+		t.Fatalf("filter_values field missing or wrong type: %#v", m)
+	} else if filterValues["id"] != float64(1) {
+		t.Errorf("unexpected filter_values content: %#v", filterValues)
+	}
 }
 
 func TestMutateRowMissingPlugin(t *testing.T) {
 	m := New()
-	_, err := m.MutateRow("nonexistent", nil, pluginpb.PluginV1_MutateRowRequest_DELETE, "t", nil, "")
+	_, err := m.MutateRow("nonexistent", nil, pluginpb.PluginV1_MutateRowRequest_DELETE, "t", nil, "", nil)
 	if err == nil {
 		t.Errorf("expected error for missing plugin")
 	}
@@ -301,7 +320,7 @@ fi
 
 	m := &Manager{plugins: map[string]PluginInfo{req: {Path: script}}}
 
-	resp, err := m.MutateRow(req, nil, pluginpb.PluginV1_MutateRowRequest_INSERT, "t", nil, "")
+	resp, err := m.MutateRow(req, nil, pluginpb.PluginV1_MutateRowRequest_INSERT, "t", nil, "", nil)
 	if err != nil {
 		t.Fatalf("MutateRow error: %v", err)
 	}
@@ -309,7 +328,7 @@ fi
 		t.Errorf("unexpected response: %+v", resp)
 	}
 	// also try with extension to ensure normalization
-	resp2, err2 := m.MutateRow(name, nil, pluginpb.PluginV1_MutateRowRequest_INSERT, "t", nil, "")
+	resp2, err2 := m.MutateRow(name, nil, pluginpb.PluginV1_MutateRowRequest_INSERT, "t", nil, "", nil)
 	if err2 != nil {
 		t.Fatalf("MutateRow with extension failed: %v", err2)
 	}

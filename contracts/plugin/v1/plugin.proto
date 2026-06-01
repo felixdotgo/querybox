@@ -46,10 +46,12 @@ service PluginService {
   // MutateRow performs an insert/update/delete operation on a single row.
   // The plugin defines the semantics of the `source` (e.g. table name)
   // and `filter` (e.g. WHERE clause) parameters, and the core simply forwards
-  // them from the UI.  The `values` map contains column→value pairs for
-  // insert/update operations.  The plugin returns success=true if the mutation
-  // succeeded, or false with an optional error message if it failed.  This
-  // RPC is OPTIONAL – plugins that do not implement it should return
+  // them from the UI.  The `values` map contains typed column→value pairs for
+  // insert/update operations.  `filter_values` contains typed column→value
+  // pairs for UI-generated row identity filters; plugins may use `filter` as a
+  // raw fallback when this map is empty.  The plugin returns success=true if
+  // the mutation succeeded, or false with an optional error message if it
+  // failed.  This RPC is OPTIONAL – plugins that do not implement it should return
   // success=false and an appropriate error message.
   rpc MutateRow(PluginV1.MutateRowRequest) returns (PluginV1.MutateRowResponse);
 }
@@ -283,8 +285,9 @@ message PluginV1 {
     map<string, string> connection = 1;
     OperationType operation = 2;
     string source = 3;
-    map<string, string> values = 4; // column→value for insert/update
+    map<string, google.protobuf.Value> values = 4; // column→value for insert/update
     string filter = 5; // optional filter expression for update/delete
+    map<string, google.protobuf.Value> filter_values = 6; // column→original value for generated WHERE filters
   }
 
   // MutateRowResponse indicates whether the mutation operation succeeded.

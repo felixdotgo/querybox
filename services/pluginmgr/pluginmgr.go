@@ -9,6 +9,7 @@ import (
 	"github.com/felixdotgo/querybox/pkg/plugin"
 	"github.com/felixdotgo/querybox/services"
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 // On Windows the helper hideWindow (implemented in platform-specific files)
@@ -128,11 +129,12 @@ type execRequest struct {
 // Go types for CLI JSON encoding.  The `Operation` field reuses the
 // alias defined in pkg/plugin so the enum names are consistent.
 type mutateRowRequest struct {
-	Connection map[string]string    `json:"connection"`
-	Operation  plugin.OperationType `json:"operation"`
-	Source     string               `json:"source"`
-	Values     map[string]string    `json:"values"`
-	Filter     string               `json:"filter"`
+	Connection   map[string]string          `json:"connection"`
+	Operation    plugin.OperationType       `json:"operation"`
+	Source       string                     `json:"source"`
+	Values       map[string]*structpb.Value `json:"values"`
+	Filter       string                     `json:"filter"`
+	FilterValues map[string]*structpb.Value `json:"filter_values,omitempty"`
 }
 
 // We reuse the generated protobuf alias for the response so we stay in sync

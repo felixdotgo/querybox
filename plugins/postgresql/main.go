@@ -14,6 +14,7 @@ import (
 	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
 
 	_ "github.com/lib/pq" // postgres driver
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 // postgresqlPlugin implements the protobuf PluginServiceServer interface for a simple PostgreSQL executor.
@@ -842,6 +843,39 @@ func quoteSourcePG(source string) string {
 	return fmt.Sprintf(`"%s"`, escapeDoubleQuote(source))
 }
 
+func quoteColumnPG(column string) string {
+	return fmt.Sprintf(`"%s"`, escapeDoubleQuote(column))
+}
+
+func buildWherePG(filterValues map[string]*structpb.Value, fallback string, start int) (string, []interface{}, error) {
+	if len(filterValues) == 0 {
+		return fallback, nil, nil
+	}
+	keys := make([]string, 0, len(filterValues))
+	for key := range filterValues {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	args := make([]interface{}, 0, len(keys))
+	nextPlaceholder := start
+	for _, key := range keys {
+		value := filterValues[key]
+		if plugin.IsNullValue(value) {
+			parts = append(parts, fmt.Sprintf("%s IS NULL", quoteColumnPG(key)))
+			continue
+		}
+		arg, err := plugin.SQLArgFromValue(value)
+		if err != nil {
+			return "", nil, err
+		}
+		parts = append(parts, fmt.Sprintf("%s=$%d", quoteColumnPG(key), nextPlaceholder))
+		args = append(args, arg)
+		nextPlaceholder++
+	}
+	return strings.Join(parts, " AND "), args, nil
+}
+
 // MutateRow executes an UPDATE or DELETE against the PostgreSQL database
 // identified by req.Connection.  req.Source must be the unquoted table name
 // and req.Filter must be a non-empty SQL WHERE expression; both are supplied
@@ -853,8 +887,8 @@ func (m *postgresqlPlugin) MutateRow(ctx context.Context, req *plugin.MutateRowR
 	if req.Source == "" {
 		return &plugin.MutateRowResponse{Success: false, Error: "source (table name) is required"}, nil
 	}
-	if req.Filter == "" {
-		return &plugin.MutateRowResponse{Success: false, Error: "filter (WHERE clause) is required"}, nil
+	if req.Filter == "" && len(req.FilterValues) == 0 {
+		return &plugin.MutateRowResponse{Success: false, Error: "filter (WHERE clause) or filter_values is required"}, nil
 	}
 
 	dsn, err := buildConnString(req.Connection)
@@ -900,13 +934,27 @@ func (m *postgresqlPlugin) MutateRow(ctx context.Context, req *plugin.MutateRowR
 		setParts := make([]string, 0, len(keys))
 		for i, k := range keys {
 			// PostgreSQL uses $1, $2, … positional placeholders.
-			setParts = append(setParts, fmt.Sprintf(`"%s"=$%d`, escapeDoubleQuote(k), i+1))
-			args = append(args, req.Values[k])
+			arg, err := plugin.SQLArgFromValue(req.Values[k])
+			if err != nil {
+				return &plugin.MutateRowResponse{Success: false, Error: err.Error()}, nil
+			}
+			setParts = append(setParts, fmt.Sprintf(`%s=$%d`, quoteColumnPG(k), i+1))
+			args = append(args, arg)
 		}
+		whereClause, whereArgs, err := buildWherePG(req.FilterValues, req.Filter, len(args)+1)
+		if err != nil {
+			return &plugin.MutateRowResponse{Success: false, Error: err.Error()}, nil
+		}
+		args = append(args, whereArgs...)
 		query = fmt.Sprintf("UPDATE %s SET %s WHERE %s",
-			quoteSourcePG(req.Source), strings.Join(setParts, ", "), req.Filter)
+			quoteSourcePG(req.Source), strings.Join(setParts, ", "), whereClause)
 	case pluginpb.PluginV1_MutateRowRequest_DELETE:
-		query = fmt.Sprintf("DELETE FROM %s WHERE %s", quoteSourcePG(req.Source), req.Filter)
+		whereClause, whereArgs, err := buildWherePG(req.FilterValues, req.Filter, 1)
+		if err != nil {
+			return &plugin.MutateRowResponse{Success: false, Error: err.Error()}, nil
+		}
+		args = append(args, whereArgs...)
+		query = fmt.Sprintf("DELETE FROM %s WHERE %s", quoteSourcePG(req.Source), whereClause)
 	default:
 		return &plugin.MutateRowResponse{Success: false, Error: "operation not supported"}, nil
 	}

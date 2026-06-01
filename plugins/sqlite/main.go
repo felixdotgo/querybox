@@ -11,6 +11,7 @@ import (
 	"github.com/felixdotgo/querybox/pkg/plugin"
 	pluginpb "github.com/felixdotgo/querybox/rpc/contracts/plugin/v1"
 
+	"google.golang.org/protobuf/types/known/structpb"
 	_ "modernc.org/sqlite"
 )
 
@@ -403,6 +404,37 @@ func quoteSourceSQLite(source string) string {
 	return fmt.Sprintf(`"%s"`, escapeDoubleQuoteSQLite(source))
 }
 
+func quoteColumnSQLite(column string) string {
+	return fmt.Sprintf(`"%s"`, escapeDoubleQuoteSQLite(column))
+}
+
+func buildWhereSQLite(filterValues map[string]*structpb.Value, fallback string) (string, []interface{}, error) {
+	if len(filterValues) == 0 {
+		return fallback, nil, nil
+	}
+	keys := make([]string, 0, len(filterValues))
+	for key := range filterValues {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	args := make([]interface{}, 0, len(keys))
+	for _, key := range keys {
+		value := filterValues[key]
+		if plugin.IsNullValue(value) {
+			parts = append(parts, fmt.Sprintf("%s IS NULL", quoteColumnSQLite(key)))
+			continue
+		}
+		arg, err := plugin.SQLArgFromValue(value)
+		if err != nil {
+			return "", nil, err
+		}
+		parts = append(parts, fmt.Sprintf("%s=?", quoteColumnSQLite(key)))
+		args = append(args, arg)
+	}
+	return strings.Join(parts, " AND "), args, nil
+}
+
 // MutateRow executes an UPDATE or DELETE against the SQLite database
 // identified by req.Connection.  req.Source must be the unquoted table name
 // and req.Filter must be a non-empty SQL WHERE expression; both are supplied
@@ -412,8 +444,8 @@ func (m *sqlitePlugin) MutateRow(ctx context.Context, req *plugin.MutateRowReque
 	if req.Source == "" {
 		return &plugin.MutateRowResponse{Success: false, Error: "source (table name) is required"}, nil
 	}
-	if req.Filter == "" {
-		return &plugin.MutateRowResponse{Success: false, Error: "filter (WHERE clause) is required"}, nil
+	if req.Filter == "" && len(req.FilterValues) == 0 {
+		return &plugin.MutateRowResponse{Success: false, Error: "filter (WHERE clause) or filter_values is required"}, nil
 	}
 
 	c := parseCredential(req.Connection)
@@ -430,6 +462,10 @@ func (m *sqlitePlugin) MutateRow(ctx context.Context, req *plugin.MutateRowReque
 
 	var query string
 	var args []interface{}
+	whereClause, whereArgs, err := buildWhereSQLite(req.FilterValues, req.Filter)
+	if err != nil {
+		return &plugin.MutateRowResponse{Success: false, Error: err.Error()}, nil
+	}
 
 	switch req.Operation {
 	case pluginpb.PluginV1_MutateRowRequest_UPDATE:
@@ -444,13 +480,19 @@ func (m *sqlitePlugin) MutateRow(ctx context.Context, req *plugin.MutateRowReque
 		sort.Strings(keys)
 		setParts := make([]string, 0, len(keys))
 		for _, k := range keys {
-			setParts = append(setParts, fmt.Sprintf(`"%s"=?`, escapeDoubleQuoteSQLite(k)))
-			args = append(args, req.Values[k])
+			arg, err := plugin.SQLArgFromValue(req.Values[k])
+			if err != nil {
+				return &plugin.MutateRowResponse{Success: false, Error: err.Error()}, nil
+			}
+			setParts = append(setParts, fmt.Sprintf(`%s=?`, quoteColumnSQLite(k)))
+			args = append(args, arg)
 		}
+		args = append(args, whereArgs...)
 		query = fmt.Sprintf("UPDATE %s SET %s WHERE %s",
-			quoteSourceSQLite(req.Source), strings.Join(setParts, ", "), req.Filter)
+			quoteSourceSQLite(req.Source), strings.Join(setParts, ", "), whereClause)
 	case pluginpb.PluginV1_MutateRowRequest_DELETE:
-		query = fmt.Sprintf("DELETE FROM %s WHERE %s", quoteSourceSQLite(req.Source), req.Filter)
+		args = append(args, whereArgs...)
+		query = fmt.Sprintf("DELETE FROM %s WHERE %s", quoteSourceSQLite(req.Source), whereClause)
 	default:
 		return &plugin.MutateRowResponse{Success: false, Error: "operation not supported"}, nil
 	}

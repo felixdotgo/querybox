@@ -52,6 +52,7 @@ export function useRowEditorModal(buildFilter?: (row: Record<string, unknown>) =
         params.source,
         params.values || {},
         params.filter,
+        params.filterValues || {},
         database,
       )
       if (res && (res.success === false || res.error)) {

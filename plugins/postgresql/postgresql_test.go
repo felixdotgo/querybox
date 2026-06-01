@@ -710,18 +710,28 @@ func TestMutateRowPGUpdate(t *testing.T) {
 	}
 	openPostgresDB = func(dsn string) (*sql.DB, error) { return db, nil }
 
-	// keys are sorted alphabetically: age then name
-	mock.ExpectExec(`UPDATE "users" SET "age"=\$1, "name"=\$2 WHERE id = 1`).
-		WithArgs("25", "Bob").
+	values, err := plugin.NewValueMap(map[string]interface{}{"name": "Bob", "age": float64(25)})
+	if err != nil {
+		t.Fatalf("NewValueMap values: %v", err)
+	}
+	filterValues, err := plugin.NewValueMap(map[string]interface{}{"id": float64(1)})
+	if err != nil {
+		t.Fatalf("NewValueMap filter values: %v", err)
+	}
+
+	// keys are sorted alphabetically: age then name, then filter id
+	mock.ExpectExec(`UPDATE "users" SET "age"=\$1, "name"=\$2 WHERE "id"=\$3`).
+		WithArgs(float64(25), "Bob", float64(1)).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	p := &postgresqlPlugin{}
 	resp, err := p.MutateRow(context.Background(), &pluginpb.PluginV1_MutateRowRequest{
-		Connection: map[string]string{"dsn": "host=localhost sslmode=disable"},
-		Operation:  pluginpb.PluginV1_MutateRowRequest_UPDATE,
-		Source:     "users",
-		Values:     map[string]string{"name": "Bob", "age": "25"},
-		Filter:     "id = 1",
+		Connection:   map[string]string{"dsn": "host=localhost sslmode=disable"},
+		Operation:    pluginpb.PluginV1_MutateRowRequest_UPDATE,
+		Source:       "users",
+		Values:       values,
+		Filter:       "id = 1",
+		FilterValues: filterValues,
 	})
 	if err != nil {
 		t.Fatalf("MutateRow error: %v", err)

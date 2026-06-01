@@ -222,6 +222,18 @@ function pkFilterFor(row) {
   return parts.join(' AND ')
 }
 
+function filterValuesFor(row) {
+  const schemaCols = Array.isArray(props.schema?.columns) ? props.schema.columns : []
+  const pkNames = schemaCols.filter(c => c.primary_key).map(c => c.name)
+  const keys = pkNames.length > 0 ? pkNames : Object.keys(row).filter(key => key !== 'key')
+  const filterValues = {}
+  keys.forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(row, key))
+      filterValues[key] = row[key]
+  })
+  return filterValues
+}
+
 function sourceFrom() {
   return props.schema?.name ?? ''
 }
@@ -259,14 +271,17 @@ function formatCellValue(value) {
 
 const { showEditor, editorOperation, editorRow, editorFilter, editorSource, editorFields, editorFocusField, openEditor, closeEditor, performMutation } = useRowEditorModal()
 const editorRowKey = ref(null)
+const editorFilterValues = ref({})
 const editingRowKey = ref(null)
 const inlineDraftValues = ref({})
 const inlineOriginalFilter = ref('')
+const inlineOriginalFilterValues = ref({})
 
 function resetInlineEdit() {
   editingRowKey.value = null
   inlineDraftValues.value = {}
   inlineOriginalFilter.value = ''
+  inlineOriginalFilterValues.value = {}
 }
 
 function beginInlineEdit(row) {
@@ -274,6 +289,7 @@ function beginInlineEdit(row) {
   editingRowKey.value = row.key
   inlineDraftValues.value = normalizeDraft(named)
   inlineOriginalFilter.value = pkFilterFor(named)
+  inlineOriginalFilterValues.value = filterValuesFor(named)
 }
 
 function openTypedEditor(row, focusField = '') {
@@ -281,6 +297,7 @@ function openTypedEditor(row, focusField = '') {
     ? { ...inlineDraftValues.value }
     : normalizeDraft(namedRow(row))
   editorRowKey.value = row.key
+  editorFilterValues.value = filterValuesFor(namedRow(row))
   openEditor('update', named, sourceFrom(), pkFilterFor(namedRow(row)), buildRowFields(named), focusField)
 }
 
@@ -291,6 +308,7 @@ function handleEdit(row) {
 function handleDelete(row) {
   const named = namedRow(row)
   editorRowKey.value = row.key
+  editorFilterValues.value = filterValuesFor(named)
   openEditor('delete', named, sourceFrom(), pkFilterFor(named), buildRowFields(named))
 }
 
@@ -314,6 +332,7 @@ function saveInlineEdit() {
     source: sourceFrom(),
     values: { ...inlineDraftValues.value },
     filter: inlineOriginalFilter.value,
+    filterValues: { ...inlineOriginalFilterValues.value },
   }
   handleMutation(params, capturedRowKey)
 }
@@ -352,8 +371,13 @@ async function refreshRow(rowKey, source, filter) {
 
 async function handleMutation(params, forcedRowKey = null) {
   const capturedRowKey = forcedRowKey ?? editorRowKey.value
-  await performMutation(props.connection, params, props.database, ({ operation, source, filter } = {}) => {
+  const mutationParams = {
+    ...params,
+    filterValues: params.filterValues || { ...editorFilterValues.value },
+  }
+  await performMutation(props.connection, mutationParams, props.database, ({ operation, source, filter } = {}) => {
     resetInlineEdit()
+    editorFilterValues.value = {}
     if (operation === 'delete')
       emit('mutated')
     else refreshRow(capturedRowKey, source, filter)
