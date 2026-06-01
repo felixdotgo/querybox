@@ -41,24 +41,27 @@ contents:
   - src: "./build/linux/querybox.desktop"
     dst: "/usr/share/applications/querybox.desktop"
 
-# Default dependencies for Ubuntu 24.04+ with Wails v3 GTK4 / WebKitGTK 6.0
+# Default dependencies for Ubuntu/Debian builds using Wails v3 GTK3 / WebKit2GTK 4.1
 depends:
-  - libgtk-4-1
-  - libwebkitgtk-6.0-4
+  - libgtk-3-0 | libgtk-3-0t64
+  - libwebkit2gtk-4.1-0
+  - libsoup-3.0-0
 
 # Distribution-specific overrides for different package formats and WebKit versions
 overrides:
-  # RPM packages for modern Fedora/RHEL-family distributions with WebKitGTK 6.0
+  # RPM packages for Fedora/RHEL-family distributions with WebKit2GTK 4.1
   rpm:
     depends:
-      - gtk4
-      - webkitgtk6.0
+      - gtk3
+      - webkit2gtk4.1
+      - libsoup3
 
-  # Arch Linux packages with WebKitGTK 6.0
+  # Arch Linux packages with WebKit2GTK 4.1
   archlinux:
     depends:
-      - gtk4
-      - webkitgtk-6.0
+      - gtk3
+      - webkit2gtk-4.1
+      - libsoup3
 
 # scripts section to ensure desktop database is updated after install
 scripts:
@@ -72,8 +75,8 @@ scripts:
 # provides:
 #   - bar
 # depends:
-#   - gtk4
-#   - webkitgtk-6.0
+#   - gtk3
+#   - webkit2gtk-4.1
 # recommends:
 #   - whatever
 # suggests:

@@ -19,6 +19,22 @@ red()   { printf '\033[31m%s\033[0m\n' "$*"; }
 green() { printf '\033[32m%s\033[0m\n' "$*"; }
 bold()  { printf '\033[1m%s\033[0m\n' "$*"; }
 die()   { red "Error: $*"; exit 1; }
+fetch_tags() {
+  local output
+  local conflicting_tag
+
+  echo "Fetching tags from remote..."
+  if ! output="$(git fetch --tags 2>&1)"; then
+    [[ -z "$output" ]] || red "$output"
+    if [[ "$output" =~ \-\>\ ([^[:space:]]+)[[:space:]]+\(would\ clobber\ existing\ tag\) ]]; then
+      conflicting_tag="${BASH_REMATCH[1]}"
+      red "Local tag '$conflicting_tag' differs from the remote tag."
+      red "Inspect it with: git show-ref --tags $conflicting_tag && git ls-remote --tags origin $conflicting_tag"
+      red "If the remote tag is correct, delete the local tag with: git tag -d $conflicting_tag"
+    fi
+    die "Could not fetch tags. Resolve the Git tag issue above, then rerun this script."
+  fi
+}
 
 # ── args ──────────────────────────────────────────────────────────────────────
 PLUGIN="${1:-}"
@@ -67,7 +83,7 @@ BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 
 [[ -z "$(git status --porcelain)" ]] || die "Working tree is not clean. Commit or stash changes first."
 
-git fetch --tags --quiet
+fetch_tags
 
 [[ -z "$(git tag -l "$TAG")" ]] || die "Tag '$TAG' already exists."
 
