@@ -117,6 +117,67 @@ func TestResourceGraphGroupsKeysByType(t *testing.T) {
 	}
 }
 
+func TestResourceGraphScanMarkerExposesInspectAction(t *testing.T) {
+	restore := stubRedisDialer(t, func(args []string) string {
+		switch strings.ToUpper(args[0]) {
+		case "SCAN":
+			return "*2\r\n$2\r\n12\r\n*1\r\n$9\r\nsession-1\r\n"
+		case "TYPE":
+			return "+string\r\n"
+		case "TTL":
+			return ":-1\r\n"
+		default:
+			t.Fatalf("unexpected command: %v", args)
+		}
+		return ""
+	})
+	defer restore()
+
+	p := &redisPlugin{}
+	graph, err := p.ResourceGraph(context.Background(), &plugin.ResourceGraphRequest{
+		Connection: map[string]string{"credential_blob": plugin.MakeTestBlob(map[string]string{"host": "localhost"})},
+	})
+	if err != nil {
+		t.Fatalf("ResourceGraph error: %v", err)
+	}
+	marker := graph.Nodes[len(graph.Nodes)-1]
+	if marker.ID != "__scan_limited__" {
+		t.Fatalf("expected scan marker, got %+v", marker)
+	}
+	if marker.Metadata["scan_cursor"] != "12" {
+		t.Fatalf("unexpected scan cursor metadata: %+v", marker.Metadata)
+	}
+	if len(marker.Actions) != 1 || marker.Actions[0].Query != `SCAN "12" COUNT 50` || !marker.Actions[0].NewTab {
+		t.Fatalf("unexpected marker action: %+v", marker.Actions)
+	}
+}
+
+func TestExecScanReturnsDocumentRows(t *testing.T) {
+	restore := stubRedisDialer(t, func(args []string) string {
+		if !reflect.DeepEqual(args, []string{"SCAN", "12", "COUNT", "2"}) {
+			t.Fatalf("unexpected SCAN args: %v", args)
+		}
+		return "*2\r\n$1\r\n0\r\n*2\r\n$1\r\nb\r\n$1\r\na\r\n"
+	})
+	defer restore()
+
+	p := &redisPlugin{}
+	resp, err := p.Exec(context.Background(), &plugin.ExecRequest{
+		Connection: map[string]string{"credential_blob": plugin.MakeTestBlob(map[string]string{"host": "localhost"})},
+		Query:      `SCAN "12" COUNT 2`,
+	})
+	if err != nil {
+		t.Fatalf("Exec error: %v", err)
+	}
+	docs := resp.GetResult().GetDocument().GetDocuments()
+	if len(docs) != 2 {
+		t.Fatalf("expected 2 docs, got %d", len(docs))
+	}
+	if docs[0].Fields["key"].GetStringValue() != "a" || docs[1].Fields["key"].GetStringValue() != "b" {
+		t.Fatalf("unexpected scan docs: %+v", docs)
+	}
+}
+
 func stubRedisDialer(t *testing.T, handler func(args []string) string) func() {
 	t.Helper()
 	orig := dialRedis

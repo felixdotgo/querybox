@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import { resultViewType, unwrapExecPayload } from '@/lib/resultPayload'
 import ResultViewerDocument from './ResultViewerDocument.vue'
 import ResultViewerKeyValue from './ResultViewerKeyValue.vue'
 import ResultViewerRdbms from './ResultViewerRdbms.vue'
@@ -38,73 +39,12 @@ const props = defineProps({
 defineEmits(['mutated'])
 
 const payload = computed(() => {
-  // Unwrap the ExecResult envelope produced by core-service.
-  // The result coming from the backend may be:
-  //   { columns:…, rows:… }            -- already unwrapped RDBMS
-  //   { sql: {…} }                      -- lowercase sql wrapper
-  //   { Sql: {…} }                      -- capitalised sql wrapper
-  //   { document: {…} }                 -- document wrapper
-  //   { kv: {…} }                       -- kv wrapper
-  //   PluginV1_ExecResult instance       -- JS class with Payload field
-  const result = props.result || {}
-  console.debug('ResultViewer received result prop', result)
-
-  let r = result
-
-  // unwrap protobuf class envelope
-  if (r && typeof r === 'object' && 'Payload' in r) {
-    r = r.Payload
-  }
-
-  // first unwrap pass
-  if (r.sql)
-    r = r.sql
-  else if (r.Sql)
-    r = r.Sql
-  else if (r.document)
-    r = r.document
-  else if (r.Document)
-    r = r.Document
-  else if (r.kv)
-    r = r.kv
-  else if (r.Kv)
-    r = r.Kv
-
-  // second pass in case unwrapping produced another wrapper
-  if (r && typeof r === 'object') {
-    if (r.sql)
-      r = r.sql
-    else if (r.Sql)
-      r = r.Sql
-    else if (r.document)
-      r = r.document
-    else if (r.Document)
-      r = r.Document
-    else if (r.kv)
-      r = r.kv
-    else if (r.Kv)
-      r = r.Kv
-  }
-
-  console.debug('ResultViewer payload computed', r)
-  return r
+  return unwrapExecPayload(props.result)
 })
 
 // Determine which sub-viewer to render based on the payload shape.
 const viewType = computed(() => {
-  const p = payload.value
-  if (!p)
-    return null
-  if (p.columns)
-    return 'rdbms'
-  // proto defines DocumentResult as repeated Struct documents, not a
-  // single "document" field.  previous code wrongly checked p.document and
-  // therefore never activated when plugins returned multiple rows.
-  if (p.documents !== undefined)
-    return 'document'
-  if (p.data !== undefined)
-    return 'kv'
-  return null
+  return resultViewType(payload.value)
 })
 </script>
 

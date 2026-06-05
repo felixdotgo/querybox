@@ -12,10 +12,12 @@ The active backlog starts after the completed foundation work:
 
 ## Roadmap
 
-### Phase 2: deepen the first non-database workflow
+### Phase 2.1: Redis workflow hardening
 
 - strengthen the Redis validation slice around `browse -> open -> inspect -> action`
 - continue generalizing result handlers and resource actions beyond SQL-only assumptions
+- cover Redis-style key/value and document result routing with focused frontend tests
+- keep stream/session design out of this phase unless a Redis validation gap proves it is required
 
 ### Phase 3: sessions and streaming
 

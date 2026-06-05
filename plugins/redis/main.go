@@ -134,7 +134,7 @@ func (m *redisPlugin) ResourceGraph(ctx context.Context, req *plugin.ResourceGra
 	}
 	defer client.Close()
 
-	keys, nextCursor, err := client.scanKeys(ctx, defaultScanCount)
+	keys, nextCursor, err := client.scanKeys(ctx, "0", defaultScanCount)
 	if err != nil {
 		return nil, fmt.Errorf("redis: scan failed: %w", err)
 	}
@@ -225,6 +225,15 @@ func (m *redisPlugin) ResourceGraph(ctx context.Context, req *plugin.ResourceGra
 				"scan_cursor": nextCursor,
 				"scan_count":  strconv.Itoa(defaultScanCount),
 			},
+			Actions: []*plugin.ResourceAction{
+				{
+					ID:     "select",
+					Kind:   "select",
+					Title:  "Inspect next scan page",
+					Query:  fmt.Sprintf("SCAN %s COUNT %d", strconv.Quote(nextCursor), defaultScanCount),
+					NewTab: true,
+				},
+			},
 		})
 	}
 
@@ -297,6 +306,39 @@ func (m *redisPlugin) Exec(ctx context.Context, req *plugin.ExecRequest) (*plugi
 			return kvResponse(map[string]string{"key": args[1], "exists": "false"}), nil
 		}
 		return kvResponse(map[string]string{"key": args[1], "value": value}), nil
+	case "SCAN":
+		cursor := "0"
+		count := defaultScanCount
+		if len(args) >= 2 {
+			cursor = args[1]
+		}
+		for i := 2; i < len(args); i += 2 {
+			if strings.EqualFold(args[i], "COUNT") {
+				if i+1 >= len(args) {
+					return &plugin.ExecResponse{Error: "redis: SCAN COUNT requires a value"}, nil
+				}
+				parsed, err := strconv.Atoi(args[i+1])
+				if err != nil || parsed <= 0 {
+					return &plugin.ExecResponse{Error: "redis: SCAN COUNT must be a positive integer"}, nil
+				}
+				count = parsed
+				continue
+			}
+			return &plugin.ExecResponse{Error: fmt.Sprintf("redis: unsupported SCAN option %q", args[i])}, nil
+		}
+		keys, nextCursor, err := client.scanKeys(ctx, cursor, count)
+		if err != nil {
+			return &plugin.ExecResponse{Error: fmt.Sprintf("redis: scan failed: %v", err)}, nil
+		}
+		sort.Strings(keys)
+		docs := make([]map[string]any, 0, len(keys)+1)
+		for _, key := range keys {
+			docs = append(docs, map[string]any{"key": key})
+		}
+		if nextCursor != "0" {
+			docs = append(docs, map[string]any{"next_cursor": nextCursor, "count": float64(count)})
+		}
+		return documentResponse(docs)
 	case "DEL":
 		deleted, err := client.integerCommand(ctx, args...)
 		if err != nil {
@@ -579,20 +621,20 @@ func (c *redisClient) streamEntriesCommand(ctx context.Context, args ...string) 
 	return out, nil
 }
 
-func (c *redisClient) scanKeys(ctx context.Context, count int) ([]string, string, error) {
-	value, err := c.command(ctx, "SCAN", "0", "COUNT", strconv.Itoa(count))
+func (c *redisClient) scanKeys(ctx context.Context, cursor string, count int) ([]string, string, error) {
+	value, err := c.command(ctx, "SCAN", cursor, "COUNT", strconv.Itoa(count))
 	if err != nil {
 		return nil, "", err
 	}
 	if value.kind != '*' || len(value.array) != 2 {
 		return nil, "", fmt.Errorf("unexpected SCAN response")
 	}
-	cursor := value.array[0].text
+	nextCursor := value.array[0].text
 	keys, err := arrayAsStrings(value.array[1])
 	if err != nil {
 		return nil, "", err
 	}
-	return keys, cursor, nil
+	return keys, nextCursor, nil
 }
 
 func splitRedisCommand(input string) ([]string, error) {
