@@ -4,7 +4,7 @@
 
 ```bash
 go install github.com/go-task/task/v3/cmd/task@latest
-go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.98
 go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.10
 go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.1
 ```

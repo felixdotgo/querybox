@@ -8,6 +8,9 @@ on:
 permissions:
   contents: write
 
+env:
+  WAILS_CLI_VERSION: v3.0.0-alpha.98
+
 jobs:
   build-linux:
     name: Build (Linux)
@@ -36,9 +39,7 @@ jobs:
 
       - name: Install wails3 CLI
         shell: bash
-        run: |
-          WAILS_VERSION="$(go list -m -f '{{.Version}}' github.com/wailsapp/wails/v3)"
-          go install github.com/wailsapp/wails/v3/cmd/wails3@"${WAILS_VERSION}"
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@"${WAILS_CLI_VERSION}"
 
       - name: Build frontend
         run: cd frontend && npm ci && npm run build
@@ -102,9 +103,7 @@ jobs:
 
       - name: Install wails3 CLI
         shell: bash
-        run: |
-          WAILS_VERSION="$(go list -m -f '{{.Version}}' github.com/wailsapp/wails/v3)"
-          go install github.com/wailsapp/wails/v3/cmd/wails3@"${WAILS_VERSION}"
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@"${WAILS_CLI_VERSION}"
 
       - name: Build frontend
         run: cd frontend && npm ci && npm run build
@@ -162,9 +161,7 @@ jobs:
 
       - name: Install wails3 CLI
         shell: bash
-        run: |
-          WAILS_VERSION="$(go list -m -f '{{.Version}}' github.com/wailsapp/wails/v3)"
-          go install github.com/wailsapp/wails/v3/cmd/wails3@"${WAILS_VERSION}"
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@"${WAILS_CLI_VERSION}"
 
       - name: Build frontend
         run: cd frontend && npm ci && npm run build

@@ -6,7 +6,7 @@
 |------|---------|---------|
 | Go | `>=1.26.1` | Backend and plugin builds |
 | Node.js | `>=24` | Frontend tooling |
-| Wails v3 CLI | current v3 alpha used by the repo | Desktop runtime and packaging |
+| Wails v3 CLI | `v3.0.0-alpha.98` | Desktop runtime and packaging |
 | Task | latest | Build automation |
 
 ## Optional code generation prerequisites

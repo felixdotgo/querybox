@@ -19,7 +19,7 @@ Today's implementation is still strongest on database workflows, but the product
 | Tool | Version | Purpose |
 |------|---------|---------|
 | [Go](https://go.dev/dl/) | >=1.26.1 | Backend |
-| [Wails v3](https://v3alpha.wails.io/getting-started/installation/) | v3 alpha | Desktop framework |
+| [Wails v3](https://v3.wails.io/getting-started/installation/) | v3.0.0-alpha.98 | Desktop framework |
 | [Task](https://taskfile.dev/installation/) | latest | Build automation |
 | [Node.js](https://nodejs.org/) | >=24 | Frontend tooling |
 | [protoc](https://grpc.io/docs/protoc-installation/) + [protoc-gen-go](https://pkg.go.dev/google.golang.org/protobuf/cmd/protoc-gen-go) + [protoc-gen-go-grpc](https://pkg.go.dev/google.golang.org/grpc/cmd/protoc-gen-go-grpc) | libprotoc 29.6 / protoc-gen-go v1.36.10 / protoc-gen-go-grpc v1.6.1 | gRPC code generation (only if modifying `.proto` files) |
@@ -35,7 +35,7 @@ go install github.com/go-task/task/v3/cmd/task@latest
 npm install -g taskfile
 
 # Install Wails CLI
-go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.98
 
 # Install protoc-gen-go (only needed if modifying .proto files)
 go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.10
