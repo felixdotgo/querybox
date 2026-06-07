@@ -62,6 +62,27 @@ func TestExecGetReturnsKeyValue(t *testing.T) {
 	}
 }
 
+func TestTestConnectionPingsRedis(t *testing.T) {
+	restore := stubRedisDialer(t, func(args []string) string {
+		if !reflect.DeepEqual(args, []string{"PING"}) {
+			t.Fatalf("unexpected PING args: %v", args)
+		}
+		return "+PONG\r\n"
+	})
+	defer restore()
+
+	p := &redisPlugin{}
+	resp, err := p.TestConnection(context.Background(), &plugin.TestConnectionRequest{
+		Connection: map[string]string{"credential_blob": plugin.MakeTestBlob(map[string]string{"host": "localhost"})},
+	})
+	if err != nil {
+		t.Fatalf("TestConnection error: %v", err)
+	}
+	if !resp.Ok || resp.Message != "PONG" {
+		t.Fatalf("unexpected test connection response: %+v", resp)
+	}
+}
+
 func TestResourceGraphGroupsKeysByType(t *testing.T) {
 	restore := stubRedisDialer(t, func(args []string) string {
 		switch strings.ToUpper(args[0]) {
