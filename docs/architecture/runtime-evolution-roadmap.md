@@ -10,6 +10,7 @@ The active backlog starts after the completed foundation work:
 - `RuntimeManager` exists with the local runtime path
 - Redis is the first shipped non-database MVP slice
 - release scripts exist for app and bundled-plugin release preparation
+- release smoke validation covers bundled plugin metadata, plugin builds, targeted runtime tests, and optional app artifact presence
 
 ## Roadmap
 
@@ -22,10 +23,10 @@ The active backlog starts after the completed foundation work:
 
 ### Phase 2.2: product quality and release confidence
 
-- polish the primary user journeys around connection setup, resource browsing, result inspection, and edit/delete actions
-- make loading, empty, and error states concrete across connection, plugin, resource, result, and mutation failures
+- continue polishing the primary user journeys around connection setup, resource browsing, result inspection, and edit/delete actions
+- continue making loading, empty, and error states concrete across connection, plugin, resource, result, and mutation failures
 - keep Redis and other non-SQL workflows from feeling secondary to table-result workflows
-- add a release smoke path that verifies app startup, bundled plugin discovery, basic connection tests, and packaged artifact sanity
+- keep release smoke validation current as app startup, bundled plugin discovery, basic connection tests, and packaged artifact checks evolve
 - keep release docs, artifact names, plugin metadata, and platform prerequisites aligned
 
 ### Phase 3: sessions and streaming

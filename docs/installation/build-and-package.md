@@ -24,4 +24,20 @@ GOOS=windows GOARCH=amd64 task build:plugins
 - On startup, QueryBox copies bundled plugins into the per-user plugin directory and then scans both the user directory and bundled directory.
 - The user directory takes precedence when the same plugin name exists in both locations.
 
+## Release smoke
+
+Before tagging a release candidate, run:
+
+```bash
+bash scripts/smoke-release.sh
+```
+
+After `wails3 build`, require an app artifact check:
+
+```bash
+bash scripts/smoke-release.sh --require-app-artifact
+```
+
+The smoke validates bundled plugin metadata, sidecar manifests, targeted plugin/runtime tests, and the app artifact presence when requested.
+
 See [Release process](../development/release-process.md) for versioning, release notes, and plugin release workflow.

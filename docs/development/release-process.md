@@ -2,7 +2,19 @@
 
 ## App release
 
+- Run the local release smoke before tagging:
+
+```bash
+bash scripts/smoke-release.sh
+```
+
 - Build the desktop application with `wails3 build`.
+- For a release-candidate artifact check after the app build, run:
+
+```bash
+bash scripts/smoke-release.sh --require-app-artifact
+```
+
 - Ensure version information is embedded correctly before packaging.
 - Generate release notes against the previous `v*` app tag, not an arbitrary git range.
 
@@ -14,6 +26,7 @@
 
 ## Important files
 
+- `scripts/smoke-release.sh`
 - `scripts/release-app.sh`
 - `scripts/release-plugin.sh`
 - `scripts/check-plugin-release.sh`
@@ -21,7 +34,8 @@
 
 ## Verification checklist
 
-1. Build app and bundled plugins.
-2. Verify manifests exist beside plugin binaries.
-3. Verify release-note boundaries use the correct previous app tag.
-4. Recheck docs links if release behavior or artifact layout changed.
+1. Run `bash scripts/smoke-release.sh`.
+2. Build the app with `wails3 build`.
+3. Run `bash scripts/smoke-release.sh --require-app-artifact`.
+4. Verify release-note boundaries use the correct previous app tag.
+5. Recheck docs links if release behavior or artifact layout changed.
