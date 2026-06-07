@@ -32,11 +32,23 @@ function unwrapResultVariant(value: unknown): unknown {
   return value
 }
 
+function normalizeTopLevelKeys(value: unknown): unknown {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    return value
+
+  const out: Record<string, unknown> = {}
+  for (const [key, fieldValue] of Object.entries(value as Record<string, unknown>)) {
+    const normalizedKey = key.charAt(0).toLowerCase() + key.slice(1)
+    out[normalizedKey] = fieldValue
+  }
+  return out
+}
+
 export function unwrapExecPayload(result: unknown): unknown {
   let current = unwrapPayloadEnvelope(result || {})
   current = unwrapResultVariant(current)
   current = unwrapResultVariant(current)
-  return current
+  return normalizeTopLevelKeys(current)
 }
 
 export function resultViewType(payload: unknown): ResultViewType {

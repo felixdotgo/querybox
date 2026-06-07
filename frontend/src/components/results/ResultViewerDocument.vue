@@ -101,7 +101,7 @@ const docs = computed(() => {
       </div>
     </template>
     <div v-else class="text-center text-gray-500 py-6 text-sm">
-      (no documents)
+      No documents
     </div>
     <RowEditorModal
       v-model:show="showEditor"

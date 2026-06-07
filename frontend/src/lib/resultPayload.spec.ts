@@ -43,4 +43,19 @@ describe('resultPayload', () => {
     expect(payload).toEqual({ documents: [{ key: 'a' }, { key: 'b' }] })
     expect(resultViewType(payload)).toBe('document')
   })
+
+  it('normalizes capitalized protobuf fields after unwrapping', () => {
+    const payload = unwrapExecPayload({
+      Payload: {
+        Document: {
+          Documents: [
+            { key: 'session:1' },
+          ],
+        },
+      },
+    })
+
+    expect(payload).toEqual({ documents: [{ key: 'session:1' }] })
+    expect(resultViewType(payload)).toBe('document')
+  })
 })

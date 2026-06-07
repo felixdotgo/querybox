@@ -76,8 +76,8 @@ const viewType = computed(() => {
       :query="props.query"
       @mutated="$emit('mutated')"
     />
-    <div v-else class="text-gray-500">
-      No Results
+    <div v-else class="h-full w-full p-4 text-sm text-gray-500">
+      No supported result payload
     </div>
   </div>
 </template>

@@ -334,8 +334,8 @@ defineExpose({ openTab })
                   >
 {{ tab.error }}
                   </pre>
-                  <div v-else class="text-gray-500 p-4">
-                    No Results
+                  <div v-else class="text-gray-500 p-4 text-sm">
+                    No result returned by this action
                   </div>
                 </template>
               </n-tab-pane>
@@ -357,8 +357,8 @@ defineExpose({ openTab })
               </n-tab-pane>
             </n-tabs>
           </div>
-          <div v-else-if="tab.type !== 'welcome'" class="text-gray-500 p-4">
-            No Results
+          <div v-else-if="tab.type !== 'welcome'" class="text-gray-500 p-4 text-sm">
+            Waiting for a result
           </div>
         </template>
       </n-tab-pane>

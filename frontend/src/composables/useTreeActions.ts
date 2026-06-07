@@ -11,6 +11,7 @@ import {
   TestConnection,
 } from '@/bindings/github.com/felixdotgo/querybox/services/pluginmgr/manager'
 import { extractDatabase } from '@/lib/nodeKey'
+import { unwrapExecPayload } from '@/lib/resultPayload'
 
 /** Node types that immediately trigger a select action on click. */
 const INSTANT_SELECT_TYPES = new Set(['table', 'collection', 'key', 'view', 'foreign-table'])
@@ -188,29 +189,7 @@ export function useTreeActions({
       if (!res)
         return
 
-      let payload: unknown = res.result || {}
-      if (payload && typeof payload === 'object' && 'Payload' in payload) {
-        payload = (payload as { Payload?: unknown }).Payload ?? payload
-      }
-
-      if (payload && typeof payload === 'object' && 'Sql' in payload)
-        payload = (payload as { Sql?: unknown }).Sql ?? payload
-      else if (payload && typeof payload === 'object' && 'Document' in payload)
-        payload = (payload as { Document?: unknown }).Document ?? payload
-      else if (payload && typeof payload === 'object' && 'Kv' in payload)
-        payload = (payload as { Kv?: unknown }).Kv ?? payload
-
-      const normalizeKeys = (obj: unknown): unknown => {
-        if (!obj || typeof obj !== 'object')
-          return obj
-        const out: Record<string, unknown> = {}
-        for (const key of Object.keys(obj)) {
-          const lower = key.charAt(0).toLowerCase() + key.slice(1)
-          out[lower] = (obj as Record<string, unknown>)[key]
-        }
-        return out
-      }
-      payload = normalizeKeys(payload)
+      const payload = unwrapExecPayload(res.result)
 
       const context = {
         conn,

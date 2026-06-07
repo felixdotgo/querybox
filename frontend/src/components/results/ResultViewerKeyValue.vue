@@ -41,6 +41,7 @@ const showDelete = computed(() => {
 
 // Normalise: payload may be { data: {...} } or a flat object of k/v pairs.
 const entries = computed(() => props.payload.data || props.payload || {})
+const hasEntries = computed(() => Object.keys(entries.value).length > 0)
 
 const {
   showEditor,
@@ -65,7 +66,7 @@ async function handleMutation(params) {
 </script>
 
 <template>
-  <n-descriptions bordered column="1">
+  <n-descriptions v-if="hasEntries" bordered column="1">
     <n-descriptions-item
       v-for="(v, k) in entries"
       :key="k"
@@ -90,6 +91,9 @@ async function handleMutation(params) {
       {{ v }}
     </n-descriptions-item>
   </n-descriptions>
+  <div v-else class="text-center text-gray-500 py-6 text-sm">
+    No key/value entries
+  </div>
   <RowEditorModal
     v-model:show="showEditor"
     :operation="editorOperation"
