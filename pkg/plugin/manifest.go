@@ -12,15 +12,15 @@ const (
 )
 
 var SupportedCapabilitiesV1 = map[string]struct{}{
-	"connection.test":    {},
-	"explain-query":      {},
-	"mutate-row":         {},
-	"mutate-row::delete": {},
-	"mutate-row::edit":   {},
-	"query.execute":      {},
-	"resource.graph":     {},
-	"schema.inspect":     {},
-	"stream.read":        {},
+	"connection.test":   {},
+	"query.execute":     {},
+	"query.explain":     {},
+	"resource.graph":    {},
+	"row.mutate":        {},
+	"row.mutate.delete": {},
+	"row.mutate.edit":   {},
+	"schema.inspect":    {},
+	"stream.read":       {},
 }
 
 type Manifest struct {

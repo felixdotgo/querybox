@@ -7,10 +7,10 @@
 - `stream.read`
 - `connection.test`
 - `schema.inspect`
-- `explain-query`
-- `mutate-row`
-- `mutate-row::edit`
-- `mutate-row::delete`
+- `query.explain`
+- `row.mutate`
+- `row.mutate.edit`
+- `row.mutate.delete`
 
 ## Usage rules
 
@@ -18,8 +18,8 @@
 - Do not use legacy names such as `query` or `describe-schema`.
 - Use `resource.graph` for browseable plugins.
 - Use `schema.inspect` for schema and completion metadata flows.
-- Use `explain-query` only when the plugin understands the execution option.
-- Use `mutate-row::*` when support is narrower than full edit plus delete behavior.
+- Use `query.explain` only when the plugin understands the `options["explain-query"]` execution option.
+- Use `row.mutate.*` when support is narrower than full edit plus delete behavior.
 
 ## Relationship to manifests
 

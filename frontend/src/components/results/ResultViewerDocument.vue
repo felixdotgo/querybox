@@ -28,18 +28,18 @@ const props = defineProps({
 const emit = defineEmits(['mutated'])
 
 // Capability-gated visibility for mutation actions.
-const showActions = computed(() => props.capabilities.includes('mutate-row'))
+const showActions = computed(() => props.capabilities.includes('row.mutate'))
 const showEdit = computed(() => {
   if (!showActions.value)
     return false
-  const hasSub = props.capabilities.includes('mutate-row::edit') || props.capabilities.includes('mutate-row::delete')
-  return !hasSub || props.capabilities.includes('mutate-row::edit')
+  const hasSub = props.capabilities.includes('row.mutate.edit') || props.capabilities.includes('row.mutate.delete')
+  return !hasSub || props.capabilities.includes('row.mutate.edit')
 })
 const showDelete = computed(() => {
   if (!showActions.value)
     return false
-  const hasSub = props.capabilities.includes('mutate-row::edit') || props.capabilities.includes('mutate-row::delete')
-  return !hasSub || props.capabilities.includes('mutate-row::delete')
+  const hasSub = props.capabilities.includes('row.mutate.edit') || props.capabilities.includes('row.mutate.delete')
+  return !hasSub || props.capabilities.includes('row.mutate.delete')
 })
 
 const {

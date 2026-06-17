@@ -12,7 +12,8 @@
   "capabilities": [
     "resource.graph",
     "connection.test",
-    "query.execute"
+    "query.execute",
+    "row.mutate"
   ],
   "tags": [
     "template",

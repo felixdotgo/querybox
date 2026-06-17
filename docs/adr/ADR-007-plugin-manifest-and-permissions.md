@@ -40,10 +40,10 @@ The current supported capability taxonomy is:
 - `stream.read`
 - `connection.test`
 - `schema.inspect`
-- `explain-query`
-- `mutate-row`
-- `mutate-row::edit`
-- `mutate-row::delete`
+- `query.explain`
+- `row.mutate`
+- `row.mutate.edit`
+- `row.mutate.delete`
 
 Discovery loads and validates the manifest before execution. The manifest is the source of truth for both runtime-sensitive fields and host-visible plugin metadata. `info` is no longer part of discovery.
 

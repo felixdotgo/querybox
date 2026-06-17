@@ -12,8 +12,8 @@ func TestValidateManifestAllowsExtendedCapabilities(t *testing.T) {
 			"resource.graph",
 			"query.execute",
 			"schema.inspect",
-			"explain-query",
-			"mutate-row",
+			"query.explain",
+			"row.mutate",
 		},
 		Limits: Limits{TimeoutSeconds: 30},
 	}

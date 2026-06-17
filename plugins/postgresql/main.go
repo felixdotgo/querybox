@@ -30,7 +30,7 @@ func (m *postgresqlPlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRe
 		Description:  "PostgreSQL database driver",
 		Url:          "https://www.postgresql.org/",
 		Author:       "QueryBox Team",
-		Capabilities: []string{"resource.graph", "connection.test", "query.execute", "schema.inspect", "explain-query", "mutate-row"},
+		Capabilities: []string{"resource.graph", "connection.test", "query.execute", "schema.inspect", "query.explain", "row.mutate"},
 		Tags:         []string{"sql", "relational"},
 		License:      "MIT",
 		IconUrl:      "https://www.postgresql.org/media/img/about/press/elephant.png",

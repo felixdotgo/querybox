@@ -14,8 +14,8 @@
     "connection.test",
     "query.execute",
     "schema.inspect",
-    "explain-query",
-    "mutate-row"
+    "query.explain",
+    "row.mutate"
   ],
   "tags": [
     "sql",

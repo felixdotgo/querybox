@@ -35,7 +35,7 @@ onMounted(() => {
 })
 
 function supportsExplain(tab) {
-  return !!(tab && tab.context && Array.isArray(tab.context.capabilities) && tab.context.capabilities.includes('explain-query'))
+  return !!(tab && tab.context && Array.isArray(tab.context.capabilities) && tab.context.capabilities.includes('query.explain'))
 }
 
 function handleExplain(tab) {

@@ -21,7 +21,7 @@ func (t *templatePlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRequ
 		Description:  "Template plugin (on-demand)",
 		Url:          "https://example.com/template-plugin",
 		Author:       "Querybox Core Team",
-		Capabilities: []string{"query.execute", "resource.graph", "mutate-row"},
+		Capabilities: []string{"query.execute", "resource.graph", "connection.test", "row.mutate"},
 		Tags:         []string{"template", "sample"},
 		License:      "MIT",
 		IconUrl:      "https://example.com/icon.png",

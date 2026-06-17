@@ -28,10 +28,10 @@ QueryBox standardizes on one manifest-declared capability taxonomy:
 
 ### Feature and UI extension capabilities
 
-- `explain-query`
-- `mutate-row`
-- `mutate-row::edit`
-- `mutate-row::delete`
+- `query.explain`
+- `row.mutate`
+- `row.mutate.edit`
+- `row.mutate.delete`
 
 Rules:
 

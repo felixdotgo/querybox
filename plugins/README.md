@@ -59,10 +59,10 @@ Use only the current capability names:
 - `stream.read`
 - `connection.test`
 - `schema.inspect`
-- `explain-query`
-- `mutate-row`
-- `mutate-row::edit`
-- `mutate-row::delete`
+- `query.explain`
+- `row.mutate`
+- `row.mutate.edit`
+- `row.mutate.delete`
 
 Do not introduce or keep legacy names such as:
 
@@ -75,9 +75,9 @@ Do not introduce or keep legacy names such as:
 - Declare `query.execute` if the plugin accepts `exec`.
 - Declare `connection.test` if the plugin implements connectivity checks.
 - Declare `schema.inspect` if the plugin implements `describe-schema` or completion/schema metadata.
-- Declare `explain-query` only if `exec` understands `options["explain-query"]`.
-- Declare `mutate-row` for editable results.
-- Add `mutate-row::edit` and/or `mutate-row::delete` when mutation support is narrower than full edit+delete.
+- Declare `query.explain` only if `exec` understands `options["explain-query"]`.
+- Declare `row.mutate` for editable results.
+- Add `row.mutate.edit` and/or `row.mutate.delete` when mutation support is narrower than full edit+delete.
 
 ## Authoring Guardrails
 

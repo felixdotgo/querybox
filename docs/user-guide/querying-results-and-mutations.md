@@ -12,9 +12,9 @@ The frontend renders the result according to its payload shape and the action th
 
 ## Current behavior
 
-- SQL drivers support query execution, explain-query flows, and row mutation.
+- SQL drivers support query execution, query explain flows, and row mutation.
 - The Redis MVP supports bounded browse and inspect flows without requiring sessions or streaming.
-- When a plugin advertises `mutate-row`, the UI can expose edit and delete affordances for returned records.
+- When a plugin advertises `row.mutate`, the UI can expose edit and delete affordances for returned records.
 
 ## Important limits
 

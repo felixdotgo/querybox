@@ -63,10 +63,10 @@ allowed = {
     "stream.read",
     "connection.test",
     "schema.inspect",
-    "explain-query",
-    "mutate-row",
-    "mutate-row::edit",
-    "mutate-row::delete",
+    "query.explain",
+    "row.mutate",
+    "row.mutate.edit",
+    "row.mutate.delete",
 }
 
 errors = []
