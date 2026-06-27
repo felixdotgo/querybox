@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue'
-import { resultViewType, unwrapExecPayload } from '@/lib/resultPayload'
+import { isEmptyExecPayload, resultViewType, unwrapExecPayload } from '@/lib/resultPayload'
 import ResultViewerDocument from './ResultViewerDocument.vue'
 import ResultViewerKeyValue from './ResultViewerKeyValue.vue'
 import ResultViewerRdbms from './ResultViewerRdbms.vue'
@@ -46,6 +46,20 @@ const payload = computed(() => {
 const viewType = computed(() => {
   return resultViewType(payload.value)
 })
+
+const isEmptyPayload = computed(() => isEmptyExecPayload(payload.value))
+
+const prettyPayload = computed(() => {
+  const value = payload.value
+  if (typeof value === 'string')
+    return value
+  try {
+    return JSON.stringify(value, null, 2)
+  }
+  catch {
+    return String(value)
+  }
+})
 </script>
 
 <template>
@@ -76,8 +90,14 @@ const viewType = computed(() => {
       :query="props.query"
       @mutated="$emit('mutated')"
     />
-    <div v-else class="h-full w-full p-4 text-sm text-gray-500">
-      No supported result payload
+    <div v-else-if="isEmptyPayload" class="flex h-full w-full items-center justify-center p-6 text-center text-sm text-gray-500">
+      No data returned by this action
+    </div>
+    <div v-else class="h-full w-full overflow-auto p-4">
+      <div class="mb-3 text-sm font-medium text-slate-700">
+        Unsupported result payload
+      </div>
+      <pre class="overflow-auto rounded border border-slate-200 bg-slate-50 p-3 font-mono text-xs text-slate-700">{{ prettyPayload }}</pre>
     </div>
   </div>
 </template>

@@ -64,3 +64,33 @@ export function resultViewType(payload: unknown): ResultViewType {
     return 'kv'
   return null
 }
+
+export function isEmptyExecPayload(payload: unknown): boolean {
+  if (payload == null)
+    return true
+
+  if (Array.isArray(payload))
+    return payload.length === 0
+
+  if (typeof payload !== 'object')
+    return false
+
+  const record = payload as Record<string, unknown>
+
+  if (Array.isArray(record.columns) && Array.isArray(record.rows))
+    return record.columns.length === 0 && record.rows.length === 0
+
+  if (record.documents !== undefined) {
+    if (Array.isArray(record.documents))
+      return record.documents.length === 0
+    return false
+  }
+
+  if (record.data !== undefined) {
+    if (!record.data || typeof record.data !== 'object')
+      return false
+    return Object.keys(record.data as Record<string, unknown>).length === 0
+  }
+
+  return Object.keys(record).length === 0
+}

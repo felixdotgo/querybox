@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resultViewType, unwrapExecPayload } from './resultPayload'
+import { isEmptyExecPayload, resultViewType, unwrapExecPayload } from './resultPayload'
 
 describe('resultPayload', () => {
   it('unwraps SQL payloads from protobuf envelopes', () => {
@@ -57,5 +57,18 @@ describe('resultPayload', () => {
 
     expect(payload).toEqual({ documents: [{ key: 'session:1' }] })
     expect(resultViewType(payload)).toBe('document')
+  })
+
+  it('treats empty typed payloads as empty results', () => {
+    expect(isEmptyExecPayload({ columns: [], rows: [] })).toBe(true)
+    expect(isEmptyExecPayload({ documents: [] })).toBe(true)
+    expect(isEmptyExecPayload({ data: {} })).toBe(true)
+    expect(isEmptyExecPayload({})).toBe(true)
+    expect(isEmptyExecPayload(null)).toBe(true)
+  })
+
+  it('keeps unsupported but non-empty payloads visible for fallback rendering', () => {
+    expect(isEmptyExecPayload({ summary: 'ok', count: 1 })).toBe(false)
+    expect(resultViewType({ summary: 'ok', count: 1 })).toBe(null)
   })
 })

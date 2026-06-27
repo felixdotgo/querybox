@@ -144,6 +144,7 @@ check_app_artifact() {
 
 require_cmd python3
 require_cmd go
+require_cmd npm
 
 APP_VERSION="$(read_app_version)"
 [[ "$APP_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "build/config.yml info.version must be semver, got '$APP_VERSION'"
@@ -166,6 +167,7 @@ validate_built_plugin_artifacts
 
 echo "Running targeted smoke tests..."
 go test ./services/pluginmgr ./plugins/redis ./pkg/plugin
+npm --prefix frontend run test -- --run --api=false src/lib/resultPayload.spec.ts src/composables/useTreeActions.spec.ts
 
 check_app_artifact
 

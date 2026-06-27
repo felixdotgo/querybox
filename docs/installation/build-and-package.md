@@ -38,6 +38,6 @@ After `wails3 build`, require an app artifact check:
 bash scripts/smoke-release.sh --require-app-artifact
 ```
 
-The smoke validates bundled plugin metadata, sidecar manifests, targeted plugin/runtime tests, and the app artifact presence when requested.
+The smoke validates bundled plugin metadata, sidecar manifests, targeted plugin/runtime tests, focused frontend result-state specs, and the app artifact presence when requested.
 
 See [Release process](../development/release-process.md) for versioning, release notes, and plugin release workflow.

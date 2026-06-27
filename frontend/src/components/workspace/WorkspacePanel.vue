@@ -1,5 +1,5 @@
 <script setup>
-import { NButton, NIcon, useNotification } from 'naive-ui'
+import { NButton, NEmpty, NIcon, NSpin, useNotification } from 'naive-ui'
 import { onMounted, ref, toRef, watch } from 'vue'
 import { ResultViewer } from '@/components/results'
 import { useResourceGraph } from '@/composables/useResourceGraph'
@@ -266,7 +266,7 @@ defineExpose({ openTab })
       >
         <template #default>
           <WelcomeTab v-if="tab.type === 'welcome'" />
-          <div v-else-if="tab.result || tab.error" class="h-full overflow-hidden">
+          <div v-else-if="tab.result || tab.error || tab.loading" class="h-full overflow-hidden">
             <!-- Query Editor Area -->
             <div
               v-if="tab.context"
@@ -327,15 +327,27 @@ defineExpose({ openTab })
               </template>
               <n-tab-pane name="result" tab="Result" display-directives="show:lazy">
                 <template #default>
-                  <ResultViewer v-if="tab.result" :result="tab.result" :schema="getSchemaForTab(tab)" :database="getDatabaseFromTab(tab)" :connection="tab.context?.conn" :capabilities="tab.context?.capabilities ?? []" :query="tab.query" @mutated="handleRefresh(tab)" />
-                  <pre
-                    v-else-if="tab.error"
-                    class="whitespace-pre-wrap p-4 text-red-600 bg-red-50 flex-1 overflow-auto font-mono text-sm"
-                  >
+                  <div class="relative h-full">
+                    <ResultViewer v-if="tab.result" :result="tab.result" :schema="getSchemaForTab(tab)" :database="getDatabaseFromTab(tab)" :connection="tab.context?.conn" :capabilities="tab.context?.capabilities ?? []" :query="tab.query" @mutated="handleRefresh(tab)" />
+                    <pre
+                      v-else-if="tab.error"
+                      class="whitespace-pre-wrap p-4 text-red-600 bg-red-50 h-full overflow-auto font-mono text-sm"
+                    >
 {{ tab.error }}
-                  </pre>
-                  <div v-else class="text-gray-500 p-4 text-sm">
-                    No result returned by this action
+                    </pre>
+                    <div v-else class="flex h-full items-center justify-center p-4">
+                      <NEmpty :description="tab.loading ? 'Running action...' : 'No result returned by this action'" size="small" />
+                    </div>
+
+                    <div
+                      v-if="tab.loading"
+                      class="absolute inset-0 flex items-center justify-center bg-white/70 backdrop-blur-[1px]"
+                    >
+                      <div class="flex items-center gap-3 rounded border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">
+                        <NSpin :size="18" />
+                        <span>Refreshing result…</span>
+                      </div>
+                    </div>
                   </div>
                 </template>
               </n-tab-pane>
@@ -357,8 +369,8 @@ defineExpose({ openTab })
               </n-tab-pane>
             </n-tabs>
           </div>
-          <div v-else-if="tab.type !== 'welcome'" class="text-gray-500 p-4 text-sm">
-            Waiting for a result
+          <div v-else-if="tab.type !== 'welcome'" class="flex h-full items-center justify-center p-4">
+            <NEmpty description="Run a query or choose a resource action to see results" size="small" />
           </div>
         </template>
       </n-tab-pane>

@@ -39,3 +39,5 @@ bash scripts/smoke-release.sh --require-app-artifact
 3. Run `bash scripts/smoke-release.sh --require-app-artifact`.
 4. Verify release-note boundaries use the correct previous app tag.
 5. Recheck docs links if release behavior or artifact layout changed.
+
+The smoke includes targeted Go runtime tests plus focused frontend Vitest coverage for result routing and error-state handling.
