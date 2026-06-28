@@ -1,6 +1,6 @@
 <script setup>
 import { VueMonacoEditor } from '@guolao/vue-monaco-editor'
-import { NAlert, NButton, NFlex, NForm, NFormItem, NInput, NInputNumber, NModal, NSwitch, NText } from 'naive-ui'
+import { NAlert, NButton, NFlex, NForm, NInput, NInputNumber, NModal, NSwitch, NText } from 'naive-ui'
 import { computed, nextTick, ref, watch } from 'vue'
 import { buildEditorFieldsFromValue, coerceEditorValue } from '@/lib/rowEditor'
 
@@ -226,73 +226,81 @@ function handleJsonMount(key, editor, monaco) {
   <NModal v-model:show="visible" preset="card" :style="{ width: '760px', maxWidth: '96vw' }" :title="modalTitle" closable>
     <div v-if="props.operation === 'update'">
       <NForm>
-        <NFormItem v-for="field in editorFields" :key="field.key" :label="field.label || field.key">
-          <div class="flex w-full flex-col gap-2">
-            <NText v-if="field.rawType" depth="3" class="text-xs">
-              {{ field.rawType }}
-            </NText>
+        <div class="row-editor-fields">
+          <div v-for="field in editorFields" :key="field.key" class="row-editor-field">
+            <div class="row-editor-meta">
+              <div class="row-editor-label" :title="field.label || field.key">
+                {{ field.label || field.key }}
+              </div>
+              <NText v-if="field.rawType" depth="3" class="row-editor-type">
+                {{ field.rawType }}
+              </NText>
+            </div>
 
-            <NInputNumber
-              v-if="field.kind === 'number'"
-              :ref="el => setFieldRef(field.key, el)"
-              v-model:value="localValues[field.key]"
-              class="w-full"
-              :step="getNumberStep(field)"
-              :precision="field.numericMode === 'integer' ? 0 : undefined"
-            />
+            <div class="row-editor-value">
+              <NInputNumber
+                v-if="field.kind === 'number'"
+                :ref="el => setFieldRef(field.key, el)"
+                v-model:value="localValues[field.key]"
+                class="w-full"
+                :step="getNumberStep(field)"
+                :precision="field.numericMode === 'integer' ? 0 : undefined"
+              />
 
-            <NSwitch
-              v-else-if="field.kind === 'boolean'"
-              :ref="el => setFieldRef(field.key, el)"
-              v-model:value="localValues[field.key]"
-            />
-
-            <template v-else-if="field.kind === 'json'">
-              <div class="json-editor-shell">
-                <VueMonacoEditor
-                  :key="jsonEditorKey(field.key)"
+              <div v-else-if="field.kind === 'boolean'" class="row-editor-boolean">
+                <NSwitch
                   :ref="el => setFieldRef(field.key, el)"
-                  v-model:value="jsonDrafts[field.key]"
-                  :path="jsonModelPath(field.key)"
-                  language="json"
-                  default-language="json"
-                  theme="vs-light"
-                  :options="monacoOptions"
-                  width="100%"
-                  height="240px"
-                  class-name="json-editor"
-                  @mount="(editor, monaco) => handleJsonMount(field.key, editor, monaco)"
-                  @update:value="value => updateJsonDraft(field.key, value ?? '')"
+                  v-model:value="localValues[field.key]"
                 />
               </div>
-              <NFlex justify="space-between" align="center">
-                <NButton size="small" secondary @click="beautifyJson(field.key)">
-                  Beautify JSON
-                </NButton>
-                <NText depth="3" class="text-xs">
-                  JSON must be valid before save
-                </NText>
-              </NFlex>
-              <NAlert v-if="jsonErrors[field.key]" type="error" :show-icon="false">
-                {{ jsonErrors[field.key] }}
-              </NAlert>
-            </template>
 
-            <NInput
-              v-else-if="field.kind === 'textarea'"
-              :ref="el => setFieldRef(field.key, el)"
-              v-model:value="localValues[field.key]"
-              type="textarea"
-              :autosize="{ minRows: 3, maxRows: 8 }"
-            />
+              <template v-else-if="field.kind === 'json'">
+                <div class="json-editor-shell">
+                  <VueMonacoEditor
+                    :key="jsonEditorKey(field.key)"
+                    :ref="el => setFieldRef(field.key, el)"
+                    v-model:value="jsonDrafts[field.key]"
+                    :path="jsonModelPath(field.key)"
+                    language="json"
+                    default-language="json"
+                    theme="vs-light"
+                    :options="monacoOptions"
+                    width="100%"
+                    height="240px"
+                    class-name="json-editor"
+                    @mount="(editor, monaco) => handleJsonMount(field.key, editor, monaco)"
+                    @update:value="value => updateJsonDraft(field.key, value ?? '')"
+                  />
+                </div>
+                <NFlex justify="space-between" align="center">
+                  <NButton size="small" secondary @click="beautifyJson(field.key)">
+                    Beautify JSON
+                  </NButton>
+                  <NText depth="3" class="text-xs">
+                    JSON must be valid before save
+                  </NText>
+                </NFlex>
+                <NAlert v-if="jsonErrors[field.key]" type="error" :show-icon="false">
+                  {{ jsonErrors[field.key] }}
+                </NAlert>
+              </template>
 
-            <NInput
-              v-else
-              :ref="el => setFieldRef(field.key, el)"
-              v-model:value="localValues[field.key]"
-            />
+              <NInput
+                v-else-if="field.kind === 'textarea'"
+                :ref="el => setFieldRef(field.key, el)"
+                v-model:value="localValues[field.key]"
+                type="textarea"
+                :autosize="{ minRows: 3, maxRows: 8 }"
+              />
+
+              <NInput
+                v-else
+                :ref="el => setFieldRef(field.key, el)"
+                v-model:value="localValues[field.key]"
+              />
+            </div>
           </div>
-        </NFormItem>
+        </div>
       </NForm>
     </div>
     <div v-else>
@@ -312,6 +320,68 @@ function handleJsonMount(key, editor, monaco) {
 </template>
 
 <style scoped>
+.row-editor-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.row-editor-field {
+  display: grid;
+  grid-template-columns: minmax(160px, 220px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--n-border-color, #e5e7eb) 88%, white);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--n-card-color, #ffffff) 96%, var(--n-primary-color-suppl, #f3f7ff));
+  transition: border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.row-editor-field:focus-within {
+  border-color: var(--n-primary-color, #2563eb);
+  background: color-mix(in srgb, var(--n-primary-color-suppl, #eef4ff) 60%, white);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--n-primary-color, #2563eb) 12%, transparent);
+}
+
+.row-editor-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.row-editor-label {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--n-text-color, #111827);
+  overflow-wrap: anywhere;
+}
+
+.row-editor-type {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1.2;
+  background: color-mix(in srgb, var(--n-border-color, #e5e7eb) 52%, white);
+}
+
+.row-editor-value {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.row-editor-boolean {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+}
+
 .json-editor-shell {
   min-height: 220px;
   border: 1px solid var(--n-border-color, #e5e7eb);
@@ -321,5 +391,13 @@ function handleJsonMount(key, editor, monaco) {
 
 :deep(.json-editor) {
   height: 240px;
+}
+
+@media (max-width: 720px) {
+  .row-editor-field {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 14px;
+  }
 }
 </style>
