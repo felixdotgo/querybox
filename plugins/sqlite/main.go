@@ -26,7 +26,7 @@ func (m *sqlitePlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoReques
 	return &plugin.InfoResponse{
 		Type:         plugin.TypeDriver,
 		Name:         "SQLite",
-		Version:      "0.1.2",
+		Version:      "0.2.0",
 		Description:  "SQLite database driver",
 		Url:          "https://www.sqlite.org/",
 		Author:       "QueryBox Team",

@@ -26,7 +26,7 @@ func (m *mysqlPlugin) Info(ctx context.Context, _ *pluginpb.PluginV1_InfoRequest
 	return &plugin.InfoResponse{
 		Type:         plugin.TypeDriver,
 		Name:         "MySQL",
-		Version:      "0.1.2",
+		Version:      "0.2.0",
 		Description:  "MySQL database driver",
 		Url:          "https://www.mysql.com/",
 		Author:       "QueryBox Team",

@@ -22,7 +22,7 @@ Unicode true
 ## !define INFO_PROJECTNAME    "querybox" # Default "querybox"
 ## !define INFO_COMPANYNAME    "QueryBox Inc." # Default "My Company"
 ## !define INFO_PRODUCTNAME    "QueryBox" # Default "My Product"
-## !define INFO_PRODUCTVERSION "1.0.0"     # Default "0.1.2"
+## !define INFO_PRODUCTVERSION "1.0.0"     # Default "0.2.0"
 ## !define INFO_COPYRIGHT      "(c) 2026, QueryBox Inc." # Default "© 2026, My Company"
 ###
 ## !define PRODUCT_EXECUTABLE  "Application.exe"      # Default "${INFO_PROJECTNAME}.exe"

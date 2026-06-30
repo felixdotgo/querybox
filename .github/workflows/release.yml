@@ -6,6 +6,7 @@ on:
       - 'v[0-9]+.[0-9]+.[0-9]+'
 
 permissions:
+  actions: read
   contents: write
 
 env:
@@ -34,7 +35,8 @@ jobs:
             pkg-config \
             libgtk-3-dev \
             libwebkit2gtk-4.1-dev \
-            libsoup-3.0-dev \
+            libgtk-4-dev \
+            libwebkitgtk-6.0-dev \
             rpm
 
       - name: Install wails3 CLI
@@ -233,9 +235,15 @@ jobs:
             echo "No previous app tag found. GitHub will generate first-release notes."
           fi
 
-      - uses: actions/download-artifact@v4
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
         with:
+          pattern: '*-artifact'
+          path: release-assets
           merge-multiple: true
+
+      - name: List release artifacts
+        run: ls -la release-assets
 
       - uses: softprops/action-gh-release@v2
         with:
@@ -245,10 +253,10 @@ jobs:
           previous_tag: ${{ steps.previous-tag.outputs.value }}
           generate_release_notes: true
           files: |
-            querybox-linux-amd64.tar.gz
-            querybox-linux-amd64.deb
-            querybox-linux-amd64.rpm
-            querybox-darwin-arm64.zip
-            querybox-windows-amd64-installer.exe
+            release-assets/querybox-linux-amd64.tar.gz
+            release-assets/querybox-linux-amd64.deb
+            release-assets/querybox-linux-amd64.rpm
+            release-assets/querybox-darwin-arm64.zip
+            release-assets/querybox-windows-amd64-installer.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

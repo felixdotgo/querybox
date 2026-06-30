@@ -3,7 +3,7 @@
   "type": 1,
   "name": "SQLite",
   "description": "Built-in SQLite driver plugin for QueryBox.",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "url": "https://www.sqlite.org/",
   "author": "QueryBox Team",
   "runtime": {
